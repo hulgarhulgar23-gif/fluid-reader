@@ -29,7 +29,7 @@ enum FrontAppPaster {
         to application: NSRunningApplication?,
         pasteboard: NSPasteboard = .general,
         accessibilityTrusted: () -> Bool = PermissionStatus.accessibilityTrusted,
-        postPasteShortcut: @MainActor () -> Bool = FrontAppPaster.postPasteShortcut,
+        postPasteShortcut: (@MainActor () -> Bool)? = nil,
         activationDelayNanoseconds: UInt64 = FrontAppPaster.activationDelayNanoseconds,
         restoreDelayNanoseconds: UInt64 = FrontAppPaster.restoreDelayNanoseconds
     ) async -> FrontAppPasteResult {
@@ -51,6 +51,7 @@ enum FrontAppPaster {
 
         try? await Task.sleep(nanoseconds: activationDelayNanoseconds)
 
+        let postPasteShortcut = postPasteShortcut ?? FrontAppPaster.postPasteShortcut
         guard postPasteShortcut() else {
             snapshot.restore(to: pasteboard)
             return .eventFailed

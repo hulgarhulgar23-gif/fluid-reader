@@ -19365,7 +19365,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 case .missingCadenceStep:
                     reportNextMoveMissingCadenceStep(
                         activityDetailBase: "copy-next-move-cadence-execution-kit",
-                        errorText: "New handoff missing cadence step.",
+                        errorText: "New handoff missing cadence step."
                     )
                 case .missingDraft:
                     reportNextMoveMissingDraft(
