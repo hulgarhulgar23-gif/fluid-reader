@@ -1,0 +1,6 @@
+| Metric | Previous | Current | Delta |
+| MRR |
+| CAC |
+| LTV/CAC ratio |
+## Signals
+## Next Actions

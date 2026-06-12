@@ -3,6 +3,9 @@ import SwiftUI
 
 @MainActor
 final class RewardHUDController {
+    private static let minContentSize = NSSize(width: 160, height: 54)
+    private static let maxContentSize = NSSize(width: 340, height: 96)
+
     enum Mood {
         case success
         case working
@@ -17,7 +20,12 @@ final class RewardHUDController {
 
         let view = RewardHUDView(title: title, mood: mood, intensity: intensity)
         let hosting = NSHostingController(rootView: view)
-        let size = hosting.view.fittingSize
+        let size = WindowBounds.clampedSize(
+            hosting.view.fittingSize,
+            minimum: Self.minContentSize,
+            maximum: Self.maxContentSize
+        )
+        hosting.view.frame = CGRect(origin: .zero, size: size)
         let screenFrame = NSScreen.main?.visibleFrame ?? .zero
         let origin = CGPoint(
             x: screenFrame.midX - size.width / 2,
@@ -34,23 +42,22 @@ final class RewardHUDController {
             panel.isOpaque = false
             panel.backgroundColor = .clear
             panel.hasShadow = true
+            panel.animationBehavior = .none
+            panel.isReleasedWhenClosed = false
             panel.level = .floating
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
             panel.ignoresMouseEvents = true
+            panel.contentMinSize = Self.minContentSize
+            panel.contentMaxSize = Self.maxContentSize
             self.panel = panel
         }
 
         guard let panel else { return }
         panel.contentViewController = hosting
         panel.setFrame(CGRect(origin: origin, size: size), display: true)
-        panel.alphaValue = 0
+        WindowBounds.clampOrigin(toVisibleScreen: panel)
+        panel.alphaValue = 1
         panel.orderFrontRegardless()
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().alphaValue = 1
-        }
 
         let holdSeconds: TimeInterval = switch mood {
         case .success:
@@ -72,14 +79,8 @@ final class RewardHUDController {
 
     func hide() {
         guard let panel else { return }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().alphaValue = 0
-        } completionHandler: {
-            panel.orderOut(nil)
-        }
+        panel.alphaValue = 0
+        panel.orderOut(nil)
     }
 }
 

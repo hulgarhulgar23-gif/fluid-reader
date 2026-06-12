@@ -1,5 +1,10 @@
 import AppKit
 
+enum SelectionCaptureMode {
+    case lasso
+    case screenshotLine
+}
+
 struct SelectionOverlayResult {
     let image: CGImage
     let pngData: Data?
@@ -7,6 +12,7 @@ struct SelectionOverlayResult {
 
 final class SelectionOverlayView: NSView {
     private let screenImage: CGImage
+    private let mode: SelectionCaptureMode
     private let onDrawStart: () -> Void
     private let onCommit: () -> Void
     private let onFinish: (SelectionOverlayResult) -> Void
@@ -22,12 +28,14 @@ final class SelectionOverlayView: NSView {
 
     init(
         screenImage: CGImage,
+        mode: SelectionCaptureMode = .lasso,
         onDrawStart: @escaping () -> Void,
         onCommit: @escaping () -> Void,
         onFinish: @escaping (SelectionOverlayResult) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.screenImage = screenImage
+        self.mode = mode
         self.onDrawStart = onDrawStart
         self.onCommit = onCommit
         self.onFinish = onFinish
@@ -92,13 +100,27 @@ final class SelectionOverlayView: NSView {
         invalidateCachedPaths()
         onCommit()
 
-        guard points.count > 4,
-              let result = ImageMasker.maskedImage(
-                from: screenImage,
-                viewSize: bounds.size,
-                points: points
-              )
-        else {
+        let result: SelectionOverlayResult?
+        switch mode {
+        case .lasso:
+            result = points.count > 4
+                ? ImageMasker.maskedImage(
+                    from: screenImage,
+                    viewSize: bounds.size,
+                    points: points
+                )
+                : nil
+        case .screenshotLine:
+            result = points.count > 2
+                ? ImageMasker.annotatedScreenshot(
+                    from: screenImage,
+                    viewSize: bounds.size,
+                    points: points
+                )
+                : nil
+        }
+
+        guard let result else {
             onCancel()
             return
         }
@@ -119,6 +141,10 @@ final class SelectionOverlayView: NSView {
         }
 
         guard points.count > 1 else { return }
+        if mode == .screenshotLine {
+            drawScreenshotLine(elapsed: elapsed, pulse: pulse)
+            return
+        }
 
         let paths = currentPaths()
         let fillPath = paths.closed
@@ -139,6 +165,30 @@ final class SelectionOverlayView: NSView {
         NSShadow().set()
         NSColor.white.withAlphaComponent(0.94).setStroke()
         path.lineWidth = 2.2
+        path.stroke()
+
+        drawGlints(elapsed: elapsed, pulse: pulse)
+
+        if let last = points.last {
+            drawPointer(at: last, pulse: pulse)
+        }
+    }
+
+    private func drawScreenshotLine(elapsed: Double, pulse: Double) {
+        let path = currentPaths().open
+
+        let glow = NSShadow()
+        glow.shadowBlurRadius = 10 + pulse * 4
+        glow.shadowColor = NSColor(calibratedRed: 1.0, green: 0.42, blue: 0.68, alpha: 0.48)
+        glow.set()
+
+        NSColor(calibratedRed: 1.0, green: 0.22, blue: 0.48, alpha: 0.78).setStroke()
+        path.lineWidth = 7
+        path.stroke()
+
+        NSShadow().set()
+        NSColor.white.withAlphaComponent(0.90).setStroke()
+        path.lineWidth = 2
         path.stroke()
 
         drawGlints(elapsed: elapsed, pulse: pulse)

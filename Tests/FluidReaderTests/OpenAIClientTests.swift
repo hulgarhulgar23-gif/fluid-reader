@@ -45,6 +45,87 @@ final class OpenAIClientTests: XCTestCase {
         XCTAssertTrue((content[0]["text"] as? String)?.contains("No text was found") == true)
     }
 
+    func testAskBodyIncludesPreviousAnswerWhenAvailable() throws {
+        let data = try OpenAIClient.makeAskBody(
+            question: "Make it shorter",
+            selectedText: "Original text",
+            previousAnswer: "Long answer",
+            imageData: nil,
+            model: "custom-model"
+        )
+        let json = try dictionary(from: data)
+
+        let input = try XCTUnwrap(json["input"] as? [[String: Any]])
+        let message = try XCTUnwrap(input.first)
+        let content = try XCTUnwrap(message["content"] as? [[String: Any]])
+        let text = try XCTUnwrap(content[0]["text"] as? String)
+
+        XCTAssertTrue(text.contains("OCR text:\nOriginal text"))
+        XCTAssertTrue(text.contains("Previous answer:\nLong answer"))
+    }
+
+    func testAskBodySkipsBlankPreviousAnswer() throws {
+        let data = try OpenAIClient.makeAskBody(
+            question: "Explain",
+            selectedText: "Text",
+            previousAnswer: "  ",
+            imageData: nil,
+            model: "custom-model"
+        )
+        let json = try dictionary(from: data)
+
+        let input = try XCTUnwrap(json["input"] as? [[String: Any]])
+        let message = try XCTUnwrap(input.first)
+        let content = try XCTUnwrap(message["content"] as? [[String: Any]])
+        let text = try XCTUnwrap(content[0]["text"] as? String)
+
+        XCTAssertFalse(text.contains("Previous answer:"))
+    }
+
+    func testChatBodyUsesCompatibleShape() throws {
+        let data = try OpenAIClient.makeChatBody(
+            question: "Explain this",
+            selectedText: "Marked text",
+            imageData: Data([4, 5, 6]),
+            model: "chat-model"
+        )
+        let json = try dictionary(from: data)
+
+        XCTAssertEqual(json["model"] as? String, "chat-model")
+        XCTAssertEqual(json["max_tokens"] as? Int, 700)
+
+        let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.count, 2)
+        XCTAssertEqual(messages[0]["role"] as? String, "system")
+        XCTAssertEqual(messages[1]["role"] as? String, "user")
+
+        let content = try XCTUnwrap(messages[1]["content"] as? [[String: Any]])
+        XCTAssertEqual(content.count, 2)
+        XCTAssertEqual(content[0]["type"] as? String, "text")
+        XCTAssertTrue((content[0]["text"] as? String)?.contains("Marked text") == true)
+        XCTAssertEqual(content[1]["type"] as? String, "image_url")
+
+        let imageURL = try XCTUnwrap(content[1]["image_url"] as? [String: Any])
+        XCTAssertTrue((imageURL["url"] as? String)?.hasPrefix("data:image/png;base64,") == true)
+    }
+
+    func testChatBodyIncludesPreviousAnswer() throws {
+        let data = try OpenAIClient.makeChatBody(
+            question: "Follow up",
+            selectedText: "Marked text",
+            previousAnswer: "Earlier answer",
+            imageData: nil,
+            model: "chat-model"
+        )
+        let json = try dictionary(from: data)
+
+        let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
+        let content = try XCTUnwrap(messages[1]["content"] as? [[String: Any]])
+        let text = try XCTUnwrap(content[0]["text"] as? String)
+
+        XCTAssertTrue(text.contains("Previous answer:\nEarlier answer"))
+    }
+
     func testSpeechBodyUsesDefaultsAndLimitsText() throws {
         let longText = String(repeating: "a", count: 8_100)
         let data = try OpenAIClient.makeSpeechBody(

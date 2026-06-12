@@ -13,6 +13,7 @@ final class SelectionController {
     private var onCancelEffect: (() -> Void)?
 
     func start(
+        mode: SelectionCaptureMode = .lasso,
         onDrawStart: @escaping () -> Void,
         onCommit: @escaping () -> Void,
         onCancel: @escaping () -> Void,
@@ -22,8 +23,8 @@ final class SelectionController {
         self.completion = completion
         onCancelEffect = onCancel
 
-        guard screenCaptureAllowed() else {
-            CGRequestScreenCaptureAccess()
+        guard PermissionStatus.screenRecordingAllowed() else {
+            PermissionStatus.requestScreenRecordingAccess()
             showScreenAccessAlert()
             self.completion = nil
             onCancelEffect = nil
@@ -49,6 +50,7 @@ final class SelectionController {
         for (screen, image) in captures {
             let view = SelectionOverlayView(
                 screenImage: image,
+                mode: mode,
                 onDrawStart: onDrawStart,
                 onCommit: onCommit,
                 onFinish: { [weak self] result in
@@ -70,20 +72,16 @@ final class SelectionController {
             window.isOpaque = false
             window.backgroundColor = .clear
             window.hasShadow = false
+            window.animationBehavior = .none
+            window.isReleasedWhenClosed = false
             window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)))
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
             window.ignoresMouseEvents = false
             window.acceptsMouseMovedEvents = true
             window.makeKeyAndOrderFront(nil)
-            window.alphaValue = 0
             window.makeFirstResponder(view)
             windows.append(window)
 
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.10
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                window.animator().alphaValue = 1
-            }
         }
 
         NSApp.activate(ignoringOtherApps: true)
@@ -95,7 +93,7 @@ final class SelectionController {
         self.completion = nil
         onCancelEffect = nil
 
-        closeWindows(animated: true) {
+        closeWindows {
             selectedCompletion?(selected)
         }
     }
@@ -104,36 +102,19 @@ final class SelectionController {
         onCancelEffect?()
         completion = nil
         onCancelEffect = nil
-        closeWindows(animated: true)
+        closeWindows()
     }
 
-    private func closeWindows(animated: Bool, completion: (() -> Void)? = nil) {
+    private func closeWindows(completion: (() -> Void)? = nil) {
         let closingWindows = windows
         windows.removeAll()
 
-        guard animated, !closingWindows.isEmpty else {
-            closingWindows.forEach { $0.close() }
-            completion?()
-            return
+        closingWindows.forEach { window in
+            window.ignoresMouseEvents = true
+            window.contentView = nil
+            window.close()
         }
-
-        closingWindows.forEach { $0.ignoresMouseEvents = true }
-
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.08
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            closingWindows.forEach { $0.animator().alphaValue = 0 }
-        } completionHandler: {
-            closingWindows.forEach { $0.close() }
-            completion?()
-        }
-    }
-
-    private func screenCaptureAllowed() -> Bool {
-        if #available(macOS 10.15, *) {
-            return CGPreflightScreenCaptureAccess()
-        }
-        return true
+        completion?()
     }
 
     private func showScreenAccessAlert() {

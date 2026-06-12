@@ -1,0 +1,564 @@
+name: Launch Pack Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Launch week label (optional, format: YYYY-Www)'
+        required: false
+        default: ''
+        type: string
+      command:
+        description: 'Command spotlight'
+        required: false
+        default: 'Copy Win Card'
+        type: string
+      problem:
+        description: 'Problem statement'
+        required: false
+        default: 'manual weekly status updates'
+        type: string
+      outcome:
+        description: 'Outcome statement'
+        required: false
+        default: 'share-ready recap in under one minute'
+        type: string
+      metric:
+        description: 'Measurable result'
+        required: false
+        default: 'saved ~10 minutes per day'
+        type: string
+      workflow:
+        description: 'Three-step flow (pipe-separated)'
+        required: false
+        default: 'Read Selected Text|Ask Anything|Copy Win Card'
+        type: string
+      cta:
+        description: 'Call-to-action line'
+        required: false
+        default: 'Try this flow and share your first Win Card.'
+        type: string
+      audience:
+        description: 'Audience label'
+        required: false
+        default: 'builders, writers, and researchers'
+        type: string
+      asset:
+        description: 'Primary proof asset'
+        required: false
+        default: 'Copy Win Card'
+        type: string
+      primary_channel:
+        description: 'Primary launch channel'
+        required: false
+        default: 'X / Threads'
+        type: string
+      backup_channel:
+        description: 'Backup launch channel'
+        required: false
+        default: 'LinkedIn'
+        type: string
+      primary_audience_region:
+        description: 'Primary audience region (global/us/eu/apac)'
+        required: false
+        default: 'global'
+        type: string
+      backup_audience_region:
+        description: 'Backup audience region (global/us/eu/apac)'
+        required: false
+        default: 'global'
+        type: string
+      channel_roi_preferred_channel:
+        description: 'Preferred lead route (primary/backup/balanced)'
+        required: false
+        default: 'balanced'
+        type: string
+      channel_roi_recommendation:
+        description: 'Optional ROI routing recommendation line'
+        required: false
+        default: ''
+        type: string
+      channel_mix_recommendation:
+        description: 'Optional channel mix recommendation line'
+        required: false
+        default: ''
+        type: string
+      creator_signal_entries:
+        description: 'Creator signal entries captured from comments'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_high_fit:
+        description: 'Creator signal entries with fit score >=70'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_warm_intros:
+        description: 'Creator signal entries with warm intros'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_collab_ready:
+        description: 'Creator signal entries marked collab-ready'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_top_segment:
+        description: 'Top creator signal segment label'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_top_handle:
+        description: 'Top creator signal handle'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_enrichment_score:
+        description: 'Creator signal enrichment score'
+        required: false
+        default: 'n/a'
+        type: string
+      creator_signal_recommendation:
+        description: 'Creator signal recommendation line'
+        required: false
+        default: 'Capture creator signal comments in Monday checklist before Friday review.'
+        type: string
+      founder_transcript:
+        description: 'Optional founder transcript source path (repo-relative) for transcript ingestion quality'
+        required: false
+        default: ''
+        type: string
+      founder_fame_daily_mission:
+        description: 'Optional in-app founder daily mission markdown path (repo-relative) for action-queue mission bridge'
+        required: false
+        default: ''
+        type: string
+      founder_first48h_primary_char_limit:
+        description: 'Founder first-48h primary short-variant char limit'
+        required: false
+        default: '280'
+        type: string
+      founder_first48h_backup_char_limit:
+        description: 'Founder first-48h backup short-variant char limit'
+        required: false
+        default: '500'
+        type: string
+      founder_first48h_primary_tone:
+        description: 'Founder first-48h primary tone profile (x-punchy|x-thread|neutral)'
+        required: false
+        default: 'x-punchy'
+        type: string
+      founder_first48h_backup_tone:
+        description: 'Founder first-48h backup tone profile (linkedin-context|linkedin-operator|neutral)'
+        required: false
+        default: 'linkedin-context'
+        type: string
+      post_founder_fame_war_room_comment:
+        description: 'Upsert founder fame war-room checklist comment after generation'
+        required: false
+        default: false
+        type: boolean
+      founder_fame_war_room_comment_issue:
+        description: 'Optional Monday checklist issue number override for founder war-room comment upsert'
+        required: false
+        default: ''
+        type: string
+      founder_fame_war_room_comment_repo:
+        description: 'Optional repository slug override (owner/repo) for founder war-room comment upsert'
+        required: false
+        default: ''
+        type: string
+      post_founder_fame_exceptional_loop_comment:
+        description: 'Upsert founder fame exceptional-loop checklist comment after generation'
+        required: false
+        default: false
+        type: boolean
+      founder_fame_exceptional_loop_comment_issue:
+        description: 'Optional Monday checklist issue number override for founder exceptional-loop comment upsert'
+        required: false
+        default: ''
+        type: string
+      founder_fame_exceptional_loop_comment_repo:
+        description: 'Optional repository slug override (owner/repo) for founder exceptional-loop comment upsert'
+        required: false
+        default: ''
+        type: string
+      skip_tests:
+        description: 'Skip swift test in launch runner'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  generate-launch-pack:
+    name: Generate launch pack artifacts
+    runs-on: macos-14
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run launch-day orchestrator
+        shell: zsh {0}
+        env:
+          INPUT_WEEK: ${{ inputs.week }}
+          INPUT_COMMAND: ${{ inputs.command }}
+          INPUT_PROBLEM: ${{ inputs.problem }}
+          INPUT_OUTCOME: ${{ inputs.outcome }}
+          INPUT_METRIC: ${{ inputs.metric }}
+          INPUT_WORKFLOW: ${{ inputs.workflow }}
+          INPUT_CTA: ${{ inputs.cta }}
+          INPUT_AUDIENCE: ${{ inputs.audience }}
+          INPUT_ASSET: ${{ inputs.asset }}
+          INPUT_PRIMARY_CHANNEL: ${{ inputs.primary_channel }}
+          INPUT_BACKUP_CHANNEL: ${{ inputs.backup_channel }}
+          INPUT_PRIMARY_AUDIENCE_REGION: ${{ inputs.primary_audience_region }}
+          INPUT_BACKUP_AUDIENCE_REGION: ${{ inputs.backup_audience_region }}
+          INPUT_CHANNEL_ROI_PREFERRED_CHANNEL: ${{ inputs.channel_roi_preferred_channel }}
+          INPUT_CHANNEL_ROI_RECOMMENDATION: ${{ inputs.channel_roi_recommendation }}
+          INPUT_CHANNEL_MIX_RECOMMENDATION: ${{ inputs.channel_mix_recommendation }}
+          INPUT_CREATOR_SIGNAL_ENTRIES: ${{ inputs.creator_signal_entries }}
+          INPUT_CREATOR_SIGNAL_HIGH_FIT: ${{ inputs.creator_signal_high_fit }}
+          INPUT_CREATOR_SIGNAL_WARM_INTROS: ${{ inputs.creator_signal_warm_intros }}
+          INPUT_CREATOR_SIGNAL_COLLAB_READY: ${{ inputs.creator_signal_collab_ready }}
+          INPUT_CREATOR_SIGNAL_TOP_SEGMENT: ${{ inputs.creator_signal_top_segment }}
+          INPUT_CREATOR_SIGNAL_TOP_HANDLE: ${{ inputs.creator_signal_top_handle }}
+          INPUT_CREATOR_SIGNAL_ENRICHMENT_SCORE: ${{ inputs.creator_signal_enrichment_score }}
+          INPUT_CREATOR_SIGNAL_RECOMMENDATION: ${{ inputs.creator_signal_recommendation }}
+          INPUT_FOUNDER_TRANSCRIPT: ${{ inputs.founder_transcript }}
+          INPUT_FOUNDER_FAME_DAILY_MISSION: ${{ inputs.founder_fame_daily_mission }}
+          INPUT_FOUNDER_FIRST48H_PRIMARY_CHAR_LIMIT: ${{ inputs.founder_first48h_primary_char_limit }}
+          INPUT_FOUNDER_FIRST48H_BACKUP_CHAR_LIMIT: ${{ inputs.founder_first48h_backup_char_limit }}
+          INPUT_FOUNDER_FIRST48H_PRIMARY_TONE: ${{ inputs.founder_first48h_primary_tone }}
+          INPUT_FOUNDER_FIRST48H_BACKUP_TONE: ${{ inputs.founder_first48h_backup_tone }}
+          INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT: ${{ inputs.post_founder_fame_war_room_comment }}
+          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE: ${{ inputs.founder_fame_war_room_comment_issue }}
+          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO: ${{ inputs.founder_fame_war_room_comment_repo }}
+          INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT: ${{ inputs.post_founder_fame_exceptional_loop_comment }}
+          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ${{ inputs.founder_fame_exceptional_loop_comment_issue }}
+          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO: ${{ inputs.founder_fame_exceptional_loop_comment_repo }}
+          INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          week="$INPUT_WEEK"
+          if [[ -z "$week" ]]; then
+            week="$(date '+%Y-W%V')"
+          fi
+
+          output_dir=".build/launch"
+          mkdir -p "$output_dir"
+          pack_path="$output_dir/${week}-launch.md"
+          founder_update_path="$output_dir/${week}-founder-update.md"
+          founder_fame_path="$output_dir/${week}-founder-fame-pack.md"
+          founder_press_path="$output_dir/${week}-founder-press-kit.md"
+          founder_media_path="$output_dir/${week}-founder-media-blast.md"
+          weekly_issue_path="$output_dir/${week}-weekly-growth-issue.md"
+          proof_path="$output_dir/${week}-social-proof.md"
+          reply_pack_path="$output_dir/${week}-reply-pack.md"
+          monday_checkpoint_path="$output_dir/${week}-monday-checkpoint.md"
+          outreach_path="$output_dir/${week}-creator-outreach.md"
+          target_list_path="$output_dir/${week}-creator-target-list.md"
+          distribution_path="$output_dir/${week}-distribution-plan.md"
+          viral_board_path="$output_dir/${week}-viral-experiment-board.md"
+          social_proof_wall_path="$output_dir/${week}-social-proof-wall.md"
+          founder_fame_ops_path="$output_dir/${week}-founder-fame-ops-brief.md"
+          founder_fame_action_queue_path="$output_dir/${week}-founder-fame-action-queue.md"
+          founder_fame_interview_prep_path="$output_dir/${week}-founder-fame-interview-prep.md"
+          founder_fame_transcript_ingestion_path="$output_dir/${week}-founder-fame-transcript-ingestion.md"
+          founder_fame_repurpose_path="$output_dir/${week}-founder-fame-repurpose-plan.md"
+          founder_fame_uplift_tracker_path="$output_dir/${week}-founder-fame-uplift-tracker.md"
+          founder_fame_weight_profile_path="$output_dir/${week}-founder-fame-weight-profile.md"
+          founder_fame_momentum_path="$output_dir/${week}-founder-fame-momentum-brief.md"
+          founder_fame_opportunity_radar_path="$output_dir/${week}-founder-fame-opportunity-radar.md"
+          founder_fame_execution_sprint_path="$output_dir/${week}-founder-fame-execution-sprint.md"
+          founder_fame_execution_scorecard_path="$output_dir/${week}-founder-fame-execution-scorecard.md"
+          founder_fame_risk_response_path="$output_dir/${week}-founder-fame-risk-response-plan.md"
+          founder_fame_escalation_queue_path="$output_dir/${week}-founder-fame-escalation-queue.md"
+          founder_fame_command_center_path="$output_dir/${week}-founder-fame-command-center.md"
+          founder_fame_next_move_handoff_path="$output_dir/${week}-founder-fame-next-move-handoff.md"
+          founder_fame_next_move_draft_pack_path="$output_dir/${week}-founder-fame-next-move-draft-pack.md"
+          founder_fame_war_room_path="$output_dir/${week}-founder-fame-war-room.md"
+          founder_fame_war_room_check_path="$output_dir/${week}-founder-fame-war-room-check.md"
+          founder_fame_war_room_live_check_path="$output_dir/${week}-founder-fame-war-room-live-check.md"
+          founder_fame_war_room_comment_path="$output_dir/${week}-founder-fame-war-room-comment.md"
+          founder_fame_spotlight_path="$output_dir/${week}-founder-fame-spotlight-pack.md"
+          founder_fame_breakout_path="$output_dir/${week}-founder-fame-breakout-plan.md"
+          founder_fame_outreach_sprint_path="$output_dir/${week}-founder-fame-outreach-sprint.md"
+          founder_fame_proof_loop_path="$output_dir/${week}-founder-fame-proof-loop.md"
+          founder_fame_proof_loop_check_path="$output_dir/${week}-founder-fame-proof-loop-check.md"
+          founder_fame_kpi_snapshot_path="$output_dir/${week}-founder-fame-kpi-snapshot.md"
+          founder_fame_velocity_scoreboard_path="$output_dir/${week}-founder-fame-velocity-scoreboard.md"
+          founder_fame_exceptional_loop_path="$output_dir/${week}-founder-fame-exceptional-loop.md"
+          founder_fame_exceptional_loop_comment_path="$output_dir/${week}-founder-fame-exceptional-loop-comment.md"
+          founder_fame_exceptional_loop_live_check_path="$output_dir/${week}-founder-fame-exceptional-loop-live-check.md"
+          founder_fame_narrative_lab_path="$output_dir/${week}-founder-fame-narrative-lab.md"
+          founder_first48h_post_pack_path="$output_dir/${week}-founder-first48h-post-pack.md"
+          winning_hook_path="$output_dir/${week}-winning-hook-library.md"
+          credibility_ledger_path="$output_dir/${week}-credibility-ledger.md"
+          brief_path="$output_dir/${week}-launch-brief.md"
+
+          args=(
+            --week "$week"
+            --command "$INPUT_COMMAND"
+            --problem "$INPUT_PROBLEM"
+            --outcome "$INPUT_OUTCOME"
+            --metric "$INPUT_METRIC"
+            --workflow "$INPUT_WORKFLOW"
+            --cta "$INPUT_CTA"
+            --audience "$INPUT_AUDIENCE"
+            --asset "$INPUT_ASSET"
+            --primary-channel "$INPUT_PRIMARY_CHANNEL"
+            --backup-channel "$INPUT_BACKUP_CHANNEL"
+            --primary-audience-region "$INPUT_PRIMARY_AUDIENCE_REGION"
+            --backup-audience-region "$INPUT_BACKUP_AUDIENCE_REGION"
+            --channel-roi-preferred-channel "$INPUT_CHANNEL_ROI_PREFERRED_CHANNEL"
+            --channel-roi-recommendation "$INPUT_CHANNEL_ROI_RECOMMENDATION"
+            --channel-mix-recommendation "$INPUT_CHANNEL_MIX_RECOMMENDATION"
+            --creator-signal-entries "$INPUT_CREATOR_SIGNAL_ENTRIES"
+            --creator-signal-high-fit "$INPUT_CREATOR_SIGNAL_HIGH_FIT"
+            --creator-signal-warm-intros "$INPUT_CREATOR_SIGNAL_WARM_INTROS"
+            --creator-signal-collab-ready "$INPUT_CREATOR_SIGNAL_COLLAB_READY"
+            --creator-signal-top-segment "$INPUT_CREATOR_SIGNAL_TOP_SEGMENT"
+            --creator-signal-top-handle "$INPUT_CREATOR_SIGNAL_TOP_HANDLE"
+            --creator-signal-enrichment-score "$INPUT_CREATOR_SIGNAL_ENRICHMENT_SCORE"
+            --creator-signal-recommendation "$INPUT_CREATOR_SIGNAL_RECOMMENDATION"
+            --founder-first48h-primary-char-limit "$INPUT_FOUNDER_FIRST48H_PRIMARY_CHAR_LIMIT"
+            --founder-first48h-backup-char-limit "$INPUT_FOUNDER_FIRST48H_BACKUP_CHAR_LIMIT"
+            --founder-first48h-primary-tone "$INPUT_FOUNDER_FIRST48H_PRIMARY_TONE"
+            --founder-first48h-backup-tone "$INPUT_FOUNDER_FIRST48H_BACKUP_TONE"
+            --pack-out "$pack_path"
+            --founder-update-out "$founder_update_path"
+            --founder-fame-out "$founder_fame_path"
+            --founder-press-out "$founder_press_path"
+            --founder-media-out "$founder_media_path"
+            --weekly-issue-out "$weekly_issue_path"
+            --proof-out "$proof_path"
+            --reply-pack-out "$reply_pack_path"
+            --monday-checkpoint-out "$monday_checkpoint_path"
+            --outreach-out "$outreach_path"
+            --target-list-out "$target_list_path"
+            --distribution-out "$distribution_path"
+            --viral-out "$viral_board_path"
+            --proof-wall-out "$social_proof_wall_path"
+            --founder-fame-ops-out "$founder_fame_ops_path"
+            --founder-fame-action-queue-out "$founder_fame_action_queue_path"
+            --founder-fame-interview-prep-out "$founder_fame_interview_prep_path"
+            --founder-fame-transcript-ingestion-out "$founder_fame_transcript_ingestion_path"
+            --founder-fame-repurpose-out "$founder_fame_repurpose_path"
+            --founder-fame-uplift-tracker-out "$founder_fame_uplift_tracker_path"
+            --founder-fame-weight-profile-out "$founder_fame_weight_profile_path"
+            --founder-fame-momentum-out "$founder_fame_momentum_path"
+            --founder-fame-opportunity-radar-out "$founder_fame_opportunity_radar_path"
+            --founder-fame-execution-sprint-out "$founder_fame_execution_sprint_path"
+            --founder-fame-execution-scorecard-out "$founder_fame_execution_scorecard_path"
+            --founder-fame-risk-response-out "$founder_fame_risk_response_path"
+            --founder-fame-escalation-queue-out "$founder_fame_escalation_queue_path"
+            --founder-fame-command-center-out "$founder_fame_command_center_path"
+            --founder-fame-next-move-handoff-out "$founder_fame_next_move_handoff_path"
+            --founder-fame-next-move-draft-pack-out "$founder_fame_next_move_draft_pack_path"
+            --founder-fame-war-room-out "$founder_fame_war_room_path"
+            --founder-fame-war-room-check-out "$founder_fame_war_room_check_path"
+            --founder-fame-war-room-live-check-out "$founder_fame_war_room_live_check_path"
+            --founder-fame-war-room-comment-out "$founder_fame_war_room_comment_path"
+            --founder-fame-spotlight-out "$founder_fame_spotlight_path"
+            --founder-fame-breakout-out "$founder_fame_breakout_path"
+            --founder-fame-outreach-sprint-out "$founder_fame_outreach_sprint_path"
+            --founder-fame-proof-loop-out "$founder_fame_proof_loop_path"
+            --founder-fame-proof-loop-check-out "$founder_fame_proof_loop_check_path"
+            --founder-fame-kpi-snapshot-out "$founder_fame_kpi_snapshot_path"
+            --founder-fame-velocity-scoreboard-out "$founder_fame_velocity_scoreboard_path"
+            --founder-fame-exceptional-loop-out "$founder_fame_exceptional_loop_path"
+            --founder-fame-exceptional-loop-comment-out "$founder_fame_exceptional_loop_comment_path"
+            --founder-fame-exceptional-loop-live-check-out "$founder_fame_exceptional_loop_live_check_path"
+            --founder-fame-narrative-lab-out "$founder_fame_narrative_lab_path"
+            --founder-first48h-post-pack-out "$founder_first48h_post_pack_path"
+            --hook-out "$winning_hook_path"
+            --credibility-out "$credibility_ledger_path"
+            --brief-out "$brief_path"
+          )
+
+          if [[ "$INPUT_SKIP_TESTS" == "true" ]]; then
+            args+=(--skip-tests)
+          fi
+
+          if [[ "$INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT" == "true" ]]; then
+            args+=(--post-founder-fame-war-room-comment)
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_TRANSCRIPT" ]]; then
+            args+=(--founder-transcript "$INPUT_FOUNDER_TRANSCRIPT")
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_FAME_DAILY_MISSION" ]]; then
+            args+=(--founder-fame-daily-mission "$INPUT_FOUNDER_FAME_DAILY_MISSION")
+            founder_fame_daily_mission_source="$INPUT_FOUNDER_FAME_DAILY_MISSION"
+          else
+            founder_fame_daily_mission_source="(optional input not provided; action queue uses ops-brief only)"
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE" ]]; then
+            args+=(--founder-fame-war-room-comment-issue "$INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE")
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO" ]]; then
+            args+=(--founder-fame-war-room-comment-repo "$INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO")
+          fi
+
+          if [[ "$INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT" == "true" ]]; then
+            args+=(--post-founder-fame-exceptional-loop-comment)
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE" ]]; then
+            args+=(--founder-fame-exceptional-loop-comment-issue "$INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE")
+          fi
+
+          if [[ -n "$INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO" ]]; then
+            args+=(--founder-fame-exceptional-loop-comment-repo "$INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO")
+          fi
+
+          zsh scripts/run_launch_day.sh "${args[@]}"
+
+          founder_fame_daily_mission_freshness_line="$(rg -m1 '^- Mission freshness: ' "$founder_fame_action_queue_path" || true)"
+          founder_fame_daily_mission_freshness="${founder_fame_daily_mission_freshness_line#"- Mission freshness: "}"
+          if [[ -z "$founder_fame_daily_mission_freshness" ]]; then
+            founder_fame_daily_mission_freshness="n/a (missing mission freshness line in action queue artifact)"
+          fi
+
+          echo "week=$week" >> "$GITHUB_OUTPUT"
+          echo "pack_path=$pack_path" >> "$GITHUB_OUTPUT"
+          echo "founder_update_path=$founder_update_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_path=$founder_fame_path" >> "$GITHUB_OUTPUT"
+          echo "founder_press_path=$founder_press_path" >> "$GITHUB_OUTPUT"
+          echo "founder_media_path=$founder_media_path" >> "$GITHUB_OUTPUT"
+          echo "weekly_issue_path=$weekly_issue_path" >> "$GITHUB_OUTPUT"
+          echo "proof_path=$proof_path" >> "$GITHUB_OUTPUT"
+          echo "reply_pack_path=$reply_pack_path" >> "$GITHUB_OUTPUT"
+          echo "monday_checkpoint_path=$monday_checkpoint_path" >> "$GITHUB_OUTPUT"
+          echo "outreach_path=$outreach_path" >> "$GITHUB_OUTPUT"
+          echo "target_list_path=$target_list_path" >> "$GITHUB_OUTPUT"
+          echo "distribution_path=$distribution_path" >> "$GITHUB_OUTPUT"
+          echo "viral_board_path=$viral_board_path" >> "$GITHUB_OUTPUT"
+          echo "social_proof_wall_path=$social_proof_wall_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_ops_path=$founder_fame_ops_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_daily_mission_source=$founder_fame_daily_mission_source" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_daily_mission_freshness=$founder_fame_daily_mission_freshness" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_action_queue_path=$founder_fame_action_queue_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_interview_prep_path=$founder_fame_interview_prep_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_transcript_ingestion_path=$founder_fame_transcript_ingestion_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_repurpose_path=$founder_fame_repurpose_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_uplift_tracker_path=$founder_fame_uplift_tracker_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_weight_profile_path=$founder_fame_weight_profile_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_momentum_path=$founder_fame_momentum_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_opportunity_radar_path=$founder_fame_opportunity_radar_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_execution_sprint_path=$founder_fame_execution_sprint_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_execution_scorecard_path=$founder_fame_execution_scorecard_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_risk_response_path=$founder_fame_risk_response_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_escalation_queue_path=$founder_fame_escalation_queue_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_command_center_path=$founder_fame_command_center_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_next_move_handoff_path=$founder_fame_next_move_handoff_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_next_move_draft_pack_path=$founder_fame_next_move_draft_pack_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_war_room_path=$founder_fame_war_room_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_war_room_check_path=$founder_fame_war_room_check_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_war_room_live_check_path=$founder_fame_war_room_live_check_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_war_room_comment_path=$founder_fame_war_room_comment_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_spotlight_path=$founder_fame_spotlight_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_breakout_path=$founder_fame_breakout_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_outreach_sprint_path=$founder_fame_outreach_sprint_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_proof_loop_path=$founder_fame_proof_loop_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_proof_loop_check_path=$founder_fame_proof_loop_check_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_kpi_snapshot_path=$founder_fame_kpi_snapshot_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_velocity_scoreboard_path=$founder_fame_velocity_scoreboard_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_exceptional_loop_path=$founder_fame_exceptional_loop_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_exceptional_loop_comment_path=$founder_fame_exceptional_loop_comment_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_exceptional_loop_live_check_path=$founder_fame_exceptional_loop_live_check_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_narrative_lab_path=$founder_fame_narrative_lab_path" >> "$GITHUB_OUTPUT"
+          echo "founder_first48h_post_pack_path=$founder_first48h_post_pack_path" >> "$GITHUB_OUTPUT"
+          echo "winning_hook_path=$winning_hook_path" >> "$GITHUB_OUTPUT"
+          echo "credibility_ledger_path=$credibility_ledger_path" >> "$GITHUB_OUTPUT"
+          echo "brief_path=$brief_path" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Launch Pack Generated"
+            echo ""
+            echo "- Week: \`$week\`"
+            echo "- Campaign pack: \`$pack_path\`"
+            echo "- Founder update post pack: \`$founder_update_path\`"
+            echo "- Founder fame pack: \`$founder_fame_path\`"
+            echo "- Founder press kit: \`$founder_press_path\`"
+            echo "- Founder media blast: \`$founder_media_path\`"
+            echo "- Weekly growth issue template: \`$weekly_issue_path\`"
+            echo "- Social proof kit: \`$proof_path\`"
+            echo "- First-24-hour reply pack: \`$reply_pack_path\`"
+            echo "- Monday publish checkpoint: \`$monday_checkpoint_path\`"
+            echo "- Creator outreach kit: \`$outreach_path\`"
+            echo "- Creator target list: \`$target_list_path\`"
+            echo "- Distribution follow-up plan: \`$distribution_path\`"
+            echo "- Viral experiment board: \`$viral_board_path\`"
+            echo "- Social proof wall: \`$social_proof_wall_path\`"
+            echo "- Founder fame ops brief: \`$founder_fame_ops_path\`"
+            echo "- Founder fame daily mission source: \`$founder_fame_daily_mission_source\`"
+            echo "- Founder fame daily mission freshness: \`$founder_fame_daily_mission_freshness\`"
+            echo "- Founder fame action queue: \`$founder_fame_action_queue_path\`"
+            echo "- Founder fame interview prep: \`$founder_fame_interview_prep_path\`"
+            echo "- Founder fame transcript ingestion: \`$founder_fame_transcript_ingestion_path\`"
+            if [[ -n "$INPUT_FOUNDER_TRANSCRIPT" ]]; then
+              echo "- Founder transcript source input: \`$INPUT_FOUNDER_TRANSCRIPT\`"
+            else
+              echo "- Founder transcript source input: \`(auto) $founder_fame_interview_prep_path\`"
+            fi
+            echo "- Founder fame repurpose plan: \`$founder_fame_repurpose_path\`"
+            echo "- Founder fame uplift tracker: \`$founder_fame_uplift_tracker_path\`"
+            echo "- Founder fame weight profile: \`$founder_fame_weight_profile_path\`"
+            echo "- Founder fame momentum brief: \`$founder_fame_momentum_path\`"
+            echo "- Founder fame opportunity radar: \`$founder_fame_opportunity_radar_path\`"
+            echo "- Founder fame execution sprint: \`$founder_fame_execution_sprint_path\`"
+            echo "- Founder fame execution scorecard: \`$founder_fame_execution_scorecard_path\`"
+            echo "- Founder fame risk response plan: \`$founder_fame_risk_response_path\`"
+            echo "- Founder fame escalation queue: \`$founder_fame_escalation_queue_path\`"
+            echo "- Founder fame command center: \`$founder_fame_command_center_path\`"
+            echo "- Founder fame next-move handoff: \`$founder_fame_next_move_handoff_path\`"
+            echo "- Founder fame next-move draft pack: \`$founder_fame_next_move_draft_pack_path\`"
+            echo "- In-app fast loop: run \`Fame -> Run Fame Next Move\`, then log artifact link + owner update in \`Monday Publish Checklist <week>\`."
+            echo "- Founder fame war room: \`$founder_fame_war_room_path\`"
+            echo "- Founder fame war-room verification: \`$founder_fame_war_room_check_path\`"
+            if [[ "$INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT" == "true" ]]; then
+              echo "- Founder fame war-room checklist comment: \`$founder_fame_war_room_comment_path\` (upsert enabled)."
+              echo "- Founder fame war-room live verification: \`$founder_fame_war_room_live_check_path\` (strict)."
+            else
+              echo "- Founder fame war-room checklist comment: \`$founder_fame_war_room_comment_path\` (draft-only; set \`post_founder_fame_war_room_comment=true\` to upsert)."
+              echo "- Founder fame war-room live verification: \`$founder_fame_war_room_live_check_path\` (non-strict draft validation)."
+            fi
+            echo "- Founder fame spotlight pack: \`$founder_fame_spotlight_path\`"
+            echo "- Founder fame breakout plan: \`$founder_fame_breakout_path\`"
+            echo "- Founder fame outreach sprint: \`$founder_fame_outreach_sprint_path\`"
+            echo "- Founder fame proof loop: \`$founder_fame_proof_loop_path\`"
+            echo "- Founder fame proof loop verification: \`$founder_fame_proof_loop_check_path\`"
+            echo "- Founder fame KPI snapshot: \`$founder_fame_kpi_snapshot_path\`"
+            echo "- Founder fame velocity scoreboard: \`$founder_fame_velocity_scoreboard_path\`"
+            echo "- Founder fame exceptional loop: \`$founder_fame_exceptional_loop_path\`"
+            if [[ "$INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT" == "true" ]]; then
+              echo "- Founder fame exceptional-loop checklist comment: \`$founder_fame_exceptional_loop_comment_path\` (upsert enabled)."
+              echo "- Founder fame exceptional-loop live verification: \`$founder_fame_exceptional_loop_live_check_path\` (strict)."
+            else
+              echo "- Founder fame exceptional-loop checklist comment: \`$founder_fame_exceptional_loop_comment_path\` (draft-only; set \`post_founder_fame_exceptional_loop_comment=true\` to upsert)."
+              echo "- Founder fame exceptional-loop live verification: \`$founder_fame_exceptional_loop_live_check_path\` (non-strict draft validation)."
+            fi
+            echo "- Founder fame narrative lab: \`$founder_fame_narrative_lab_path\`"
+            echo "- Founder first-48h post pack: \`$founder_first48h_post_pack_path\`"
+            echo "- Winning hook library: \`$winning_hook_path\`"
+            echo "- Credibility ledger: \`$credibility_ledger_path\`"
+            echo "- Launch brief: \`$brief_path\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload launch artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-pack-${{ github.run_id }}
+          path: |
+            .build/launch/*.md
+          if-no-files-found: error

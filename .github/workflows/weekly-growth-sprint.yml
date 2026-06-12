@@ -1,0 +1,422 @@
+name: Weekly Growth Sprint
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Sprint week label (optional, format: YYYY-Www)'
+        required: false
+        default: ''
+        type: string
+      primary_channel:
+        description: 'Primary channel'
+        required: false
+        default: 'X / Threads'
+        type: string
+      backup_channel:
+        description: 'Backup channel'
+        required: false
+        default: 'LinkedIn'
+        type: string
+      metric_focus:
+        description: 'Primary metric focus'
+        required: false
+        default: 'Win Card copies and reply quality'
+        type: string
+      command:
+        description: 'Command spotlight'
+        required: false
+        default: 'Copy Win Card'
+        type: string
+      problem:
+        description: 'Problem statement'
+        required: false
+        default: 'manual weekly status updates'
+        type: string
+      outcome:
+        description: 'Outcome statement'
+        required: false
+        default: 'share-ready recap in under one minute'
+        type: string
+      metric:
+        description: 'Post metric statement'
+        required: false
+        default: 'saved ~10 minutes per day'
+        type: string
+      workflow:
+        description: 'Three-step flow (pipe-separated)'
+        required: false
+        default: 'Read Selected Text|Ask Anything|Copy Win Card'
+        type: string
+      cta:
+        description: 'Call-to-action line'
+        required: false
+        default: 'Try this flow and share your first Win Card.'
+        type: string
+      audience:
+        description: 'Audience label'
+        required: false
+        default: 'builders, writers, and researchers'
+        type: string
+      asset:
+        description: 'Primary proof asset'
+        required: false
+        default: 'Copy Win Card'
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  weekly-growth-sprint:
+    name: Generate weekly growth sprint
+    runs-on: macos-14
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Build weekly growth artifacts
+        shell: zsh {0}
+        env:
+          INPUT_WEEK: ${{ inputs.week }}
+          INPUT_PRIMARY_CHANNEL: ${{ inputs.primary_channel }}
+          INPUT_BACKUP_CHANNEL: ${{ inputs.backup_channel }}
+          INPUT_METRIC_FOCUS: ${{ inputs.metric_focus }}
+          INPUT_COMMAND: ${{ inputs.command }}
+          INPUT_PROBLEM: ${{ inputs.problem }}
+          INPUT_OUTCOME: ${{ inputs.outcome }}
+          INPUT_METRIC: ${{ inputs.metric }}
+          INPUT_WORKFLOW: ${{ inputs.workflow }}
+          INPUT_CTA: ${{ inputs.cta }}
+          INPUT_AUDIENCE: ${{ inputs.audience }}
+          INPUT_ASSET: ${{ inputs.asset }}
+        run: |
+          set -euo pipefail
+
+          default_or_value() {
+            local value="$1"
+            local fallback="$2"
+            if [[ -n "$value" ]]; then
+              echo "$value"
+            else
+              echo "$fallback"
+            fi
+          }
+
+          week="$INPUT_WEEK"
+          if [[ -z "$week" ]]; then
+            week="$(date '+%Y-W%V')"
+          fi
+
+          command_value="$(default_or_value "$INPUT_COMMAND" "Copy Win Card")"
+          problem_value="$(default_or_value "$INPUT_PROBLEM" "manual weekly status updates")"
+          outcome_value="$(default_or_value "$INPUT_OUTCOME" "share-ready recap in under one minute")"
+          metric_value="$(default_or_value "$INPUT_METRIC" "saved ~10 minutes per day")"
+          workflow_value="$(default_or_value "$INPUT_WORKFLOW" "Read Selected Text|Ask Anything|Copy Win Card")"
+          cta_value="$(default_or_value "$INPUT_CTA" "Try this flow and share your first Win Card.")"
+          audience_value="$(default_or_value "$INPUT_AUDIENCE" "builders, writers, and researchers")"
+          asset_value="$(default_or_value "$INPUT_ASSET" "Copy Win Card")"
+          primary_channel_value="$(default_or_value "$INPUT_PRIMARY_CHANNEL" "X / Threads")"
+          backup_channel_value="$(default_or_value "$INPUT_BACKUP_CHANNEL" "LinkedIn")"
+          metric_focus_value="$(default_or_value "$INPUT_METRIC_FOCUS" "Win Card copies and reply quality")"
+
+          output_dir=".build/growth"
+          mkdir -p "$output_dir"
+
+          campaign_path="$output_dir/${week}-campaign.md"
+          issue_path="$output_dir/${week}-issue.md"
+
+          zsh scripts/generate_campaign_pack.sh \
+            --week "$week" \
+            --command "$command_value" \
+            --problem "$problem_value" \
+            --outcome "$outcome_value" \
+            --metric "$metric_value" \
+            --workflow "$workflow_value" \
+            --cta "$cta_value" \
+            --audience "$audience_value" \
+            --asset "$asset_value" \
+            --out "$campaign_path"
+
+          echo "week=$week" >> "$GITHUB_ENV"
+          echo "campaign_path=$campaign_path" >> "$GITHUB_ENV"
+          echo "issue_path=$issue_path" >> "$GITHUB_ENV"
+          echo "primary_channel_value=$primary_channel_value" >> "$GITHUB_ENV"
+          echo "backup_channel_value=$backup_channel_value" >> "$GITHUB_ENV"
+          echo "metric_focus_value=$metric_focus_value" >> "$GITHUB_ENV"
+
+          {
+            echo "## Weekly Growth Sprint Artifacts"
+            echo ""
+            echo "- Week: \`$week\`"
+            echo "- Campaign: \`$campaign_path\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Extract previous weekly metrics
+        id: previous_metrics
+        uses: actions/github-script@v7
+        env:
+          CURRENT_WEEK: ${{ env.week }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const currentTitle = `Weekly Growth Sprint ${process.env.CURRENT_WEEK}`;
+            const weeklyPrefix = 'Weekly Growth Sprint ';
+
+            function clean(value) {
+              if (!value) return '';
+              return String(value).replace(/\r?\n/g, ' ').trim();
+            }
+
+            function extractMetric(body, label) {
+              const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(`^-\\s*${escaped}:\\s*(.*)$`, 'mi');
+              const match = (body || '').match(regex);
+              return clean(match ? match[1] : '');
+            }
+
+            function parseNumber(value) {
+              const match = clean(value).match(/-?\d+(?:\.\d+)?/);
+              if (!match) return null;
+              const parsed = Number(match[0]);
+              return Number.isFinite(parsed) ? parsed : null;
+            }
+
+            function formatDelta(currentValue, baselineValue) {
+              const currentNumber = parseNumber(currentValue);
+              const baselineNumber = parseNumber(baselineValue);
+              if (currentNumber === null || baselineNumber === null) return '';
+              const delta = currentNumber - baselineNumber;
+              const normalized = Number.isInteger(delta)
+                ? String(delta)
+                : String(Math.round(delta * 100) / 100);
+              return delta > 0 ? `+${normalized}` : normalized;
+            }
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'all',
+              per_page: 100
+            });
+
+            const previousIssues = issues
+              .filter((issue) =>
+                !issue.pull_request &&
+                issue.title.startsWith(weeklyPrefix) &&
+                issue.title !== currentTitle
+              )
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const previous = previousIssues[0];
+            const baseline = previousIssues[1];
+
+            if (!previous) {
+              core.setOutput('previous_week', '');
+              core.setOutput('previous_baseline_week', '');
+              core.setOutput('previous_win_card', '');
+              core.setOutput('previous_win_card_delta', '');
+              core.setOutput('previous_win_recap', '');
+              core.setOutput('previous_win_recap_delta', '');
+              core.setOutput('previous_posts', '');
+              core.setOutput('previous_posts_delta', '');
+              core.setOutput('previous_stories', '');
+              core.setOutput('previous_stories_delta', '');
+              core.setOutput('previous_installs', '');
+              core.setOutput('previous_installs_delta', '');
+              core.info('No previous weekly sprint issue found.');
+              return;
+            }
+
+            const previousWeek = clean(previous.title.replace(weeklyPrefix, ''));
+            const previousBody = previous.body || '';
+            const baselineWeek = baseline ? clean(baseline.title.replace(weeklyPrefix, '')) : '';
+            const baselineBody = baseline ? (baseline.body || '') : '';
+
+            const previousWinCard = extractMetric(previousBody, 'Win Card copies');
+            const previousWinRecap = extractMetric(previousBody, 'Win Recap copies');
+            const previousPosts = extractMetric(previousBody, 'Public posts shipped');
+            const previousStories = extractMetric(previousBody, 'User-generated stories');
+            const previousInstalls = extractMetric(previousBody, 'Inbound installs/trials');
+
+            const baselineWinCard = extractMetric(baselineBody, 'Win Card copies');
+            const baselineWinRecap = extractMetric(baselineBody, 'Win Recap copies');
+            const baselinePosts = extractMetric(baselineBody, 'Public posts shipped');
+            const baselineStories = extractMetric(baselineBody, 'User-generated stories');
+            const baselineInstalls = extractMetric(baselineBody, 'Inbound installs/trials');
+
+            core.setOutput('previous_week', previousWeek);
+            core.setOutput('previous_baseline_week', baselineWeek);
+            core.setOutput('previous_win_card', previousWinCard);
+            core.setOutput('previous_win_card_delta', formatDelta(previousWinCard, baselineWinCard));
+            core.setOutput('previous_win_recap', previousWinRecap);
+            core.setOutput('previous_win_recap_delta', formatDelta(previousWinRecap, baselineWinRecap));
+            core.setOutput('previous_posts', previousPosts);
+            core.setOutput('previous_posts_delta', formatDelta(previousPosts, baselinePosts));
+            core.setOutput('previous_stories', previousStories);
+            core.setOutput('previous_stories_delta', formatDelta(previousStories, baselineStories));
+            core.setOutput('previous_installs', previousInstalls);
+            core.setOutput('previous_installs_delta', formatDelta(previousInstalls, baselineInstalls));
+            core.info(`Using previous weekly sprint metrics from: ${previous.title}`);
+
+      - name: Generate weekly issue body
+        shell: zsh {0}
+        run: |
+          set -euo pipefail
+
+          args=(
+            --week "$week"
+            --campaign "$campaign_path"
+            --primary "$primary_channel_value"
+            --backup "$backup_channel_value"
+            --metric "$metric_focus_value"
+            --out "$issue_path"
+          )
+
+          if [[ -n "${{ steps.previous_metrics.outputs.previous_week }}" ]]; then
+            args+=(--prev-week "${{ steps.previous_metrics.outputs.previous_week }}")
+            args+=(--prev-baseline-week "${{ steps.previous_metrics.outputs.previous_baseline_week }}")
+            args+=(--prev-win-card "${{ steps.previous_metrics.outputs.previous_win_card }}")
+            args+=(--prev-win-card-delta "${{ steps.previous_metrics.outputs.previous_win_card_delta }}")
+            args+=(--prev-win-recap "${{ steps.previous_metrics.outputs.previous_win_recap }}")
+            args+=(--prev-win-recap-delta "${{ steps.previous_metrics.outputs.previous_win_recap_delta }}")
+            args+=(--prev-posts "${{ steps.previous_metrics.outputs.previous_posts }}")
+            args+=(--prev-posts-delta "${{ steps.previous_metrics.outputs.previous_posts_delta }}")
+            args+=(--prev-stories "${{ steps.previous_metrics.outputs.previous_stories }}")
+            args+=(--prev-stories-delta "${{ steps.previous_metrics.outputs.previous_stories_delta }}")
+            args+=(--prev-installs "${{ steps.previous_metrics.outputs.previous_installs }}")
+            args+=(--prev-installs-delta "${{ steps.previous_metrics.outputs.previous_installs_delta }}")
+          fi
+
+          zsh scripts/generate_weekly_growth_issue.sh "${args[@]}"
+
+          {
+            echo "- Issue body: \`$issue_path\`"
+            if [[ -n "${{ steps.previous_metrics.outputs.previous_week }}" ]]; then
+              echo "- Previous week snapshot source: \`${{ steps.previous_metrics.outputs.previous_week }}\`"
+              if [[ -n "${{ steps.previous_metrics.outputs.previous_baseline_week }}" ]]; then
+                echo "- Delta baseline week: \`${{ steps.previous_metrics.outputs.previous_baseline_week }}\`"
+              fi
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create or update weekly issue
+        uses: actions/github-script@v7
+        env:
+          ISSUE_TITLE: Weekly Growth Sprint ${{ env.week }}
+          ISSUE_PATH: ${{ env.issue_path }}
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = process.env.ISSUE_TITLE;
+            const issuePath = process.env.ISSUE_PATH;
+            const body = fs.readFileSync(issuePath, 'utf8');
+            const weeklyPrefix = 'Weekly Growth Sprint ';
+            const labels = [
+              { name: 'growth', color: '0e8a16', description: 'Growth and distribution work' },
+              { name: 'weekly-sprint', color: '5319e7', description: 'Weekly sprint tracking issue' },
+              { name: 'autopilot', color: '1d76db', description: 'Generated by growth automation' }
+            ];
+
+            async function ensureLabel(label) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner,
+                  repo,
+                  name: label.name
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner,
+                    repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  core.info(`Created label: ${label.name}`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            for (const label of labels) {
+              await ensureLabel(label);
+            }
+
+            const labelNames = labels.map((label) => label.name);
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const existing = issues.find((issue) => issue.title === title);
+            let currentIssueNumber;
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+                labels: labelNames
+              });
+              currentIssueNumber = existing.number;
+              core.info(`Updated issue #${existing.number}: ${title}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                labels: labelNames
+              });
+              currentIssueNumber = created.data.number;
+              core.info(`Created issue #${created.data.number}: ${title}`);
+            }
+
+            const { data: refreshedOpenIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const staleIssues = refreshedOpenIssues.filter((issue) =>
+              issue.title.startsWith(weeklyPrefix) &&
+              issue.title !== title &&
+              issue.number !== currentIssueNumber
+            );
+
+            for (const stale of staleIssues) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: stale.number,
+                body: `Closing stale weekly sprint issue in favor of #${currentIssueNumber} (${title}).`
+              });
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: stale.number,
+                state: 'closed'
+              });
+              core.info(`Closed stale issue #${stale.number}: ${stale.title}`);
+            }
+
+      - name: Upload weekly growth artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-growth-${{ github.run_id }}
+          path: |
+            .build/growth/*.md
+          if-no-files-found: error

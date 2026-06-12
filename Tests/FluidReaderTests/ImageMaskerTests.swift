@@ -41,6 +41,23 @@ final class ImageMaskerTests: XCTestCase {
         XCTAssertNil(result)
     }
 
+    func testAnnotatedScreenshotKeepsFullImageSize() throws {
+        let image = try makeImage(width: 120, height: 80)
+        let result = try XCTUnwrap(ImageMasker.annotatedScreenshot(
+            from: image,
+            viewSize: CGSize(width: 60, height: 40),
+            points: [
+                CGPoint(x: 10, y: 10),
+                CGPoint(x: 30, y: 20),
+                CGPoint(x: 50, y: 30)
+            ]
+        ))
+
+        XCTAssertEqual(result.image.width, 120)
+        XCTAssertEqual(result.image.height, 80)
+        XCTAssertNotNil(result.pngData)
+    }
+
     private func makeImage(width: Int, height: Int) throws -> CGImage {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(

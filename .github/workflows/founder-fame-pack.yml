@@ -1,0 +1,1096 @@
+name: Founder Fame Pack
+
+on:
+  schedule:
+    - cron: '35 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Current week label (optional, format: YYYY-Www)'
+        required: false
+        default: ''
+        type: string
+      previous_week:
+        description: 'Previous week label (optional, format: YYYY-Www)'
+        required: false
+        default: ''
+        type: string
+      previous_mrr:
+        description: 'Previous week MRR'
+        required: false
+        default: '42000'
+        type: string
+      previous_delivery_cost:
+        description: 'Previous week delivery cost'
+        required: false
+        default: '19000'
+        type: string
+      previous_acquisition_spend:
+        description: 'Previous week acquisition spend'
+        required: false
+        default: '12000'
+        type: string
+      previous_new_customers:
+        description: 'Previous week new customers'
+        required: false
+        default: '80'
+        type: string
+      previous_monthly_contribution:
+        description: 'Previous week monthly contribution per customer'
+        required: false
+        default: '75'
+        type: string
+      previous_lifetime_months:
+        description: 'Previous week expected lifetime months'
+        required: false
+        default: '18'
+        type: string
+      previous_fixed_cost:
+        description: 'Previous week fixed cost'
+        required: false
+        default: '10000'
+        type: string
+      previous_price:
+        description: 'Previous week price'
+        required: false
+        default: '50'
+        type: string
+      previous_variable_cost:
+        description: 'Previous week variable cost'
+        required: false
+        default: '30'
+        type: string
+      current_mrr:
+        description: 'Current week MRR'
+        required: false
+        default: '49000'
+        type: string
+      current_delivery_cost:
+        description: 'Current week delivery cost'
+        required: false
+        default: '21500'
+        type: string
+      current_acquisition_spend:
+        description: 'Current week acquisition spend'
+        required: false
+        default: '12500'
+        type: string
+      current_new_customers:
+        description: 'Current week new customers'
+        required: false
+        default: '90'
+        type: string
+      current_monthly_contribution:
+        description: 'Current week monthly contribution per customer'
+        required: false
+        default: '82'
+        type: string
+      current_lifetime_months:
+        description: 'Current week expected lifetime months'
+        required: false
+        default: '19'
+        type: string
+      current_fixed_cost:
+        description: 'Current week fixed cost'
+        required: false
+        default: '11000'
+        type: string
+      current_price:
+        description: 'Current week price'
+        required: false
+        default: '54'
+        type: string
+      current_variable_cost:
+        description: 'Current week variable cost'
+        required: false
+        default: '32'
+        type: string
+      target_mrr:
+        description: 'Weekly target MRR'
+        required: false
+        default: '50000'
+        type: string
+      target_margin:
+        description: 'Weekly target margin percent'
+        required: false
+        default: '55'
+        type: string
+      target_cac:
+        description: 'Weekly target CAC'
+        required: false
+        default: '150'
+        type: string
+      target_ltv_cac:
+        description: 'Weekly target LTV/CAC'
+        required: false
+        default: '3.5'
+        type: string
+      target_new_customers:
+        description: 'Weekly target new customers'
+        required: false
+        default: '95'
+        type: string
+      product:
+        description: 'Product name for post drafts'
+        required: false
+        default: 'Fluid Reader'
+        type: string
+      primary_channel:
+        description: 'Primary channel for post drafts'
+        required: false
+        default: 'X / Threads'
+        type: string
+      backup_channel:
+        description: 'Backup channel for post drafts'
+        required: false
+        default: 'LinkedIn'
+        type: string
+      cta:
+        description: 'CTA line for update + fame drafts'
+        required: false
+        default: 'If you are building too, reply with your KPI bottleneck and I will share the exact weekly command flow.'
+        type: string
+      first48h_primary_char_limit:
+        description: 'Founder first-48h primary short-variant char limit'
+        required: false
+        default: '280'
+        type: string
+      first48h_backup_char_limit:
+        description: 'Founder first-48h backup short-variant char limit'
+        required: false
+        default: '500'
+        type: string
+      first48h_primary_tone:
+        description: 'Founder first-48h primary tone profile (x-punchy|x-thread|neutral)'
+        required: false
+        default: 'x-punchy'
+        type: string
+      first48h_backup_tone:
+        description: 'Founder first-48h backup tone profile (linkedin-context|linkedin-operator|neutral)'
+        required: false
+        default: 'linkedin-context'
+        type: string
+      founder_transcript:
+        description: 'Optional founder transcript source path (repo-relative) for transcript ingestion'
+        required: false
+        default: ''
+        type: string
+      founder_fame_daily_mission:
+        description: 'Optional founder daily mission markdown source path (repo-relative) used to enrich action-queue generation with freshness enforcement'
+        required: false
+        default: ''
+        type: string
+      creator_target_list:
+        description: 'Optional creator target list markdown source path (repo-relative) used to enrich founder outreach sprint routing'
+        required: false
+        default: ''
+        type: string
+      distribution_plan:
+        description: 'Optional distribution follow-up plan markdown source path (repo-relative) used to enrich breakout and outreach routing'
+        required: false
+        default: ''
+        type: string
+      founder_fame_action_queue:
+        description: 'Optional founder fame action queue markdown source path (repo-relative) used to enrich checklist comment mission freshness context'
+        required: false
+        default: ''
+        type: string
+      guesting_signal_entries:
+        description: 'Founder guesting signal entries captured from checklist comments'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_replied:
+        description: 'Founder guesting signal entries with replied/booked/published stage'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_booked:
+        description: 'Founder guesting signal entries with booked/published stage'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_published:
+        description: 'Founder guesting signal entries with published stage'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_top_format:
+        description: 'Founder guesting top-performing format (podcast/newsletter/community)'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_top_target:
+        description: 'Founder guesting highest-priority target'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_enrichment_score:
+        description: 'Founder guesting enrichment score'
+        required: false
+        default: 'n/a'
+        type: string
+      guesting_signal_recommendation:
+        description: 'Founder guesting recommendation line'
+        required: false
+        default: 'Capture founder guesting signal comments before Friday review.'
+        type: string
+      skip_founder_checks:
+        description: 'Skip founder workflow verification script before artifact generation'
+        required: false
+        default: true
+        type: boolean
+      post_war_room_comment:
+        description: 'Post founder fame war-room comment into Monday Publish Checklist'
+        required: false
+        default: false
+        type: boolean
+      war_room_comment_issue:
+        description: 'Optional Monday checklist issue number override used when posting war-room comment'
+        required: false
+        default: ''
+        type: string
+      post_exceptional_loop_comment:
+        description: 'Post founder fame exceptional-loop comment into Monday Publish Checklist'
+        required: false
+        default: false
+        type: boolean
+      exceptional_loop_comment_issue:
+        description: 'Optional Monday checklist issue number override used when posting exceptional-loop comment'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  generate-founder-fame-pack:
+    name: Generate founder weekly and fame artifacts
+    runs-on: macos-14
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run founder pack pipeline
+        shell: zsh {0}
+        env:
+          INPUT_WEEK: ${{ github.event.inputs.week || '' }}
+          INPUT_PREVIOUS_WEEK: ${{ github.event.inputs.previous_week || '' }}
+          INPUT_PREVIOUS_MRR: ${{ github.event.inputs.previous_mrr || '' }}
+          INPUT_PREVIOUS_DELIVERY_COST: ${{ github.event.inputs.previous_delivery_cost || '' }}
+          INPUT_PREVIOUS_ACQUISITION_SPEND: ${{ github.event.inputs.previous_acquisition_spend || '' }}
+          INPUT_PREVIOUS_NEW_CUSTOMERS: ${{ github.event.inputs.previous_new_customers || '' }}
+          INPUT_PREVIOUS_MONTHLY_CONTRIBUTION: ${{ github.event.inputs.previous_monthly_contribution || '' }}
+          INPUT_PREVIOUS_LIFETIME_MONTHS: ${{ github.event.inputs.previous_lifetime_months || '' }}
+          INPUT_PREVIOUS_FIXED_COST: ${{ github.event.inputs.previous_fixed_cost || '' }}
+          INPUT_PREVIOUS_PRICE: ${{ github.event.inputs.previous_price || '' }}
+          INPUT_PREVIOUS_VARIABLE_COST: ${{ github.event.inputs.previous_variable_cost || '' }}
+          INPUT_CURRENT_MRR: ${{ github.event.inputs.current_mrr || '' }}
+          INPUT_CURRENT_DELIVERY_COST: ${{ github.event.inputs.current_delivery_cost || '' }}
+          INPUT_CURRENT_ACQUISITION_SPEND: ${{ github.event.inputs.current_acquisition_spend || '' }}
+          INPUT_CURRENT_NEW_CUSTOMERS: ${{ github.event.inputs.current_new_customers || '' }}
+          INPUT_CURRENT_MONTHLY_CONTRIBUTION: ${{ github.event.inputs.current_monthly_contribution || '' }}
+          INPUT_CURRENT_LIFETIME_MONTHS: ${{ github.event.inputs.current_lifetime_months || '' }}
+          INPUT_CURRENT_FIXED_COST: ${{ github.event.inputs.current_fixed_cost || '' }}
+          INPUT_CURRENT_PRICE: ${{ github.event.inputs.current_price || '' }}
+          INPUT_CURRENT_VARIABLE_COST: ${{ github.event.inputs.current_variable_cost || '' }}
+          INPUT_TARGET_MRR: ${{ github.event.inputs.target_mrr || '' }}
+          INPUT_TARGET_MARGIN: ${{ github.event.inputs.target_margin || '' }}
+          INPUT_TARGET_CAC: ${{ github.event.inputs.target_cac || '' }}
+          INPUT_TARGET_LTV_CAC: ${{ github.event.inputs.target_ltv_cac || '' }}
+          INPUT_TARGET_NEW_CUSTOMERS: ${{ github.event.inputs.target_new_customers || '' }}
+          INPUT_PRODUCT: ${{ github.event.inputs.product || '' }}
+          INPUT_PRIMARY_CHANNEL: ${{ github.event.inputs.primary_channel || '' }}
+          INPUT_BACKUP_CHANNEL: ${{ github.event.inputs.backup_channel || '' }}
+          INPUT_CTA: ${{ github.event.inputs.cta || '' }}
+          INPUT_FIRST48H_PRIMARY_CHAR_LIMIT: ${{ github.event.inputs.first48h_primary_char_limit || '' }}
+          INPUT_FIRST48H_BACKUP_CHAR_LIMIT: ${{ github.event.inputs.first48h_backup_char_limit || '' }}
+          INPUT_FIRST48H_PRIMARY_TONE: ${{ github.event.inputs.first48h_primary_tone || '' }}
+          INPUT_FIRST48H_BACKUP_TONE: ${{ github.event.inputs.first48h_backup_tone || '' }}
+          INPUT_FOUNDER_TRANSCRIPT: ${{ github.event.inputs.founder_transcript || '' }}
+          INPUT_FOUNDER_FAME_DAILY_MISSION: ${{ github.event.inputs.founder_fame_daily_mission || '' }}
+          INPUT_CREATOR_TARGET_LIST: ${{ github.event.inputs.creator_target_list || '' }}
+          INPUT_DISTRIBUTION_PLAN: ${{ github.event.inputs.distribution_plan || '' }}
+          INPUT_FOUNDER_FAME_ACTION_QUEUE: ${{ github.event.inputs.founder_fame_action_queue || '' }}
+          INPUT_GUESTING_SIGNAL_ENTRIES: ${{ github.event.inputs.guesting_signal_entries || '' }}
+          INPUT_GUESTING_SIGNAL_REPLIED: ${{ github.event.inputs.guesting_signal_replied || '' }}
+          INPUT_GUESTING_SIGNAL_BOOKED: ${{ github.event.inputs.guesting_signal_booked || '' }}
+          INPUT_GUESTING_SIGNAL_PUBLISHED: ${{ github.event.inputs.guesting_signal_published || '' }}
+          INPUT_GUESTING_SIGNAL_TOP_FORMAT: ${{ github.event.inputs.guesting_signal_top_format || '' }}
+          INPUT_GUESTING_SIGNAL_TOP_TARGET: ${{ github.event.inputs.guesting_signal_top_target || '' }}
+          INPUT_GUESTING_SIGNAL_ENRICHMENT_SCORE: ${{ github.event.inputs.guesting_signal_enrichment_score || '' }}
+          INPUT_GUESTING_SIGNAL_RECOMMENDATION: ${{ github.event.inputs.guesting_signal_recommendation || '' }}
+          INPUT_SKIP_FOUNDER_CHECKS: ${{ github.event.inputs.skip_founder_checks || 'true' }}
+          INPUT_POST_WAR_ROOM_COMMENT: ${{ github.event.inputs.post_war_room_comment || 'false' }}
+          INPUT_WAR_ROOM_COMMENT_ISSUE: ${{ github.event.inputs.war_room_comment_issue || '' }}
+          INPUT_POST_EXCEPTIONAL_LOOP_COMMENT: ${{ github.event.inputs.post_exceptional_loop_comment || 'false' }}
+          INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ${{ github.event.inputs.exceptional_loop_comment_issue || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source scripts/fixtures/founder/sample_inputs.env
+
+          resolve_value() {
+            local preferred="$1"
+            local fallback="$2"
+            if [[ -n "$preferred" ]]; then
+              echo "$preferred"
+            else
+              echo "$fallback"
+            fi
+          }
+
+          previous_mrr="$(resolve_value "$INPUT_PREVIOUS_MRR" "$PREVIOUS_MRR")"
+          previous_delivery_cost="$(resolve_value "$INPUT_PREVIOUS_DELIVERY_COST" "$PREVIOUS_DELIVERY_COST")"
+          previous_acquisition_spend="$(resolve_value "$INPUT_PREVIOUS_ACQUISITION_SPEND" "$PREVIOUS_ACQUISITION_SPEND")"
+          previous_new_customers="$(resolve_value "$INPUT_PREVIOUS_NEW_CUSTOMERS" "$PREVIOUS_NEW_CUSTOMERS")"
+          previous_monthly_contribution="$(resolve_value "$INPUT_PREVIOUS_MONTHLY_CONTRIBUTION" "$PREVIOUS_MONTHLY_CONTRIBUTION")"
+          previous_lifetime_months="$(resolve_value "$INPUT_PREVIOUS_LIFETIME_MONTHS" "$PREVIOUS_LIFETIME_MONTHS")"
+          previous_fixed_cost="$(resolve_value "$INPUT_PREVIOUS_FIXED_COST" "$PREVIOUS_FIXED_COST")"
+          previous_price="$(resolve_value "$INPUT_PREVIOUS_PRICE" "$PREVIOUS_PRICE")"
+          previous_variable_cost="$(resolve_value "$INPUT_PREVIOUS_VARIABLE_COST" "$PREVIOUS_VARIABLE_COST")"
+
+          current_mrr="$(resolve_value "$INPUT_CURRENT_MRR" "$PACK_MRR")"
+          current_delivery_cost="$(resolve_value "$INPUT_CURRENT_DELIVERY_COST" "$PACK_DELIVERY_COST")"
+          current_acquisition_spend="$(resolve_value "$INPUT_CURRENT_ACQUISITION_SPEND" "$PACK_ACQUISITION_SPEND")"
+          current_new_customers="$(resolve_value "$INPUT_CURRENT_NEW_CUSTOMERS" "$PACK_NEW_CUSTOMERS")"
+          current_monthly_contribution="$(resolve_value "$INPUT_CURRENT_MONTHLY_CONTRIBUTION" "$PACK_MONTHLY_CONTRIBUTION")"
+          current_lifetime_months="$(resolve_value "$INPUT_CURRENT_LIFETIME_MONTHS" "$PACK_LIFETIME_MONTHS")"
+          current_fixed_cost="$(resolve_value "$INPUT_CURRENT_FIXED_COST" "$PACK_FIXED_COST")"
+          current_price="$(resolve_value "$INPUT_CURRENT_PRICE" "$PACK_PRICE")"
+          current_variable_cost="$(resolve_value "$INPUT_CURRENT_VARIABLE_COST" "$PACK_VARIABLE_COST")"
+
+          target_mrr="$(resolve_value "$INPUT_TARGET_MRR" "$TARGET_MRR")"
+          target_margin="$(resolve_value "$INPUT_TARGET_MARGIN" "$TARGET_MARGIN")"
+          target_cac="$(resolve_value "$INPUT_TARGET_CAC" "$TARGET_CAC")"
+          target_ltv_cac="$(resolve_value "$INPUT_TARGET_LTV_CAC" "$TARGET_LTV_CAC")"
+          target_new_customers="$(resolve_value "$INPUT_TARGET_NEW_CUSTOMERS" "$TARGET_NEW_CUSTOMERS")"
+
+          product_name="$(resolve_value "$INPUT_PRODUCT" "$PRODUCT_NAME")"
+          primary_channel="$(resolve_value "$INPUT_PRIMARY_CHANNEL" "$PRIMARY_CHANNEL")"
+          backup_channel="$(resolve_value "$INPUT_BACKUP_CHANNEL" "$BACKUP_CHANNEL")"
+          cta_text="$(resolve_value "$INPUT_CTA" "$CTA_TEXT")"
+          first48h_primary_char_limit="$(resolve_value "$INPUT_FIRST48H_PRIMARY_CHAR_LIMIT" "280")"
+          first48h_backup_char_limit="$(resolve_value "$INPUT_FIRST48H_BACKUP_CHAR_LIMIT" "500")"
+          first48h_primary_tone="$(resolve_value "$INPUT_FIRST48H_PRIMARY_TONE" "x-punchy")"
+          first48h_backup_tone="$(resolve_value "$INPUT_FIRST48H_BACKUP_TONE" "linkedin-context")"
+          post_war_room_comment="$(resolve_value "$INPUT_POST_WAR_ROOM_COMMENT" "false")"
+          post_war_room_comment="$(print -r -- "$post_war_room_comment" | tr '[:upper:]' '[:lower:]')"
+          war_room_comment_issue="$(resolve_value "$INPUT_WAR_ROOM_COMMENT_ISSUE" "")"
+          post_exceptional_loop_comment="$(resolve_value "$INPUT_POST_EXCEPTIONAL_LOOP_COMMENT" "false")"
+          post_exceptional_loop_comment="$(print -r -- "$post_exceptional_loop_comment" | tr '[:upper:]' '[:lower:]')"
+          exceptional_loop_comment_issue="$(resolve_value "$INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE" "")"
+
+          week="$INPUT_WEEK"
+          if [[ -z "$week" ]]; then
+            week="$(date '+%Y-W%V')"
+          fi
+
+          previous_week="$INPUT_PREVIOUS_WEEK"
+          if [[ -z "$previous_week" ]]; then
+            previous_week="$(date -v-7d '+%Y-W%V')"
+          fi
+
+          output_dir=".build/founder"
+          mkdir -p "$output_dir"
+          previous_review_path="$output_dir/weekly-review-${previous_week}.md"
+
+          if [[ "$INPUT_SKIP_FOUNDER_CHECKS" != "true" ]]; then
+            zsh scripts/check_founder_workflow.sh
+          fi
+
+          zsh scripts/generate_founder_weekly_review.sh \
+            --week "$previous_week" \
+            --mrr "$previous_mrr" \
+            --delivery-cost "$previous_delivery_cost" \
+            --acquisition-spend "$previous_acquisition_spend" \
+            --new-customers "$previous_new_customers" \
+            --monthly-contribution "$previous_monthly_contribution" \
+            --lifetime-months "$previous_lifetime_months" \
+            --fixed-cost "$previous_fixed_cost" \
+            --price "$previous_price" \
+            --variable-cost "$previous_variable_cost" \
+            --out "$previous_review_path"
+
+          zsh scripts/generate_founder_weekly_pack.sh \
+            --week "$week" \
+            --previous-review "$previous_review_path" \
+            --previous-label "$previous_week" \
+            --mrr "$current_mrr" \
+            --delivery-cost "$current_delivery_cost" \
+            --acquisition-spend "$current_acquisition_spend" \
+            --new-customers "$current_new_customers" \
+            --monthly-contribution "$current_monthly_contribution" \
+            --lifetime-months "$current_lifetime_months" \
+            --fixed-cost "$current_fixed_cost" \
+            --price "$current_price" \
+            --variable-cost "$current_variable_cost" \
+            --target-mrr "$target_mrr" \
+            --target-margin "$target_margin" \
+            --target-cac "$target_cac" \
+            --target-ltv-cac "$target_ltv_cac" \
+            --target-new-customers "$target_new_customers" \
+            --product "$product_name" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --guesting-signal-entries "$(resolve_value "$INPUT_GUESTING_SIGNAL_ENTRIES" "n/a")" \
+            --guesting-signal-replied "$(resolve_value "$INPUT_GUESTING_SIGNAL_REPLIED" "n/a")" \
+            --guesting-signal-booked "$(resolve_value "$INPUT_GUESTING_SIGNAL_BOOKED" "n/a")" \
+            --guesting-signal-published "$(resolve_value "$INPUT_GUESTING_SIGNAL_PUBLISHED" "n/a")" \
+            --guesting-signal-top-format "$(resolve_value "$INPUT_GUESTING_SIGNAL_TOP_FORMAT" "n/a")" \
+            --guesting-signal-top-target "$(resolve_value "$INPUT_GUESTING_SIGNAL_TOP_TARGET" "n/a")" \
+            --guesting-signal-enrichment-score "$(resolve_value "$INPUT_GUESTING_SIGNAL_ENRICHMENT_SCORE" "n/a")" \
+            --guesting-signal-recommendation "$(resolve_value "$INPUT_GUESTING_SIGNAL_RECOMMENDATION" "Capture founder guesting signal comments before Friday review.")" \
+            --cta "$cta_text" \
+            --out-dir "$output_dir"
+
+          review_path="$output_dir/weekly-review-${week}.md"
+          delta_path="$output_dir/weekly-delta-${week}.md"
+          scoreboard_path="$output_dir/scoreboard-${week}.md"
+          post_path="$output_dir/founder-update-${week}.md"
+          fame_path="$output_dir/founder-fame-pack-${week}.md"
+          press_path="$output_dir/founder-press-kit-${week}.md"
+          media_blast_path="$output_dir/founder-media-blast-${week}.md"
+          guesting_queue_path="$output_dir/founder-guesting-queue-${week}.md"
+          guesting_brief_path="$output_dir/founder-guesting-brief-${week}.md"
+          founder_fame_distribution_plan_path="$output_dir/founder-fame-distribution-plan-${week}.md"
+          founder_fame_social_proof_wall_path="$output_dir/founder-fame-social-proof-wall-${week}.md"
+          founder_fame_ops_brief_path="$output_dir/founder-fame-ops-brief-${week}.md"
+          founder_fame_action_queue_path="$output_dir/founder-fame-action-queue-${week}.md"
+          interview_prep_path="$output_dir/founder-fame-interview-prep-${week}.md"
+          transcript_ingestion_path="$output_dir/founder-fame-transcript-ingestion-${week}.md"
+          repurpose_plan_path="$output_dir/founder-fame-repurpose-plan-${week}.md"
+          uplift_tracker_path="$output_dir/founder-fame-uplift-tracker-${week}.md"
+          weight_profile_path="$output_dir/founder-fame-weight-profile-${week}.md"
+          momentum_brief_path="$output_dir/founder-fame-momentum-brief-${week}.md"
+          opportunity_radar_path="$output_dir/founder-fame-opportunity-radar-${week}.md"
+          execution_sprint_path="$output_dir/founder-fame-execution-sprint-${week}.md"
+          execution_scorecard_path="$output_dir/founder-fame-execution-scorecard-${week}.md"
+          risk_response_path="$output_dir/founder-fame-risk-response-plan-${week}.md"
+          escalation_queue_path="$output_dir/founder-fame-escalation-queue-${week}.md"
+          command_center_path="$output_dir/founder-fame-command-center-${week}.md"
+          next_move_handoff_path="$output_dir/founder-fame-next-move-handoff-${week}.md"
+          next_move_draft_pack_path="$output_dir/founder-fame-next-move-draft-pack-${week}.md"
+          spotlight_path="$output_dir/founder-fame-spotlight-pack-${week}.md"
+          breakout_path="$output_dir/founder-fame-breakout-plan-${week}.md"
+          outreach_sprint_path="$output_dir/founder-fame-outreach-sprint-${week}.md"
+          proof_loop_path="$output_dir/founder-fame-proof-loop-${week}.md"
+          proof_loop_check_path="$output_dir/founder-fame-proof-loop-check-${week}.md"
+          kpi_snapshot_path="$output_dir/founder-fame-kpi-snapshot-${week}.md"
+          velocity_scoreboard_path="$output_dir/founder-fame-velocity-scoreboard-${week}.md"
+          exceptional_loop_path="$output_dir/founder-fame-exceptional-loop-${week}.md"
+          exceptional_loop_live_check_path="$output_dir/founder-fame-exceptional-loop-live-check-${week}.md"
+          narrative_lab_path="$output_dir/founder-fame-narrative-lab-${week}.md"
+          war_room_path="$output_dir/founder-fame-war-room-${week}.md"
+          war_room_check_path="$output_dir/founder-fame-war-room-check-${week}.md"
+          war_room_live_check_path="$output_dir/founder-fame-war-room-live-check-${week}.md"
+          war_room_comment_path=""
+          exceptional_loop_comment_path="$output_dir/founder-fame-exceptional-loop-comment-${week}.md"
+          first48h_post_pack_path="$output_dir/founder-first48h-post-pack-${week}.md"
+
+          zsh scripts/generate_founder_fame_interview_prep.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --press-kit "$press_path" \
+            --media-blast "$media_blast_path" \
+            --guesting-brief "$guesting_brief_path" \
+            --out "$interview_prep_path"
+
+          transcript_source_path="$interview_prep_path"
+          if [[ -n "$INPUT_FOUNDER_TRANSCRIPT" ]]; then
+            if [[ ! -f "$INPUT_FOUNDER_TRANSCRIPT" ]]; then
+              echo "Founder transcript source file not found: $INPUT_FOUNDER_TRANSCRIPT" >&2
+              exit 1
+            fi
+            transcript_source_path="$INPUT_FOUNDER_TRANSCRIPT"
+          fi
+
+          creator_target_list_path=""
+          if [[ -n "$INPUT_CREATOR_TARGET_LIST" ]]; then
+            if [[ ! -f "$INPUT_CREATOR_TARGET_LIST" ]]; then
+              echo "Creator target list source file not found: $INPUT_CREATOR_TARGET_LIST" >&2
+              exit 1
+            fi
+            creator_target_list_path="$INPUT_CREATOR_TARGET_LIST"
+          fi
+
+          distribution_plan_path=""
+          if [[ -n "$INPUT_DISTRIBUTION_PLAN" ]]; then
+            if [[ ! -f "$INPUT_DISTRIBUTION_PLAN" ]]; then
+              echo "Distribution plan source file not found: $INPUT_DISTRIBUTION_PLAN" >&2
+              exit 1
+            fi
+            distribution_plan_path="$INPUT_DISTRIBUTION_PLAN"
+          fi
+
+          founder_fame_daily_mission_path=""
+          if [[ -n "$INPUT_FOUNDER_FAME_DAILY_MISSION" ]]; then
+            if [[ ! -f "$INPUT_FOUNDER_FAME_DAILY_MISSION" ]]; then
+              echo "Founder fame daily mission source file not found: $INPUT_FOUNDER_FAME_DAILY_MISSION" >&2
+              exit 1
+            fi
+            founder_fame_daily_mission_path="$INPUT_FOUNDER_FAME_DAILY_MISSION"
+          fi
+
+          zsh scripts/generate_distribution_followup_plan.sh \
+            --week "$week" \
+            --metric-focus "Founder fame momentum and reply quality" \
+            --strongest-metric-label "Current MRR" \
+            --strongest-metric-value "$current_mrr" \
+            --command "Run Fame Next Move" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --primary-channel-roi-score "n/a" \
+            --backup-channel-roi-score "n/a" \
+            --channel-roi-preferred-channel "balanced" \
+            --channel-roi-recommendation "Run weekly ROI review before forcing a single-channel route." \
+            --channel-mix-recommendation "Keep channel mix balanced until founder mission freshness and reply deltas stabilize." \
+            --reply-goal "12" \
+            --outreach-goal "5" \
+            --out "$founder_fame_distribution_plan_path"
+
+          zsh scripts/generate_social_proof_wall.sh \
+            --week "$week" \
+            --metric-focus "Founder fame momentum and reply quality" \
+            --strongest-metric-label "Current MRR" \
+            --strongest-metric-value "$current_mrr" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --win-card "0" \
+            --win-card-delta "n/a" \
+            --replies-sent "0" \
+            --replies-sent-delta "n/a" \
+            --outreach-replies "0" \
+            --outreach-collabs "0" \
+            --outreach-cross-posts "0" \
+            --primary-top-variant "A" \
+            --backup-top-variant "B" \
+            --creator-signal-top-handle "n/a" \
+            --creator-signal-top-segment "n/a" \
+            --guesting-signal-top-target "$(resolve_value "$INPUT_GUESTING_SIGNAL_TOP_TARGET" "n/a")" \
+            --channel-mix-recommendation "Keep channel mix balanced until founder mission freshness and reply deltas stabilize." \
+            --variant-recommendation "Use proof-loop deltas to choose next-week default variant." \
+            --outreach-recommendation "$(resolve_value "$INPUT_GUESTING_SIGNAL_RECOMMENDATION" "Capture founder guesting signal comments before Friday review.")" \
+            --out "$founder_fame_social_proof_wall_path"
+
+          distribution_plan_for_ops="$founder_fame_distribution_plan_path"
+          if [[ -n "$distribution_plan_path" ]]; then
+            distribution_plan_for_ops="$distribution_plan_path"
+          fi
+
+          zsh scripts/generate_founder_fame_ops_brief.sh \
+            --week "$week" \
+            --distribution-plan "$distribution_plan_for_ops" \
+            --social-proof-wall "$founder_fame_social_proof_wall_path" \
+            --fame-pack "$fame_path" \
+            --media-blast "$media_blast_path" \
+            --guesting-brief "$guesting_brief_path" \
+            --out "$founder_fame_ops_brief_path"
+
+          founder_fame_action_queue_args=(
+            --week "$week"
+            --ops-brief "$founder_fame_ops_brief_path"
+            --out "$founder_fame_action_queue_path"
+          )
+          if [[ -n "$founder_fame_daily_mission_path" ]]; then
+            founder_fame_action_queue_args+=(--daily-mission "$founder_fame_daily_mission_path")
+            founder_fame_action_queue_args+=(--require-fresh-daily-mission)
+          fi
+          zsh scripts/generate_founder_fame_action_queue.sh "${founder_fame_action_queue_args[@]}"
+
+          founder_fame_action_queue_overlay_path="$founder_fame_action_queue_path"
+          if [[ -n "$INPUT_FOUNDER_FAME_ACTION_QUEUE" ]]; then
+            if [[ ! -f "$INPUT_FOUNDER_FAME_ACTION_QUEUE" ]]; then
+              echo "Founder fame action queue source file not found: $INPUT_FOUNDER_FAME_ACTION_QUEUE" >&2
+              exit 1
+            fi
+            founder_fame_action_queue_overlay_path="$INPUT_FOUNDER_FAME_ACTION_QUEUE"
+          fi
+
+          founder_fame_daily_mission_source_line="$(rg -m1 '^- Daily mission source: ' "$founder_fame_action_queue_overlay_path" || true)"
+          founder_fame_daily_mission_source="${founder_fame_daily_mission_source_line#"- Daily mission source: "}"
+          if [[ -z "$founder_fame_daily_mission_source" ]]; then
+            founder_fame_daily_mission_source="n/a (missing Daily mission source line in founder_fame_action_queue overlay)"
+          fi
+
+          founder_fame_daily_mission_freshness_line="$(rg -m1 '^- Mission freshness: ' "$founder_fame_action_queue_overlay_path" || true)"
+          founder_fame_daily_mission_freshness="${founder_fame_daily_mission_freshness_line#"- Mission freshness: "}"
+          if [[ -z "$founder_fame_daily_mission_freshness" ]]; then
+            founder_fame_daily_mission_freshness="n/a (missing Mission freshness line in founder_fame_action_queue overlay)"
+          fi
+
+          zsh scripts/generate_founder_fame_interview_prep.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --ops-brief "$founder_fame_ops_brief_path" \
+            --action-queue "$founder_fame_action_queue_path" \
+            --press-kit "$press_path" \
+            --media-blast "$media_blast_path" \
+            --guesting-brief "$guesting_brief_path" \
+            --out "$interview_prep_path"
+
+          zsh scripts/generate_founder_fame_transcript_ingestion.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --transcript "$transcript_source_path" \
+            --interview-prep "$interview_prep_path" \
+            --media-blast "$media_blast_path" \
+            --out "$transcript_ingestion_path"
+
+          zsh scripts/generate_founder_fame_repurpose_plan.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --interview-prep "$interview_prep_path" \
+            --transcript-ingestion "$transcript_ingestion_path" \
+            --media-blast "$media_blast_path" \
+            --action-queue "$founder_fame_action_queue_path" \
+            --guesting-brief "$guesting_brief_path" \
+            --out "$repurpose_plan_path"
+
+          zsh scripts/generate_founder_fame_uplift_tracker.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --campaign-dir "docs/campaigns" \
+            --out "$uplift_tracker_path"
+
+          zsh scripts/generate_founder_fame_weight_profile.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --campaign-dir "docs/campaigns" \
+            --uplift-tracker "$uplift_tracker_path" \
+            --out "$weight_profile_path"
+
+          zsh scripts/generate_founder_fame_momentum_brief.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --fame-pack "$fame_path" \
+            --repurpose-plan "$repurpose_plan_path" \
+            --transcript-ingestion "$transcript_ingestion_path" \
+            --press-kit "$press_path" \
+            --media-blast "$media_blast_path" \
+            --weight-profile "$weight_profile_path" \
+            --out "$momentum_brief_path"
+
+          zsh scripts/generate_founder_fame_opportunity_radar.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --momentum-brief "$momentum_brief_path" \
+            --weight-profile "$weight_profile_path" \
+            --uplift-tracker "$uplift_tracker_path" \
+            --out "$opportunity_radar_path"
+
+          zsh scripts/generate_founder_fame_execution_sprint.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --opportunity-radar "$opportunity_radar_path" \
+            --momentum-brief "$momentum_brief_path" \
+            --out "$execution_sprint_path"
+
+          zsh scripts/generate_founder_fame_execution_scorecard.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --execution-sprint "$execution_sprint_path" \
+            --opportunity-radar "$opportunity_radar_path" \
+            --momentum-brief "$momentum_brief_path" \
+            --out "$execution_scorecard_path"
+
+          zsh scripts/generate_founder_fame_risk_response_plan.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --execution-scorecard "$execution_scorecard_path" \
+            --execution-sprint "$execution_sprint_path" \
+            --opportunity-radar "$opportunity_radar_path" \
+            --momentum-brief "$momentum_brief_path" \
+            --out "$risk_response_path"
+
+          zsh scripts/generate_founder_fame_escalation_queue.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --risk-response-plan "$risk_response_path" \
+            --execution-scorecard "$execution_scorecard_path" \
+            --execution-sprint "$execution_sprint_path" \
+            --out "$escalation_queue_path"
+
+          zsh scripts/generate_founder_fame_command_center.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --momentum-brief "$momentum_brief_path" \
+            --execution-scorecard "$execution_scorecard_path" \
+            --risk-response-plan "$risk_response_path" \
+            --escalation-queue "$escalation_queue_path" \
+            --opportunity-radar "$opportunity_radar_path" \
+            --out "$command_center_path"
+
+          zsh scripts/generate_founder_fame_next_move_handoff.sh \
+            --week "$week" \
+            --command-center "$command_center_path" \
+            --artifact-link "$command_center_path" \
+            --out "$next_move_handoff_path"
+
+          zsh scripts/generate_founder_fame_next_move_draft_pack.sh \
+            --week "$week" \
+            --next-move-handoff "$next_move_handoff_path" \
+            --out "$next_move_draft_pack_path"
+
+          zsh scripts/generate_founder_fame_spotlight_pack.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --command-center "$command_center_path" \
+            --momentum-brief "$momentum_brief_path" \
+            --execution-scorecard "$execution_scorecard_path" \
+            --risk-response-plan "$risk_response_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --cta "$cta_text" \
+            --out "$spotlight_path"
+
+          zsh scripts/generate_founder_fame_breakout_plan.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --spotlight-pack "$spotlight_path" \
+            --command-center "$command_center_path" \
+            --execution-sprint "$execution_sprint_path" \
+            --distribution-plan "$distribution_plan_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --cta "$cta_text" \
+            --out "$breakout_path"
+
+          zsh scripts/generate_founder_fame_outreach_sprint.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --breakout-plan "$breakout_path" \
+            --guesting-queue "$guesting_queue_path" \
+            --creator-target-list "$creator_target_list_path" \
+            --distribution-plan "$distribution_plan_path" \
+            --media-blast "$media_blast_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --cta "$cta_text" \
+            --out "$outreach_sprint_path"
+
+          zsh scripts/generate_founder_fame_proof_loop.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --breakout-plan "$breakout_path" \
+            --outreach-sprint "$outreach_sprint_path" \
+            --spotlight-pack "$spotlight_path" \
+            --command-center "$command_center_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --cta "$cta_text" \
+            --out "$proof_loop_path"
+
+          zsh scripts/verify_founder_fame_proof_loop.sh \
+            --proof-loop "$proof_loop_path" \
+            --strict \
+            --out "$proof_loop_check_path"
+
+          zsh scripts/generate_founder_fame_kpi_snapshot.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --proof-loop "$proof_loop_path" \
+            --command-center "$command_center_path" \
+            --proof-loop-check "$proof_loop_check_path" \
+            --out "$kpi_snapshot_path"
+
+          zsh scripts/generate_founder_fame_velocity_scoreboard.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --kpi-snapshot "$kpi_snapshot_path" \
+            --command-center "$command_center_path" \
+            --proof-loop-check "$proof_loop_check_path" \
+            --out "$velocity_scoreboard_path"
+
+          zsh scripts/generate_founder_fame_exceptional_loop.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --kpi-snapshot "$kpi_snapshot_path" \
+            --velocity-scoreboard "$velocity_scoreboard_path" \
+            --out "$exceptional_loop_path"
+
+          exceptional_loop_comment_command=(
+            zsh scripts/post_founder_fame_exceptional_loop_comment.sh
+            --exceptional-loop "$exceptional_loop_path"
+            --out "$exceptional_loop_comment_path"
+          )
+          if [[ -n "$founder_fame_action_queue_overlay_path" ]]; then
+            exceptional_loop_comment_command+=(--action-queue "$founder_fame_action_queue_overlay_path")
+          fi
+          if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+            exceptional_loop_comment_command+=(--repo "$GITHUB_REPOSITORY")
+          fi
+          if [[ -n "$exceptional_loop_comment_issue" ]]; then
+            exceptional_loop_comment_command+=(--issue "$exceptional_loop_comment_issue")
+          fi
+          if [[ "$post_exceptional_loop_comment" == "true" ]]; then
+            "${exceptional_loop_comment_command[@]}"
+          else
+            exceptional_loop_comment_command+=(--dry-run)
+            "${exceptional_loop_comment_command[@]}"
+          fi
+
+          exceptional_loop_verify_args=(
+            zsh scripts/verify_founder_fame_exceptional_loop_run.sh
+            --exceptional-loop "$exceptional_loop_path"
+            --comment "$exceptional_loop_comment_path"
+            --out "$exceptional_loop_live_check_path"
+          )
+          if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+            exceptional_loop_verify_args+=(--repo "$GITHUB_REPOSITORY")
+          fi
+          if [[ -n "$exceptional_loop_comment_issue" ]]; then
+            exceptional_loop_verify_args+=(--issue "$exceptional_loop_comment_issue")
+          fi
+          if [[ "$post_exceptional_loop_comment" == "true" ]]; then
+            exceptional_loop_verify_args+=(--strict)
+          fi
+          "${exceptional_loop_verify_args[@]}"
+
+          zsh scripts/generate_founder_fame_narrative_lab.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --kpi-snapshot "$kpi_snapshot_path" \
+            --proof-loop "$proof_loop_path" \
+            --command-center "$command_center_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --out "$narrative_lab_path"
+
+          zsh scripts/generate_founder_fame_war_room.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --command-center "$command_center_path" \
+            --next-move-handoff "$next_move_handoff_path" \
+            --next-move-draft-pack "$next_move_draft_pack_path" \
+            --proof-loop-check "$proof_loop_check_path" \
+            --narrative-lab "$narrative_lab_path" \
+            --out "$war_room_path"
+
+          zsh scripts/verify_founder_fame_war_room.sh \
+            --war-room "$war_room_path" \
+            --strict \
+            --out "$war_room_check_path"
+
+          if [[ "$post_war_room_comment" == "true" ]]; then
+            war_room_comment_path="$output_dir/founder-fame-war-room-comment-${week}.md"
+            comment_command=(
+              zsh scripts/post_founder_fame_war_room_comment.sh
+              --war-room "$war_room_path"
+              --strict
+              --out "$war_room_comment_path"
+            )
+            if [[ -n "$founder_fame_action_queue_overlay_path" ]]; then
+              comment_command+=(--action-queue "$founder_fame_action_queue_overlay_path")
+            fi
+            if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+              comment_command+=(--repo "$GITHUB_REPOSITORY")
+            fi
+            if [[ -n "$war_room_comment_issue" ]]; then
+              comment_command+=(--issue "$war_room_comment_issue")
+            fi
+            "${comment_command[@]}"
+          fi
+
+          war_room_verify_args=(
+            zsh scripts/verify_founder_fame_war_room_run.sh
+            --war-room "$war_room_path"
+            --out "$war_room_live_check_path"
+          )
+          if [[ -n "$war_room_comment_path" ]]; then
+            war_room_verify_args+=(--comment "$war_room_comment_path")
+          fi
+          if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+            war_room_verify_args+=(--repo "$GITHUB_REPOSITORY")
+          fi
+          if [[ -n "$war_room_comment_issue" ]]; then
+            war_room_verify_args+=(--issue "$war_room_comment_issue")
+          fi
+          if [[ "$post_war_room_comment" == "true" ]]; then
+            war_room_verify_args+=(--strict)
+          fi
+          "${war_room_verify_args[@]}"
+
+          zsh scripts/generate_founder_first48h_post_pack.sh \
+            --week "$week" \
+            --product "$product_name" \
+            --narrative-lab "$narrative_lab_path" \
+            --primary-channel "$primary_channel" \
+            --backup-channel "$backup_channel" \
+            --cta "$cta_text" \
+            --primary-char-limit "$first48h_primary_char_limit" \
+            --backup-char-limit "$first48h_backup_char_limit" \
+            --primary-tone "$first48h_primary_tone" \
+            --backup-tone "$first48h_backup_tone" \
+            --out "$first48h_post_pack_path"
+
+          for generated_file in \
+            "$review_path" \
+            "$delta_path" \
+            "$scoreboard_path" \
+            "$post_path" \
+            "$fame_path" \
+            "$press_path" \
+            "$media_blast_path" \
+            "$guesting_queue_path" \
+            "$guesting_brief_path" \
+            "$interview_prep_path" \
+            "$transcript_ingestion_path" \
+            "$repurpose_plan_path" \
+            "$uplift_tracker_path" \
+            "$weight_profile_path" \
+            "$momentum_brief_path" \
+            "$opportunity_radar_path" \
+            "$execution_sprint_path" \
+            "$execution_scorecard_path" \
+            "$risk_response_path" \
+            "$escalation_queue_path" \
+            "$command_center_path" \
+            "$next_move_handoff_path" \
+            "$next_move_draft_pack_path" \
+            "$spotlight_path" \
+            "$breakout_path" \
+            "$outreach_sprint_path" \
+            "$proof_loop_path" \
+            "$proof_loop_check_path" \
+            "$kpi_snapshot_path" \
+            "$velocity_scoreboard_path" \
+            "$exceptional_loop_path" \
+            "$exceptional_loop_comment_path" \
+            "$exceptional_loop_live_check_path" \
+            "$narrative_lab_path" \
+            "$war_room_path" \
+            "$war_room_check_path" \
+            "$war_room_live_check_path" \
+            "$first48h_post_pack_path"; do
+            if [[ ! -s "$generated_file" ]]; then
+              echo "Generated founder artifact missing or empty: $generated_file" >&2
+              exit 1
+            fi
+          done
+
+          if [[ "$post_war_room_comment" == "true" ]] && [[ ! -s "$war_room_comment_path" ]]; then
+            echo "Generated founder artifact missing or empty: $war_room_comment_path" >&2
+            exit 1
+          fi
+
+          echo "week=$week" >> "$GITHUB_OUTPUT"
+          echo "previous_week=$previous_week" >> "$GITHUB_OUTPUT"
+          echo "previous_review_path=$previous_review_path" >> "$GITHUB_OUTPUT"
+          echo "review_path=$review_path" >> "$GITHUB_OUTPUT"
+          echo "delta_path=$delta_path" >> "$GITHUB_OUTPUT"
+          echo "scoreboard_path=$scoreboard_path" >> "$GITHUB_OUTPUT"
+          echo "post_path=$post_path" >> "$GITHUB_OUTPUT"
+          echo "fame_path=$fame_path" >> "$GITHUB_OUTPUT"
+          echo "press_path=$press_path" >> "$GITHUB_OUTPUT"
+          echo "media_blast_path=$media_blast_path" >> "$GITHUB_OUTPUT"
+          echo "guesting_queue_path=$guesting_queue_path" >> "$GITHUB_OUTPUT"
+          echo "guesting_brief_path=$guesting_brief_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_action_queue_overlay_path=$founder_fame_action_queue_overlay_path" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_daily_mission_source=$founder_fame_daily_mission_source" >> "$GITHUB_OUTPUT"
+          echo "founder_fame_daily_mission_freshness=$founder_fame_daily_mission_freshness" >> "$GITHUB_OUTPUT"
+          echo "interview_prep_path=$interview_prep_path" >> "$GITHUB_OUTPUT"
+          echo "transcript_ingestion_path=$transcript_ingestion_path" >> "$GITHUB_OUTPUT"
+          echo "repurpose_plan_path=$repurpose_plan_path" >> "$GITHUB_OUTPUT"
+          echo "uplift_tracker_path=$uplift_tracker_path" >> "$GITHUB_OUTPUT"
+          echo "weight_profile_path=$weight_profile_path" >> "$GITHUB_OUTPUT"
+          echo "momentum_brief_path=$momentum_brief_path" >> "$GITHUB_OUTPUT"
+          echo "opportunity_radar_path=$opportunity_radar_path" >> "$GITHUB_OUTPUT"
+          echo "execution_sprint_path=$execution_sprint_path" >> "$GITHUB_OUTPUT"
+          echo "execution_scorecard_path=$execution_scorecard_path" >> "$GITHUB_OUTPUT"
+          echo "risk_response_path=$risk_response_path" >> "$GITHUB_OUTPUT"
+          echo "escalation_queue_path=$escalation_queue_path" >> "$GITHUB_OUTPUT"
+          echo "command_center_path=$command_center_path" >> "$GITHUB_OUTPUT"
+          echo "next_move_handoff_path=$next_move_handoff_path" >> "$GITHUB_OUTPUT"
+          echo "next_move_draft_pack_path=$next_move_draft_pack_path" >> "$GITHUB_OUTPUT"
+          echo "spotlight_path=$spotlight_path" >> "$GITHUB_OUTPUT"
+          echo "breakout_path=$breakout_path" >> "$GITHUB_OUTPUT"
+          echo "outreach_sprint_path=$outreach_sprint_path" >> "$GITHUB_OUTPUT"
+          echo "proof_loop_path=$proof_loop_path" >> "$GITHUB_OUTPUT"
+          echo "proof_loop_check_path=$proof_loop_check_path" >> "$GITHUB_OUTPUT"
+          echo "kpi_snapshot_path=$kpi_snapshot_path" >> "$GITHUB_OUTPUT"
+          echo "velocity_scoreboard_path=$velocity_scoreboard_path" >> "$GITHUB_OUTPUT"
+          echo "exceptional_loop_path=$exceptional_loop_path" >> "$GITHUB_OUTPUT"
+          echo "exceptional_loop_comment_path=$exceptional_loop_comment_path" >> "$GITHUB_OUTPUT"
+          echo "exceptional_loop_live_check_path=$exceptional_loop_live_check_path" >> "$GITHUB_OUTPUT"
+          echo "narrative_lab_path=$narrative_lab_path" >> "$GITHUB_OUTPUT"
+          echo "war_room_path=$war_room_path" >> "$GITHUB_OUTPUT"
+          echo "war_room_check_path=$war_room_check_path" >> "$GITHUB_OUTPUT"
+          echo "war_room_live_check_path=$war_room_live_check_path" >> "$GITHUB_OUTPUT"
+          echo "war_room_comment_path=$war_room_comment_path" >> "$GITHUB_OUTPUT"
+          echo "first48h_post_pack_path=$first48h_post_pack_path" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Founder Fame Pack Generated"
+            echo ""
+            echo "- Week: \`$week\`"
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Previous week baseline: \`$previous_week\`"
+            echo "- Baseline review: \`$previous_review_path\`"
+            echo "- Current review: \`$review_path\`"
+            echo "- Weekly delta: \`$delta_path\`"
+            echo "- Scoreboard: \`$scoreboard_path\`"
+            echo "- Founder update post: \`$post_path\`"
+            echo "- Founder fame pack: \`$fame_path\`"
+            echo "- Founder press kit: \`$press_path\`"
+            echo "- Founder media blast: \`$media_blast_path\`"
+            echo "- Founder guesting queue: \`$guesting_queue_path\`"
+            echo "- Founder guesting sprint brief: \`$guesting_brief_path\`"
+            echo "- Founder fame interview prep: \`$interview_prep_path\`"
+            echo "- Founder fame transcript ingestion: \`$transcript_ingestion_path\`"
+            echo "- Founder transcript source: \`$transcript_source_path\`"
+            echo "- Optional creator target list overlay: \`${creator_target_list_path:-n/a}\`"
+            echo "- Optional distribution plan overlay: \`${distribution_plan_path:-n/a}\`"
+            echo "- Optional founder fame action queue overlay: \`${founder_fame_action_queue_overlay_path:-n/a}\`"
+            echo "- Founder fame daily mission source: \`$founder_fame_daily_mission_source\`"
+            echo "- Founder fame daily mission freshness: \`$founder_fame_daily_mission_freshness\`"
+            echo "- Founder fame repurpose plan: \`$repurpose_plan_path\`"
+            echo "- Founder fame uplift tracker: \`$uplift_tracker_path\`"
+            echo "- Founder fame weight profile: \`$weight_profile_path\`"
+            echo "- Founder fame momentum brief: \`$momentum_brief_path\`"
+            echo "- Founder fame opportunity radar: \`$opportunity_radar_path\`"
+            echo "- Founder fame execution sprint: \`$execution_sprint_path\`"
+            echo "- Founder fame execution scorecard: \`$execution_scorecard_path\`"
+            echo "- Founder fame risk response plan: \`$risk_response_path\`"
+            echo "- Founder fame escalation queue: \`$escalation_queue_path\`"
+            echo "- Founder fame command center: \`$command_center_path\`"
+            echo "- Founder fame next-move handoff: \`$next_move_handoff_path\`"
+            echo "- Founder fame next-move draft pack: \`$next_move_draft_pack_path\`"
+            echo "- In-app fast loop: run \`Fame -> Run Fame Next Move\`, then log artifact link + owner update in \`Monday Publish Checklist <week>\`."
+            echo "- Founder fame spotlight pack: \`$spotlight_path\`"
+            echo "- Founder fame breakout plan: \`$breakout_path\`"
+            echo "- Founder fame outreach sprint: \`$outreach_sprint_path\`"
+            echo "- Founder fame proof loop: \`$proof_loop_path\`"
+            echo "- Founder fame proof loop verification: \`$proof_loop_check_path\`"
+            echo "- Founder fame KPI snapshot: \`$kpi_snapshot_path\`"
+            echo "- Founder fame velocity scoreboard: \`$velocity_scoreboard_path\`"
+            echo "- Founder fame exceptional loop: \`$exceptional_loop_path\`"
+            if [[ "$post_exceptional_loop_comment" == "true" ]]; then
+              echo "- Founder fame exceptional-loop checklist comment: \`$exceptional_loop_comment_path\` (upsert enabled)."
+              echo "- Founder fame exceptional-loop live verification: \`$exceptional_loop_live_check_path\` (strict)."
+            else
+              echo "- Founder fame exceptional-loop checklist comment: \`$exceptional_loop_comment_path\` (draft-only; set \`post_exceptional_loop_comment=true\` to enable)."
+              echo "- Founder fame exceptional-loop live verification: \`$exceptional_loop_live_check_path\` (non-strict draft validation)."
+            fi
+            echo "- Founder fame narrative lab: \`$narrative_lab_path\`"
+            echo "- Founder fame war room: \`$war_room_path\`"
+            echo "- Founder fame war-room verification: \`$war_room_check_path\`"
+            if [[ -n "$war_room_comment_path" ]]; then
+              echo "- Founder fame war-room checklist comment: \`$war_room_comment_path\`"
+              echo "- Founder fame war-room live verification: \`$war_room_live_check_path\` (strict)."
+            else
+              echo "- Founder fame war-room checklist comment: skipped (set \`post_war_room_comment=true\` to enable)."
+              echo "- Founder fame war-room live verification: \`$war_room_live_check_path\` (non-strict draft validation)."
+            fi
+            echo "- Founder first-48h post pack: \`$first48h_post_pack_path\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload founder artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-fame-pack-${{ github.run_id }}
+          path: |
+            .build/founder/*.md
+          if-no-files-found: error

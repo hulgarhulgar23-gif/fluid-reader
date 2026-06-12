@@ -72,6 +72,67 @@ enum ImageMasker {
         return SelectionOverlayResult(image: maskedImage, pngData: pngData)
     }
 
+    static func annotatedScreenshot(
+        from fullImage: CGImage,
+        viewSize: CGSize,
+        points: [CGPoint]
+    ) -> SelectionOverlayResult? {
+        guard points.count > 1, viewSize.width > 0, viewSize.height > 0 else { return nil }
+
+        let width = fullImage.width
+        let height = fullImage.height
+        guard width > 0, height > 0 else { return nil }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        let drawRect = CGRect(x: 0, y: 0, width: width, height: height)
+        context.draw(fullImage, in: drawRect)
+
+        let scaleX = CGFloat(width) / viewSize.width
+        let scaleY = CGFloat(height) / viewSize.height
+        let mappedPoints = points.map { point in
+            CGPoint(x: point.x * scaleX, y: point.y * scaleY)
+        }
+
+        drawLine(mappedPoints, in: context, scale: max(scaleX, scaleY))
+
+        guard let image = context.makeImage() else { return nil }
+        let pngData = makePNGData(from: image)
+        return SelectionOverlayResult(image: image, pngData: pngData)
+    }
+
+    private static func drawLine(_ points: [CGPoint], in context: CGContext, scale: CGFloat) {
+        guard let first = points.first else { return }
+
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+
+        context.beginPath()
+        context.move(to: first)
+        points.dropFirst().forEach { context.addLine(to: $0) }
+        context.setStrokeColor(NSColor.white.withAlphaComponent(0.95).cgColor)
+        context.setLineWidth(max(8, 8 * scale))
+        context.strokePath()
+
+        context.beginPath()
+        context.move(to: first)
+        points.dropFirst().forEach { context.addLine(to: $0) }
+        context.setStrokeColor(NSColor.systemPink.cgColor)
+        context.setLineWidth(max(4, 4 * scale))
+        context.strokePath()
+    }
+
     private static func makePNGData(from image: CGImage) -> Data? {
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(

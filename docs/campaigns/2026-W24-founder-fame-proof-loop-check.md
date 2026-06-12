@@ -1,0 +1,52 @@
+# Founder Fame Proof Loop Verification
+
+- Generated: 2026-06-09 12:22:34 +0800
+- Proof loop: `docs/campaigns/2026-W24-founder-fame-proof-loop.md`
+- Mode: strict
+- Input type: file
+- Status: PASS
+- Failures: 0
+
+## Checks
+- ✅ Marker present: founder-fame-proof-loop marker found.
+- ✅ Title heading: Founder Fame Proof Loop title found.
+- ✅ Section ## Snapshot: Section exists.
+- ✅ Section ## Proof Loop Scorecard: Section exists.
+- ✅ Section ## 72-Hour Loop Plan: Section exists.
+- ✅ Section ## Channel Proof Scripts: Section exists.
+- ✅ Section ## Conversion Signals to Log: Section exists.
+- ✅ Section ## Daily Standup Prompts: Section exists.
+- ✅ Section ## Execution Checklist: Section exists.
+- ✅ 72-hour row Day 0: Row present.
+- ✅ 72-hour row Day 1: Row present.
+- ✅ 72-hour row Day 2: Row present.
+- ✅ Primary channel script: Primary channel script block found.
+- ✅ Backup channel script: Backup channel script block found.
+- ✅ Execution checklist depth: Checklist items: 9.
+- ✅ Signal Weekly touch target total: Signal line found.
+- ✅ Signal Creator touch target: Signal line found.
+- ✅ Signal Guesting touch target: Signal line found.
+- ✅ Signal Daily touch floor (Day 0-Day 2): Signal line found.
+- ✅ Signal Practical reply target: Signal line found.
+- ✅ Signal Creator collab-ready target: Signal line found.
+- ✅ Signal Guesting booking-stage target: Signal line found.
+- ✅ Signal Recommendation source: Signal line found.
+- ✅ Signal Social proof leads: Signal line found.
+- ✅ Strict core narrative bet: Core narrative bet is populated (Narrative Compounding Loop).
+- ✅ Strict route recommendation: Route recommendation is populated.
+- ✅ Strict strongest proof signal: Strongest proof signal is populated.
+- ✅ Strict recommendation source: Recommendation source is populated.
+- ✅ Strict daily touch floor: Daily touch floor: 3.
+- ✅ Strict practical reply target: Practical reply target: 12.
+- ✅ Strict creator collab target: Creator collab-ready target: 1.
+- ✅ Strict guesting booking target: Guesting booking-stage target: 1.
+- ✅ Strict creator touch target: Creator touch target: 5.
+- ✅ Strict guesting touch target: Guesting touch target: 0.
+- ✅ Strict outreach coverage floor: At least one outreach lane has non-zero touch targets.
+- ✅ Strict Day 0 log signal: Day 0 log signal is populated.
+- ✅ Strict Day 1 log signal: Day 1 log signal is populated.
+- ✅ Strict Day 2 log signal: Day 2 log signal is populated.
+- ✅ Strict checklist item 1: Checklist item 1 is populated.
+- ✅ Strict checklist item 2: Checklist item 2 is populated.
+- ✅ Strict checklist item 3: Checklist item 3 is populated.
+- ✅ Strict checklist item 4: Checklist item 4 is populated.

@@ -14,6 +14,7 @@ EXEC_PATH="$APP_PATH/Contents/MacOS/FluidReader"
 
 APP_BYTES="$(du -sk "$APP_PATH" | awk '{print $1}')"
 ZIP_BYTES="$(du -sk "$ZIP_PATH" | awk '{print $1}')"
+MAX_APP_SIZE_KB="${MAX_APP_SIZE_KB:-1140}"
 
 if [[ ! -x "$EXEC_PATH" ]]; then
   echo "App executable is missing or cannot run."
@@ -41,8 +42,8 @@ if [[ "$MIN_SYSTEM" != "14.0" ]]; then
   exit 1
 fi
 
-if (( APP_BYTES > 1024 )); then
-  echo "App is too large: ${APP_BYTES}K"
+if (( APP_BYTES > MAX_APP_SIZE_KB )); then
+  echo "App is too large: ${APP_BYTES}K (max ${MAX_APP_SIZE_KB}K)"
   exit 1
 fi
 

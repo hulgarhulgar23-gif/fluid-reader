@@ -3,10 +3,12 @@ import AppKit
 @main
 struct FluidReaderMain {
     @MainActor
+    private static let appDelegate = AppDelegate()
+
+    @MainActor
     static func main() {
         let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
+        app.delegate = appDelegate
         app.setActivationPolicy(.accessory)
         app.run()
     }

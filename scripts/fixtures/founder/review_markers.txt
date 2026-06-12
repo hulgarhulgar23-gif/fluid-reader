@@ -1,0 +1,9 @@
+## Inputs
+## Computed KPIs
+- Margin:
+- ROI:
+- CAC:
+- LTV:
+- LTV/CAC ratio:
+- Break-even units:
+## Founder Readout
