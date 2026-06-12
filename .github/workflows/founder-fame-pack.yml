@@ -122,6 +122,7 @@ jobs:
           INPUT_WAR_ROOM_COMMENT_ISSUE: ''
           INPUT_POST_EXCEPTIONAL_LOOP_COMMENT: 'false'
           INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ''
+          INPUT_TRIGGER: ${{ github.event_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -821,7 +822,7 @@ jobs:
             echo "## Founder Fame Pack Generated"
             echo ""
             echo "- Week: \`$week\`"
-            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Trigger: \`$INPUT_TRIGGER\`"
             echo "- Previous week baseline: \`$previous_week\`"
             echo "- Baseline review: \`$previous_review_path\`"
             echo "- Current review: \`$review_path\`"
