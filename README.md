@@ -1,5 +1,9 @@
 # Fluid Reader
 
+[Website](https://hulgarhulgar23-gif.github.io/fluid-reader/) ·
+[Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
+[Power User Guide](docs/POWER_USER_GUIDE.md)
+
 Fluid Reader is a small macOS menu-bar app. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
 The default mode is local:
