@@ -63,7 +63,7 @@ permissions:
 jobs:
   weekly-growth-sprint:
     name: Generate weekly growth sprint
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check out code
         uses: actions/checkout@v4

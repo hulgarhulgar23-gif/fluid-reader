@@ -16,6 +16,11 @@ if ! grep -Eq '^[[:space:]]+contents:[[:space:]]+read$' "$CI_WORKFLOW"; then
   exit 1
 fi
 
+if ! grep -Fq 'runs-on: macos-15' "$CI_WORKFLOW"; then
+  echo "CI must run on macos-15 for the current Swift size gate."
+  exit 1
+fi
+
 if ! grep -Fq 'git diff --check' "$CI_WORKFLOW"; then
   echo "CI must check whitespace with git diff --check."
   exit 1

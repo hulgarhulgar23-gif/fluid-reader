@@ -63,7 +63,7 @@ permissions:
 jobs:
   generate-founder-fame-pack:
     name: Generate founder weekly and fame artifacts
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check out code
         uses: actions/checkout@v4

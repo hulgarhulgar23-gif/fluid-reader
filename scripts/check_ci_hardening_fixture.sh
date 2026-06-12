@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Install CI tools
         run: brew list ripgrep >/dev/null 2>&1 || brew install ripgrep
@@ -96,6 +96,7 @@ expect_fail_missing_text() {
 expect_pass
 expect_fail_missing_text "missing-permissions" $'permissions:\n' "CI must set explicit workflow token permissions."
 expect_fail_missing_text "missing-read-only-contents" "contents: read" "CI must keep contents permission read-only."
+expect_fail_missing_text "missing-macos-15-runner" "runs-on: macos-15" "CI must run on macos-15 for the current Swift size gate."
 expect_fail_missing_text "missing-whitespace-check" "git diff --check" "CI must check whitespace with git diff --check."
 expect_fail_missing_text "missing-ripgrep-install" "brew list ripgrep" "CI must install ripgrep before running growth checks."
 expect_fail_missing_text "missing-ci-hardening-check" "zsh scripts/check_ci_hardening.sh" "CI must run the CI hardening check."

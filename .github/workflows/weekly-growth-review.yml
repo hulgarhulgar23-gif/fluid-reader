@@ -63,7 +63,7 @@ permissions:
 jobs:
   weekly-growth-review:
     name: Generate weekly growth review
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check out code
         uses: actions/checkout@v4

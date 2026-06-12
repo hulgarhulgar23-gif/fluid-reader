@@ -61,7 +61,7 @@ permissions:
 jobs:
   generate-launch-pack:
     name: Generate launch pack artifacts
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Check out code
         uses: actions/checkout@v4
