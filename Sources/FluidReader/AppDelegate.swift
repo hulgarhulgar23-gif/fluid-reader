@@ -223,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fameLaunchThresholdAlertsQuickActionLastActionToken: String?
     private let fameLaunchThresholdAlertsQuickActionCooldown: TimeInterval = 1.5
     private var fameExceptionalLoopHotKeyAvailable = true
+    private var updateCheckInFlight = false
     private var launchRescueAutoSelfHealAttentionIssueToken: String?
     private var launchRescueAutoSelfHealAttentionIssueStreak = 0
     private var launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt: Date?
@@ -767,6 +768,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Stop", action: #selector(stopFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings", action: #selector(settingsFromMenu), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdatesFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitFromMenu), keyEquivalent: "q"))
         menu.items.forEach { $0.target = self }
         item.menu = menu
@@ -1785,6 +1787,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func quitFromMenu() {
         NSApp.terminate(nil)
+    }
+
+    @objc private func checkForUpdatesFromMenu() {
+        guard !updateCheckInFlight else { return }
+        updateCheckInFlight = true
+
+        Task { [weak self] in
+            let currentVersion = UpdateChecker.currentVersion()
+            var release: UpdateChecker.Release?
+            do {
+                release = try await UpdateChecker.fetchLatestRelease()
+            } catch {
+                release = nil
+            }
+
+            await MainActor.run {
+                guard let self else { return }
+                self.updateCheckInFlight = false
+                self.presentUpdateCheckResult(release: release, currentVersion: currentVersion)
+            }
+        }
+    }
+
+    private func presentUpdateCheckResult(release: UpdateChecker.Release?, currentVersion: String) {
+        let alert = NSAlert()
+        guard let release else {
+            alert.messageText = "Could not check for updates."
+            alert.informativeText = "The release feed was unreachable. Check your connection or open the releases page directly."
+            alert.addButton(withTitle: "Open Releases Page")
+            alert.addButton(withTitle: "Cancel")
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSWorkspace.shared.open(UpdateChecker.releasesPageURL)
+            }
+            return
+        }
+
+        if UpdateChecker.isVersion(release.version, newerThan: currentVersion) {
+            alert.messageText = "Update available: \(release.version)"
+            alert.informativeText = "You have \(currentVersion). Download the new version from the releases page."
+            alert.addButton(withTitle: "Open Download Page")
+            alert.addButton(withTitle: "Later")
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSWorkspace.shared.open(release.pageURL)
+            }
+        } else {
+            alert.messageText = "Fluid Reader is up to date."
+            alert.informativeText = "Version \(currentVersion) is the latest release."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 
     @objc private func runFameNextMoveFromMenu() {

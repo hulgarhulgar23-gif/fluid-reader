@@ -81,7 +81,9 @@ EXEC_PATH="$APP_PATH/Contents/MacOS/FluidReader"
 
 APP_BYTES="$(du -sk "$APP_PATH" | awk '{print $1}')"
 ZIP_BYTES="$(du -sk "$ZIP_PATH" | awk '{print $1}')"
-MAX_APP_SIZE_KB="${MAX_APP_SIZE_KB:-2816}"
+# Budget includes the 204K AppIcon.icns added for the public release polish.
+MAX_APP_SIZE_KB="${MAX_APP_SIZE_KB:-3328}"
+MAX_ZIP_SIZE_KB="${MAX_ZIP_SIZE_KB:-1664}"
 
 if [[ ! -x "$EXEC_PATH" ]]; then
   echo "App executable is missing or cannot run."
@@ -114,8 +116,8 @@ if (( APP_BYTES > MAX_APP_SIZE_KB )); then
   exit 1
 fi
 
-if (( ZIP_BYTES > 1280 )); then
-  echo "Zip is too large: ${ZIP_BYTES}K"
+if (( ZIP_BYTES > MAX_ZIP_SIZE_KB )); then
+  echo "Zip is too large: ${ZIP_BYTES}K (max ${MAX_ZIP_SIZE_KB}K)"
   exit 1
 fi
 

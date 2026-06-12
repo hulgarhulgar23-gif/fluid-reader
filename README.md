@@ -9,6 +9,28 @@ The default mode is local:
 - Speech uses the macOS voices.
 - LLM support is off until the user turns it on.
 
+## Install
+
+Download the latest `FluidReader.zip` from
+[Releases](https://github.com/hulgarhulgar23-gif/fluid-reader/releases),
+unzip it, and move `FluidReader.app` to `/Applications`.
+
+Or install with Homebrew:
+
+```sh
+brew install --cask hulgarhulgar23-gif/fluidreader/fluid-reader
+```
+
+### First launch on macOS
+
+Current builds are not yet notarized by Apple, so the first launch needs one
+extra step: right-click (or Control-click) `FluidReader.app`, choose **Open**,
+then click **Open** in the dialog. macOS remembers the choice; later launches
+are normal. See `docs/RELEASE_SIGNING.md` for the notarized-release plan.
+
+To check for new versions later, use **Check for Updates** in the menu-bar
+menu. The app never checks in the background.
+
 ## Build
 
 ```sh
