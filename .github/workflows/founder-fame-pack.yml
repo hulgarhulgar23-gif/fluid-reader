@@ -15,95 +15,10 @@ on:
         required: false
         default: ''
         type: string
-      previous_mrr:
-        description: 'Previous week MRR'
-        required: false
-        default: '42000'
-        type: string
-      previous_delivery_cost:
-        description: 'Previous week delivery cost'
-        required: false
-        default: '19000'
-        type: string
-      previous_acquisition_spend:
-        description: 'Previous week acquisition spend'
-        required: false
-        default: '12000'
-        type: string
-      previous_new_customers:
-        description: 'Previous week new customers'
-        required: false
-        default: '80'
-        type: string
-      previous_monthly_contribution:
-        description: 'Previous week monthly contribution per customer'
-        required: false
-        default: '75'
-        type: string
-      previous_lifetime_months:
-        description: 'Previous week expected lifetime months'
-        required: false
-        default: '18'
-        type: string
-      previous_fixed_cost:
-        description: 'Previous week fixed cost'
-        required: false
-        default: '10000'
-        type: string
-      previous_price:
-        description: 'Previous week price'
-        required: false
-        default: '50'
-        type: string
-      previous_variable_cost:
-        description: 'Previous week variable cost'
-        required: false
-        default: '30'
-        type: string
       current_mrr:
         description: 'Current week MRR'
         required: false
         default: '49000'
-        type: string
-      current_delivery_cost:
-        description: 'Current week delivery cost'
-        required: false
-        default: '21500'
-        type: string
-      current_acquisition_spend:
-        description: 'Current week acquisition spend'
-        required: false
-        default: '12500'
-        type: string
-      current_new_customers:
-        description: 'Current week new customers'
-        required: false
-        default: '90'
-        type: string
-      current_monthly_contribution:
-        description: 'Current week monthly contribution per customer'
-        required: false
-        default: '82'
-        type: string
-      current_lifetime_months:
-        description: 'Current week expected lifetime months'
-        required: false
-        default: '19'
-        type: string
-      current_fixed_cost:
-        description: 'Current week fixed cost'
-        required: false
-        default: '11000'
-        type: string
-      current_price:
-        description: 'Current week price'
-        required: false
-        default: '54'
-        type: string
-      current_variable_cost:
-        description: 'Current week variable cost'
-        required: false
-        default: '32'
         type: string
       target_mrr:
         description: 'Weekly target MRR'
@@ -135,131 +50,11 @@ on:
         required: false
         default: 'Fluid Reader'
         type: string
-      primary_channel:
-        description: 'Primary channel for post drafts'
-        required: false
-        default: 'X / Threads'
-        type: string
-      backup_channel:
-        description: 'Backup channel for post drafts'
-        required: false
-        default: 'LinkedIn'
-        type: string
-      cta:
-        description: 'CTA line for update + fame drafts'
-        required: false
-        default: 'If you are building too, reply with your KPI bottleneck and I will share the exact weekly command flow.'
-        type: string
-      first48h_primary_char_limit:
-        description: 'Founder first-48h primary short-variant char limit'
-        required: false
-        default: '280'
-        type: string
-      first48h_backup_char_limit:
-        description: 'Founder first-48h backup short-variant char limit'
-        required: false
-        default: '500'
-        type: string
-      first48h_primary_tone:
-        description: 'Founder first-48h primary tone profile (x-punchy|x-thread|neutral)'
-        required: false
-        default: 'x-punchy'
-        type: string
-      first48h_backup_tone:
-        description: 'Founder first-48h backup tone profile (linkedin-context|linkedin-operator|neutral)'
-        required: false
-        default: 'linkedin-context'
-        type: string
-      founder_transcript:
-        description: 'Optional founder transcript source path (repo-relative) for transcript ingestion'
-        required: false
-        default: ''
-        type: string
-      founder_fame_daily_mission:
-        description: 'Optional founder daily mission markdown source path (repo-relative) used to enrich action-queue generation with freshness enforcement'
-        required: false
-        default: ''
-        type: string
-      creator_target_list:
-        description: 'Optional creator target list markdown source path (repo-relative) used to enrich founder outreach sprint routing'
-        required: false
-        default: ''
-        type: string
-      distribution_plan:
-        description: 'Optional distribution follow-up plan markdown source path (repo-relative) used to enrich breakout and outreach routing'
-        required: false
-        default: ''
-        type: string
-      founder_fame_action_queue:
-        description: 'Optional founder fame action queue markdown source path (repo-relative) used to enrich checklist comment mission freshness context'
-        required: false
-        default: ''
-        type: string
-      guesting_signal_entries:
-        description: 'Founder guesting signal entries captured from checklist comments'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_replied:
-        description: 'Founder guesting signal entries with replied/booked/published stage'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_booked:
-        description: 'Founder guesting signal entries with booked/published stage'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_published:
-        description: 'Founder guesting signal entries with published stage'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_top_format:
-        description: 'Founder guesting top-performing format (podcast/newsletter/community)'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_top_target:
-        description: 'Founder guesting highest-priority target'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_enrichment_score:
-        description: 'Founder guesting enrichment score'
-        required: false
-        default: 'n/a'
-        type: string
-      guesting_signal_recommendation:
-        description: 'Founder guesting recommendation line'
-        required: false
-        default: 'Capture founder guesting signal comments before Friday review.'
-        type: string
       skip_founder_checks:
         description: 'Skip founder workflow verification script before artifact generation'
         required: false
         default: true
         type: boolean
-      post_war_room_comment:
-        description: 'Post founder fame war-room comment into Monday Publish Checklist'
-        required: false
-        default: false
-        type: boolean
-      war_room_comment_issue:
-        description: 'Optional Monday checklist issue number override used when posting war-room comment'
-        required: false
-        default: ''
-        type: string
-      post_exceptional_loop_comment:
-        description: 'Post founder fame exceptional-loop comment into Monday Publish Checklist'
-        required: false
-        default: false
-        type: boolean
-      exceptional_loop_comment_issue:
-        description: 'Optional Monday checklist issue number override used when posting exceptional-loop comment'
-        required: false
-        default: ''
-        type: string
 
 permissions:
   contents: read
@@ -278,55 +73,55 @@ jobs:
         env:
           INPUT_WEEK: ${{ github.event.inputs.week || '' }}
           INPUT_PREVIOUS_WEEK: ${{ github.event.inputs.previous_week || '' }}
-          INPUT_PREVIOUS_MRR: ${{ github.event.inputs.previous_mrr || '' }}
-          INPUT_PREVIOUS_DELIVERY_COST: ${{ github.event.inputs.previous_delivery_cost || '' }}
-          INPUT_PREVIOUS_ACQUISITION_SPEND: ${{ github.event.inputs.previous_acquisition_spend || '' }}
-          INPUT_PREVIOUS_NEW_CUSTOMERS: ${{ github.event.inputs.previous_new_customers || '' }}
-          INPUT_PREVIOUS_MONTHLY_CONTRIBUTION: ${{ github.event.inputs.previous_monthly_contribution || '' }}
-          INPUT_PREVIOUS_LIFETIME_MONTHS: ${{ github.event.inputs.previous_lifetime_months || '' }}
-          INPUT_PREVIOUS_FIXED_COST: ${{ github.event.inputs.previous_fixed_cost || '' }}
-          INPUT_PREVIOUS_PRICE: ${{ github.event.inputs.previous_price || '' }}
-          INPUT_PREVIOUS_VARIABLE_COST: ${{ github.event.inputs.previous_variable_cost || '' }}
+          INPUT_PREVIOUS_MRR: ''
+          INPUT_PREVIOUS_DELIVERY_COST: ''
+          INPUT_PREVIOUS_ACQUISITION_SPEND: ''
+          INPUT_PREVIOUS_NEW_CUSTOMERS: ''
+          INPUT_PREVIOUS_MONTHLY_CONTRIBUTION: ''
+          INPUT_PREVIOUS_LIFETIME_MONTHS: ''
+          INPUT_PREVIOUS_FIXED_COST: ''
+          INPUT_PREVIOUS_PRICE: ''
+          INPUT_PREVIOUS_VARIABLE_COST: ''
           INPUT_CURRENT_MRR: ${{ github.event.inputs.current_mrr || '' }}
-          INPUT_CURRENT_DELIVERY_COST: ${{ github.event.inputs.current_delivery_cost || '' }}
-          INPUT_CURRENT_ACQUISITION_SPEND: ${{ github.event.inputs.current_acquisition_spend || '' }}
-          INPUT_CURRENT_NEW_CUSTOMERS: ${{ github.event.inputs.current_new_customers || '' }}
-          INPUT_CURRENT_MONTHLY_CONTRIBUTION: ${{ github.event.inputs.current_monthly_contribution || '' }}
-          INPUT_CURRENT_LIFETIME_MONTHS: ${{ github.event.inputs.current_lifetime_months || '' }}
-          INPUT_CURRENT_FIXED_COST: ${{ github.event.inputs.current_fixed_cost || '' }}
-          INPUT_CURRENT_PRICE: ${{ github.event.inputs.current_price || '' }}
-          INPUT_CURRENT_VARIABLE_COST: ${{ github.event.inputs.current_variable_cost || '' }}
+          INPUT_CURRENT_DELIVERY_COST: ''
+          INPUT_CURRENT_ACQUISITION_SPEND: ''
+          INPUT_CURRENT_NEW_CUSTOMERS: ''
+          INPUT_CURRENT_MONTHLY_CONTRIBUTION: ''
+          INPUT_CURRENT_LIFETIME_MONTHS: ''
+          INPUT_CURRENT_FIXED_COST: ''
+          INPUT_CURRENT_PRICE: ''
+          INPUT_CURRENT_VARIABLE_COST: ''
           INPUT_TARGET_MRR: ${{ github.event.inputs.target_mrr || '' }}
           INPUT_TARGET_MARGIN: ${{ github.event.inputs.target_margin || '' }}
           INPUT_TARGET_CAC: ${{ github.event.inputs.target_cac || '' }}
           INPUT_TARGET_LTV_CAC: ${{ github.event.inputs.target_ltv_cac || '' }}
           INPUT_TARGET_NEW_CUSTOMERS: ${{ github.event.inputs.target_new_customers || '' }}
           INPUT_PRODUCT: ${{ github.event.inputs.product || '' }}
-          INPUT_PRIMARY_CHANNEL: ${{ github.event.inputs.primary_channel || '' }}
-          INPUT_BACKUP_CHANNEL: ${{ github.event.inputs.backup_channel || '' }}
-          INPUT_CTA: ${{ github.event.inputs.cta || '' }}
-          INPUT_FIRST48H_PRIMARY_CHAR_LIMIT: ${{ github.event.inputs.first48h_primary_char_limit || '' }}
-          INPUT_FIRST48H_BACKUP_CHAR_LIMIT: ${{ github.event.inputs.first48h_backup_char_limit || '' }}
-          INPUT_FIRST48H_PRIMARY_TONE: ${{ github.event.inputs.first48h_primary_tone || '' }}
-          INPUT_FIRST48H_BACKUP_TONE: ${{ github.event.inputs.first48h_backup_tone || '' }}
-          INPUT_FOUNDER_TRANSCRIPT: ${{ github.event.inputs.founder_transcript || '' }}
-          INPUT_FOUNDER_FAME_DAILY_MISSION: ${{ github.event.inputs.founder_fame_daily_mission || '' }}
-          INPUT_CREATOR_TARGET_LIST: ${{ github.event.inputs.creator_target_list || '' }}
-          INPUT_DISTRIBUTION_PLAN: ${{ github.event.inputs.distribution_plan || '' }}
-          INPUT_FOUNDER_FAME_ACTION_QUEUE: ${{ github.event.inputs.founder_fame_action_queue || '' }}
-          INPUT_GUESTING_SIGNAL_ENTRIES: ${{ github.event.inputs.guesting_signal_entries || '' }}
-          INPUT_GUESTING_SIGNAL_REPLIED: ${{ github.event.inputs.guesting_signal_replied || '' }}
-          INPUT_GUESTING_SIGNAL_BOOKED: ${{ github.event.inputs.guesting_signal_booked || '' }}
-          INPUT_GUESTING_SIGNAL_PUBLISHED: ${{ github.event.inputs.guesting_signal_published || '' }}
-          INPUT_GUESTING_SIGNAL_TOP_FORMAT: ${{ github.event.inputs.guesting_signal_top_format || '' }}
-          INPUT_GUESTING_SIGNAL_TOP_TARGET: ${{ github.event.inputs.guesting_signal_top_target || '' }}
-          INPUT_GUESTING_SIGNAL_ENRICHMENT_SCORE: ${{ github.event.inputs.guesting_signal_enrichment_score || '' }}
-          INPUT_GUESTING_SIGNAL_RECOMMENDATION: ${{ github.event.inputs.guesting_signal_recommendation || '' }}
+          INPUT_PRIMARY_CHANNEL: ''
+          INPUT_BACKUP_CHANNEL: ''
+          INPUT_CTA: ''
+          INPUT_FIRST48H_PRIMARY_CHAR_LIMIT: '280'
+          INPUT_FIRST48H_BACKUP_CHAR_LIMIT: '500'
+          INPUT_FIRST48H_PRIMARY_TONE: 'x-punchy'
+          INPUT_FIRST48H_BACKUP_TONE: 'linkedin-context'
+          INPUT_FOUNDER_TRANSCRIPT: ''
+          INPUT_FOUNDER_FAME_DAILY_MISSION: ''
+          INPUT_CREATOR_TARGET_LIST: ''
+          INPUT_DISTRIBUTION_PLAN: ''
+          INPUT_FOUNDER_FAME_ACTION_QUEUE: ''
+          INPUT_GUESTING_SIGNAL_ENTRIES: 'n/a'
+          INPUT_GUESTING_SIGNAL_REPLIED: 'n/a'
+          INPUT_GUESTING_SIGNAL_BOOKED: 'n/a'
+          INPUT_GUESTING_SIGNAL_PUBLISHED: 'n/a'
+          INPUT_GUESTING_SIGNAL_TOP_FORMAT: 'n/a'
+          INPUT_GUESTING_SIGNAL_TOP_TARGET: 'n/a'
+          INPUT_GUESTING_SIGNAL_ENRICHMENT_SCORE: 'n/a'
+          INPUT_GUESTING_SIGNAL_RECOMMENDATION: 'Capture founder guesting signal comments before Friday review.'
           INPUT_SKIP_FOUNDER_CHECKS: ${{ github.event.inputs.skip_founder_checks || 'true' }}
-          INPUT_POST_WAR_ROOM_COMMENT: ${{ github.event.inputs.post_war_room_comment || 'false' }}
-          INPUT_WAR_ROOM_COMMENT_ISSUE: ${{ github.event.inputs.war_room_comment_issue || '' }}
-          INPUT_POST_EXCEPTIONAL_LOOP_COMMENT: ${{ github.event.inputs.post_exceptional_loop_comment || 'false' }}
-          INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ${{ github.event.inputs.exceptional_loop_comment_issue || '' }}
+          INPUT_POST_WAR_ROOM_COMMENT: 'false'
+          INPUT_WAR_ROOM_COMMENT_ISSUE: ''
+          INPUT_POST_EXCEPTIONAL_LOOP_COMMENT: 'false'
+          INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ''
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail

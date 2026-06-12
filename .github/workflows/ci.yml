@@ -21,6 +21,9 @@ jobs:
       - name: Show Swift version
         run: swift --version
 
+      - name: Install CI tools
+        run: brew list ripgrep >/dev/null 2>&1 || brew install ripgrep
+
       - name: Run tests
         run: swift test
 
@@ -32,6 +35,12 @@ jobs:
 
       - name: Check CI hardening fixtures
         run: zsh scripts/check_ci_hardening_fixture.sh
+
+      - name: Check workflow dispatch input limits
+        run: zsh scripts/check_workflow_dispatch_inputs.sh
+
+      - name: Check workflow dispatch input fixtures
+        run: zsh scripts/check_workflow_dispatch_inputs_fixture.sh
 
       - name: Check Swift safety
         run: zsh scripts/check_swift_safety.sh

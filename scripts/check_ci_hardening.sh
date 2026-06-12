@@ -21,6 +21,11 @@ if ! grep -Fq 'git diff --check' "$CI_WORKFLOW"; then
   exit 1
 fi
 
+if ! grep -Fq 'brew list ripgrep' "$CI_WORKFLOW"; then
+  echo "CI must install ripgrep before running growth checks."
+  exit 1
+fi
+
 if ! grep -Fq 'zsh scripts/check_ci_hardening.sh' "$CI_WORKFLOW"; then
   echo "CI must run the CI hardening check."
   exit 1
@@ -28,6 +33,16 @@ fi
 
 if ! grep -Fq 'zsh scripts/check_ci_hardening_fixture.sh' "$CI_WORKFLOW"; then
   echo "CI must run the CI hardening fixture."
+  exit 1
+fi
+
+if ! grep -Fq 'zsh scripts/check_workflow_dispatch_inputs.sh' "$CI_WORKFLOW"; then
+  echo "CI must run the workflow dispatch input limit check."
+  exit 1
+fi
+
+if ! grep -Fq 'zsh scripts/check_workflow_dispatch_inputs_fixture.sh' "$CI_WORKFLOW"; then
+  echo "CI must run the workflow dispatch input limit fixture."
   exit 1
 fi
 

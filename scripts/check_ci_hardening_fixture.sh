@@ -26,12 +26,18 @@ jobs:
   build-and-test:
     runs-on: macos-14
     steps:
+      - name: Install CI tools
+        run: brew list ripgrep >/dev/null 2>&1 || brew install ripgrep
       - name: Check whitespace
         run: git diff --check
       - name: Check CI hardening
         run: zsh scripts/check_ci_hardening.sh
       - name: Check CI hardening fixtures
         run: zsh scripts/check_ci_hardening_fixture.sh
+      - name: Check workflow dispatch input limits
+        run: zsh scripts/check_workflow_dispatch_inputs.sh
+      - name: Check workflow dispatch input fixtures
+        run: zsh scripts/check_workflow_dispatch_inputs_fixture.sh
       - name: Check open-source readiness
         run: zsh scripts/check_open_source_ready.sh
       - name: Check open-source readiness fixtures
@@ -91,8 +97,11 @@ expect_pass
 expect_fail_missing_text "missing-permissions" $'permissions:\n' "CI must set explicit workflow token permissions."
 expect_fail_missing_text "missing-read-only-contents" "contents: read" "CI must keep contents permission read-only."
 expect_fail_missing_text "missing-whitespace-check" "git diff --check" "CI must check whitespace with git diff --check."
+expect_fail_missing_text "missing-ripgrep-install" "brew list ripgrep" "CI must install ripgrep before running growth checks."
 expect_fail_missing_text "missing-ci-hardening-check" "zsh scripts/check_ci_hardening.sh" "CI must run the CI hardening check."
 expect_fail_missing_text "missing-ci-hardening-fixture" "zsh scripts/check_ci_hardening_fixture.sh" "CI must run the CI hardening fixture."
+expect_fail_missing_text "missing-workflow-input-check" "zsh scripts/check_workflow_dispatch_inputs.sh" "CI must run the workflow dispatch input limit check."
+expect_fail_missing_text "missing-workflow-input-fixture" "zsh scripts/check_workflow_dispatch_inputs_fixture.sh" "CI must run the workflow dispatch input limit fixture."
 expect_fail_missing_text "missing-open-source-check" "zsh scripts/check_open_source_ready.sh" "CI must run the open-source readiness check."
 expect_fail_missing_text "missing-open-source-fixture" "zsh scripts/check_open_source_ready_fixture.sh" "CI must run the open-source readiness fixture."
 

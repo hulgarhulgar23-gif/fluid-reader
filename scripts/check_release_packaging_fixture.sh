@@ -101,6 +101,16 @@ if ! grep -Fq 'zsh scripts/check_ci_hardening_fixture.sh' "$ROOT_DIR/.github/wor
   exit 1
 fi
 
+if ! grep -Fq 'zsh scripts/check_workflow_dispatch_inputs.sh' "$ROOT_DIR/.github/workflows/ci.yml"; then
+  echo "CI must run workflow dispatch input limit checks."
+  exit 1
+fi
+
+if ! grep -Fq 'zsh scripts/check_workflow_dispatch_inputs_fixture.sh' "$ROOT_DIR/.github/workflows/ci.yml"; then
+  echo "CI must run workflow dispatch input limit fixtures."
+  exit 1
+fi
+
 if ! grep -Fq 'zsh scripts/check_open_source_ready.sh' "$ROOT_DIR/.github/workflows/ci.yml"; then
   echo "CI must run open-source readiness checks."
   exit 1

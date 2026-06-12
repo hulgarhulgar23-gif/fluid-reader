@@ -55,106 +55,6 @@ on:
         required: false
         default: '3'
         type: string
-      distribution_verifier_critical_assignee:
-        description: 'GitHub username to assign when verifier incident hits critical threshold'
-        required: false
-        default: ''
-        type: string
-      distribution_verifier_critical_assignees:
-        description: 'Optional comma-separated fallback assignees (priority order) for critical verifier incidents'
-        required: false
-        default: ''
-        type: string
-      distribution_verifier_critical_comment_cooldown_hours:
-        description: 'Hours to suppress repeat critical checklist-comment updates when failure count is unchanged'
-        required: false
-        default: '24'
-        type: string
-      distribution_verifier_critical_comment_min_failure_delta:
-        description: 'Minimum failure-count increase required to update critical checklist comment during cooldown'
-        required: false
-        default: '1'
-        type: string
-      founder_verifier_critical_threshold:
-        description: 'Failure count threshold before founder proof-loop verifier incident is marked critical'
-        required: false
-        default: '3'
-        type: string
-      founder_verifier_critical_assignee:
-        description: 'GitHub username to assign when founder proof-loop verifier incident hits critical threshold'
-        required: false
-        default: ''
-        type: string
-      founder_verifier_critical_assignees:
-        description: 'Optional comma-separated fallback assignees (priority order) for founder verifier critical incidents'
-        required: false
-        default: ''
-        type: string
-      founder_verifier_comment_cooldown_hours:
-        description: 'Hours to suppress repeat founder verifier checklist-comment updates when failure count is unchanged'
-        required: false
-        default: '24'
-        type: string
-      founder_verifier_comment_min_failure_delta:
-        description: 'Minimum failure-count increase required to update founder verifier checklist comments during cooldown'
-        required: false
-        default: '1'
-        type: string
-      narrative_route_critical_threshold:
-        description: 'Critical-route occurrence threshold before narrative route incident is escalated with growth-critical label'
-        required: false
-        default: '2'
-        type: string
-      narrative_route_critical_assignee:
-        description: 'GitHub username to assign when narrative-route incident reaches critical threshold'
-        required: false
-        default: ''
-        type: string
-      narrative_route_critical_assignees:
-        description: 'Optional comma-separated fallback assignees (priority order) for narrative-route critical incidents'
-        required: false
-        default: ''
-        type: string
-      narrative_route_critical_comment_cooldown_hours:
-        description: 'Hours to suppress repeat narrative-route critical checklist-comment updates when occurrence count is unchanged'
-        required: false
-        default: '24'
-        type: string
-      narrative_route_critical_comment_min_occurrence_delta:
-        description: 'Minimum critical-occurrence increase required to update narrative-route critical checklist comments during cooldown'
-        required: false
-        default: '1'
-        type: string
-      founder_transcript_path:
-        description: 'Optional founder transcript source path (repo-relative) for founder transcript ingestion'
-        required: false
-        default: ''
-        type: string
-      founder_fame_daily_mission_path:
-        description: 'Optional founder daily mission source path (repo-relative) for founder action-queue mission bridge'
-        required: false
-        default: ''
-        type: string
-      first48h_primary_char_limit:
-        description: 'Founder first-48h primary short-variant char limit'
-        required: false
-        default: '280'
-        type: string
-      first48h_backup_char_limit:
-        description: 'Founder first-48h backup short-variant char limit'
-        required: false
-        default: '500'
-        type: string
-      first48h_primary_tone:
-        description: 'Founder first-48h primary tone profile (x-punchy|x-thread|neutral)'
-        required: false
-        default: 'x-punchy'
-        type: string
-      first48h_backup_tone:
-        description: 'Founder first-48h backup tone profile (linkedin-context|linkedin-operator|neutral)'
-        required: false
-        default: 'linkedin-context'
-        type: string
 
 permissions:
   contents: read
@@ -6443,8 +6343,8 @@ jobs:
           INPUT_PREVIOUS_WEEK: ${{ steps.sprint_metrics.outputs.previous_week }}
           INPUT_PRIMARY_CHANNEL: ${{ steps.sprint_metrics.outputs.primary_channel }}
           INPUT_BACKUP_CHANNEL: ${{ steps.sprint_metrics.outputs.backup_channel }}
-          INPUT_FOUNDER_TRANSCRIPT_PATH: ${{ github.event.inputs.founder_transcript_path || '' }}
-          INPUT_FOUNDER_FAME_DAILY_MISSION_PATH: ${{ github.event.inputs.founder_fame_daily_mission_path || '' }}
+          INPUT_FOUNDER_TRANSCRIPT_PATH: ''
+          INPUT_FOUNDER_FAME_DAILY_MISSION_PATH: ''
           GUESTING_SIGNAL_ENTRIES: ${{ steps.monday_effectiveness.outputs.guesting_signal_entries }}
           GUESTING_SIGNAL_REPLIED: ${{ steps.monday_effectiveness.outputs.guesting_signal_replied }}
           GUESTING_SIGNAL_BOOKED: ${{ steps.monday_effectiveness.outputs.guesting_signal_booked }}
@@ -6931,10 +6831,10 @@ jobs:
           echo "founder_fame_war_room_comment_path=$founder_fame_war_room_comment_path" >> "$GITHUB_ENV"
           echo "founder_fame_war_room_live_check_path=$founder_fame_war_room_live_check_path" >> "$GITHUB_ENV"
           echo "founder_cta_text=$CTA_TEXT" >> "$GITHUB_ENV"
-          echo "founder_first48h_primary_char_limit=${{ inputs.first48h_primary_char_limit || '280' }}" >> "$GITHUB_ENV"
-          echo "founder_first48h_backup_char_limit=${{ inputs.first48h_backup_char_limit || '500' }}" >> "$GITHUB_ENV"
-          echo "founder_first48h_primary_tone=${{ inputs.first48h_primary_tone || 'x-punchy' }}" >> "$GITHUB_ENV"
-          echo "founder_first48h_backup_tone=${{ inputs.first48h_backup_tone || 'linkedin-context' }}" >> "$GITHUB_ENV"
+          echo "founder_first48h_primary_char_limit=280" >> "$GITHUB_ENV"
+          echo "founder_first48h_backup_char_limit=500" >> "$GITHUB_ENV"
+          echo "founder_first48h_primary_tone=x-punchy" >> "$GITHUB_ENV"
+          echo "founder_first48h_backup_tone=linkedin-context" >> "$GITHUB_ENV"
 
       - name: Upsert founder fame pack comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_path != ''
@@ -8659,9 +8559,9 @@ jobs:
           ROUTE_RECOMMENDATION: ${{ steps.monday_effectiveness.outputs.narrative_route_recommendation }}
           NARRATIVE_LAB_PATH: ${{ env.founder_fame_narrative_lab_path }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          CRITICAL_THRESHOLD: ${{ inputs.narrative_route_critical_threshold }}
-          CRITICAL_ASSIGNEE: ${{ inputs.narrative_route_critical_assignee }}
-          CRITICAL_ASSIGNEES: ${{ inputs.narrative_route_critical_assignees }}
+          CRITICAL_THRESHOLD: '2'
+          CRITICAL_ASSIGNEE: ''
+          CRITICAL_ASSIGNEES: ''
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -9047,8 +8947,8 @@ jobs:
           ROUTE_GUARDRAIL: ${{ steps.founder_narrative_route_incident.outputs.route_guardrail }}
           ROUTE_CONTROL_RECOMMENDATION: ${{ steps.founder_narrative_route_incident.outputs.route_control_recommendation }}
           ROUTE_RECOMMENDATION: ${{ steps.founder_narrative_route_incident.outputs.route_recommendation }}
-          CRITICAL_COMMENT_COOLDOWN_HOURS: ${{ inputs.narrative_route_critical_comment_cooldown_hours }}
-          CRITICAL_COMMENT_MIN_OCCURRENCE_DELTA: ${{ inputs.narrative_route_critical_comment_min_occurrence_delta }}
+          CRITICAL_COMMENT_COOLDOWN_HOURS: '24'
+          CRITICAL_COMMENT_MIN_OCCURRENCE_DELTA: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -9705,8 +9605,8 @@ jobs:
           VERIFICATION_OUTCOME: ${{ steps.founder_fame_proof_loop_verify.outcome }}
           CHECK_PATH: ${{ env.founder_fame_proof_loop_check_path }}
           VERIFY_EXIT_CODE: ${{ env.founder_fame_proof_loop_verify_exit_code }}
-          ALERT_COMMENT_COOLDOWN_HOURS: ${{ inputs.founder_verifier_comment_cooldown_hours }}
-          ALERT_COMMENT_MIN_FAILURE_DELTA: ${{ inputs.founder_verifier_comment_min_failure_delta }}
+          ALERT_COMMENT_COOLDOWN_HOURS: '24'
+          ALERT_COMMENT_MIN_FAILURE_DELTA: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -9892,9 +9792,9 @@ jobs:
           CHECK_PATH: ${{ env.founder_fame_proof_loop_check_path }}
           VERIFY_EXIT_CODE: ${{ env.founder_fame_proof_loop_verify_exit_code }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          CRITICAL_THRESHOLD: ${{ inputs.founder_verifier_critical_threshold }}
-          CRITICAL_ASSIGNEE: ${{ inputs.founder_verifier_critical_assignee }}
-          CRITICAL_ASSIGNEES: ${{ inputs.founder_verifier_critical_assignees }}
+          CRITICAL_THRESHOLD: '3'
+          CRITICAL_ASSIGNEE: ''
+          CRITICAL_ASSIGNEES: ''
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -10211,8 +10111,8 @@ jobs:
           CRITICAL_ASSIGNEE_CANDIDATES: ${{ steps.founder_fame_proof_loop_incident.outputs.critical_assignee_candidates }}
           CRITICAL_ASSIGNEE_ATTEMPTS: ${{ steps.founder_fame_proof_loop_incident.outputs.critical_assignee_attempts }}
           CRITICAL_ASSIGNEE_ACTION: ${{ steps.founder_fame_proof_loop_incident.outputs.critical_assignee_action }}
-          CRITICAL_COMMENT_COOLDOWN_HOURS: ${{ inputs.founder_verifier_comment_cooldown_hours }}
-          CRITICAL_COMMENT_MIN_FAILURE_DELTA: ${{ inputs.founder_verifier_comment_min_failure_delta }}
+          CRITICAL_COMMENT_COOLDOWN_HOURS: '24'
+          CRITICAL_COMMENT_MIN_FAILURE_DELTA: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -11223,8 +11123,8 @@ jobs:
           LIVE_CHECK_EXIT_CODE: ${{ env.distribution_nudge_live_check_exit_code }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           CRITICAL_THRESHOLD: ${{ inputs.distribution_verifier_critical_threshold }}
-          CRITICAL_ASSIGNEE: ${{ inputs.distribution_verifier_critical_assignee }}
-          CRITICAL_ASSIGNEES: ${{ inputs.distribution_verifier_critical_assignees }}
+          CRITICAL_ASSIGNEE: ''
+          CRITICAL_ASSIGNEES: ''
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -11541,8 +11441,8 @@ jobs:
           CRITICAL_ASSIGNEE_CANDIDATES: ${{ steps.distribution_nudge_incident.outputs.critical_assignee_candidates }}
           CRITICAL_ASSIGNEE_ATTEMPTS: ${{ steps.distribution_nudge_incident.outputs.critical_assignee_attempts }}
           CRITICAL_ASSIGNEE_ACTION: ${{ steps.distribution_nudge_incident.outputs.critical_assignee_action }}
-          CRITICAL_COMMENT_COOLDOWN_HOURS: ${{ inputs.distribution_verifier_critical_comment_cooldown_hours }}
-          CRITICAL_COMMENT_MIN_FAILURE_DELTA: ${{ inputs.distribution_verifier_critical_comment_min_failure_delta }}
+          CRITICAL_COMMENT_COOLDOWN_HOURS: '24'
+          CRITICAL_COMMENT_MIN_FAILURE_DELTA: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

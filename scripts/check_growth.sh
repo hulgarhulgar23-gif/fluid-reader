@@ -2861,23 +2861,23 @@ if ! rg -Fq "founder_first48h_post_pack_path=" ".github/workflows/launch-pack.ym
   exit 1
 fi
 
-if ! rg -Fq "founder_first48h_primary_char_limit:" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder first-48h primary char-limit input."
+if ! rg -Fq "INPUT_FOUNDER_FIRST48H_PRIMARY_CHAR_LIMIT: '280'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder first-48h primary char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "founder_first48h_backup_char_limit:" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder first-48h backup char-limit input."
+if ! rg -Fq "INPUT_FOUNDER_FIRST48H_BACKUP_CHAR_LIMIT: '500'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder first-48h backup char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "founder_first48h_primary_tone:" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder first-48h primary tone input."
+if ! rg -Fq "INPUT_FOUNDER_FIRST48H_PRIMARY_TONE: 'x-punchy'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder first-48h primary tone default."
   exit 1
 fi
 
-if ! rg -Fq "founder_first48h_backup_tone:" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder first-48h backup tone input."
+if ! rg -Fq "INPUT_FOUNDER_FIRST48H_BACKUP_TONE: 'linkedin-context'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder first-48h backup tone default."
   exit 1
 fi
 
@@ -3786,33 +3786,33 @@ if ! rg -Fq "distribution_completion_threshold" ".github/workflows/weekly-growth
   exit 1
 fi
 
-if ! rg -Fq "founder_transcript_path" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder transcript source dispatch input."
+if ! rg -Fq "INPUT_FOUNDER_TRANSCRIPT_PATH: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder transcript source default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_daily_mission_path" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder daily mission source dispatch input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_DAILY_MISSION_PATH: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder daily mission source default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_primary_char_limit" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder first-48h primary char-limit dispatch input."
+if ! rg -Fq "founder_first48h_primary_char_limit=280" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder first-48h primary char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_backup_char_limit" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder first-48h backup char-limit dispatch input."
+if ! rg -Fq "founder_first48h_backup_char_limit=500" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder first-48h backup char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_primary_tone" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder first-48h primary tone dispatch input."
+if ! rg -Fq "founder_first48h_primary_tone=x-punchy" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder first-48h primary tone default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_backup_tone" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder first-48h backup tone dispatch input."
+if ! rg -Fq "founder_first48h_backup_tone=linkedin-context" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder first-48h backup tone default."
   exit 1
 fi
 
@@ -4276,22 +4276,22 @@ if ! rg -Fq -- "--cta \"\${FOUNDER_CTA_TEXT" ".github/workflows/weekly-growth-re
   exit 1
 fi
 
-if ! rg -Fq -- "echo \"founder_first48h_primary_char_limit=\${{ inputs.first48h_primary_char_limit || '280' }}\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
+if ! rg -Fq -- "echo \"founder_first48h_primary_char_limit=280\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
   echo "Weekly growth review workflow is missing founder first-48h primary char-limit env export."
   exit 1
 fi
 
-if ! rg -Fq -- "echo \"founder_first48h_backup_char_limit=\${{ inputs.first48h_backup_char_limit || '500' }}\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
+if ! rg -Fq -- "echo \"founder_first48h_backup_char_limit=500\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
   echo "Weekly growth review workflow is missing founder first-48h backup char-limit env export."
   exit 1
 fi
 
-if ! rg -Fq -- "echo \"founder_first48h_primary_tone=\${{ inputs.first48h_primary_tone || 'x-punchy' }}\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
+if ! rg -Fq -- "echo \"founder_first48h_primary_tone=x-punchy\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
   echo "Weekly growth review workflow is missing founder first-48h primary tone env export."
   exit 1
 fi
 
-if ! rg -Fq -- "echo \"founder_first48h_backup_tone=\${{ inputs.first48h_backup_tone || 'linkedin-context' }}\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
+if ! rg -Fq -- "echo \"founder_first48h_backup_tone=linkedin-context\" >> \"\$GITHUB_ENV\"" ".github/workflows/weekly-growth-review.yml"; then
   echo "Weekly growth review workflow is missing founder first-48h backup tone env export."
   exit 1
 fi
@@ -5416,28 +5416,28 @@ if ! rg -Fq "Founder narrative route incident critical trigger" ".github/workflo
   exit 1
 fi
 
-if ! rg -Fq "narrative_route_critical_threshold" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing narrative route critical-threshold input wiring."
+if ! rg -Fq "CRITICAL_THRESHOLD: '2'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing narrative route critical-threshold default."
   exit 1
 fi
 
-if ! rg -Fq "narrative_route_critical_assignee" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing narrative route critical-assignee input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEE: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing narrative route critical-assignee default."
   exit 1
 fi
 
-if ! rg -Fq "narrative_route_critical_assignees" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing narrative route critical-assignees fallback input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEES: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing narrative route critical-assignees default."
   exit 1
 fi
 
-if ! rg -Fq "narrative_route_critical_comment_cooldown_hours" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing narrative route critical-comment cooldown input wiring."
+if ! rg -Fq "CRITICAL_COMMENT_COOLDOWN_HOURS: '24'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing narrative route critical-comment cooldown default."
   exit 1
 fi
 
-if ! rg -Fq "narrative_route_critical_comment_min_occurrence_delta" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing narrative route critical-comment min-occurrence-delta input wiring."
+if ! rg -Fq "CRITICAL_COMMENT_MIN_OCCURRENCE_DELTA: '1'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing narrative route critical-comment min-occurrence-delta default."
   exit 1
 fi
 
@@ -5551,28 +5551,28 @@ if ! rg -Fq "Add founder fame proof loop verifier incident summary" ".github/wor
   exit 1
 fi
 
-if ! rg -Fq "founder_verifier_critical_threshold" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder verifier critical-threshold input wiring."
+if ! rg -Fq "CRITICAL_THRESHOLD: '3'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder verifier critical-threshold default."
   exit 1
 fi
 
-if ! rg -Fq "founder_verifier_critical_assignee" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder verifier critical-assignee input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEE: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder verifier critical-assignee default."
   exit 1
 fi
 
-if ! rg -Fq "founder_verifier_critical_assignees" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder verifier critical-assignees fallback input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEES: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder verifier critical-assignees default."
   exit 1
 fi
 
-if ! rg -Fq "founder_verifier_comment_cooldown_hours" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder verifier comment cooldown input wiring."
+if ! rg -Fq "ALERT_COMMENT_COOLDOWN_HOURS: '24'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder verifier comment cooldown default."
   exit 1
 fi
 
-if ! rg -Fq "founder_verifier_comment_min_failure_delta" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing founder verifier comment min-failure-delta input wiring."
+if ! rg -Fq "ALERT_COMMENT_MIN_FAILURE_DELTA: '1'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing founder verifier comment min-failure-delta default."
   exit 1
 fi
 
@@ -6741,23 +6741,23 @@ if ! rg -Fq "distribution_verifier_critical_threshold" ".github/workflows/weekly
   exit 1
 fi
 
-if ! rg -Fq "distribution_verifier_critical_assignee" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing distribution verifier critical-assignee input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEE: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing distribution verifier critical-assignee default."
   exit 1
 fi
 
-if ! rg -Fq "distribution_verifier_critical_assignees" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing distribution verifier critical-assignees fallback input wiring."
+if ! rg -Fq "CRITICAL_ASSIGNEES: ''" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing distribution verifier critical-assignees default."
   exit 1
 fi
 
-if ! rg -Fq "distribution_verifier_critical_comment_cooldown_hours" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing distribution verifier critical-comment cooldown input wiring."
+if ! rg -Fq "CRITICAL_COMMENT_COOLDOWN_HOURS: '24'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing distribution verifier critical-comment cooldown default."
   exit 1
 fi
 
-if ! rg -Fq "distribution_verifier_critical_comment_min_failure_delta" ".github/workflows/weekly-growth-review.yml"; then
-  echo "Weekly growth review workflow is missing distribution verifier critical-comment min-failure-delta input wiring."
+if ! rg -Fq "CRITICAL_COMMENT_MIN_FAILURE_DELTA: '1'" ".github/workflows/weekly-growth-review.yml"; then
+  echo "Weekly growth review workflow is missing distribution verifier critical-comment min-failure-delta default."
   exit 1
 fi
 
@@ -7446,78 +7446,78 @@ if ! rg -Fq -- "--creator-signal-enrichment-score" "scripts/run_launch_day.sh"; 
   exit 1
 fi
 
-if ! rg -Fq "primary_audience_region" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing primary audience-region input."
+if ! rg -Fq "INPUT_PRIMARY_AUDIENCE_REGION: 'global'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing primary audience-region default."
   exit 1
 fi
 
-if ! rg -Fq "backup_audience_region" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing backup audience-region input."
+if ! rg -Fq "INPUT_BACKUP_AUDIENCE_REGION: 'global'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing backup audience-region default."
   exit 1
 fi
 
-if ! rg -Fq "channel_roi_preferred_channel" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing channel ROI preferred-route input."
+if ! rg -Fq "INPUT_CHANNEL_ROI_PREFERRED_CHANNEL: 'balanced'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing channel ROI preferred-route default."
   exit 1
 fi
 
-if ! rg -Fq "channel_roi_recommendation" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing channel ROI recommendation input."
+if ! rg -Fq "INPUT_CHANNEL_ROI_RECOMMENDATION: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing channel ROI recommendation default."
   exit 1
 fi
 
-if ! rg -Fq "channel_mix_recommendation" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing channel-mix recommendation input."
+if ! rg -Fq "INPUT_CHANNEL_MIX_RECOMMENDATION: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing channel-mix recommendation default."
   exit 1
 fi
 
-if ! rg -Fq "creator_signal_entries" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing creator signal entries input."
+if ! rg -Fq "INPUT_CREATOR_SIGNAL_ENTRIES: 'n/a'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing creator signal entries default."
   exit 1
 fi
 
-if ! rg -Fq "creator_signal_enrichment_score" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing creator enrichment score input."
+if ! rg -Fq "INPUT_CREATOR_SIGNAL_ENRICHMENT_SCORE: 'n/a'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing creator enrichment score default."
   exit 1
 fi
 
-if ! rg -Fq "founder_transcript" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder transcript source input."
+if ! rg -Fq "INPUT_FOUNDER_TRANSCRIPT: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder transcript source default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_daily_mission" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame daily mission source input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_DAILY_MISSION: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame daily mission source default."
   exit 1
 fi
 
-if ! rg -Fq "post_founder_fame_war_room_comment" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame war-room checklist comment upsert input."
+if ! rg -Fq "INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT: 'false'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame war-room checklist comment upsert default."
   exit 1
 fi
 
-if ! rg -Fq "post_founder_fame_exceptional_loop_comment" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame exceptional-loop checklist comment upsert input."
+if ! rg -Fq "INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT: 'false'" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame exceptional-loop checklist comment upsert default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_war_room_comment_issue" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame war-room checklist issue override input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame war-room checklist issue override default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_war_room_comment_repo" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame war-room checklist repo override input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame war-room checklist repo override default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_exceptional_loop_comment_issue" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame exceptional-loop checklist issue override input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame exceptional-loop checklist issue override default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_exceptional_loop_comment_repo" ".github/workflows/launch-pack.yml"; then
-  echo "Launch pack workflow is missing founder fame exceptional-loop checklist repo override input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO: ''" ".github/workflows/launch-pack.yml"; then
+  echo "Launch pack workflow is missing founder fame exceptional-loop checklist repo override default."
   exit 1
 fi
 
@@ -9926,13 +9926,13 @@ if ! rg -Fq "github.event.inputs" ".github/workflows/founder-fame-pack.yml"; the
   exit 1
 fi
 
-if ! rg -Fq "post_exceptional_loop_comment" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing post_exceptional_loop_comment input wiring."
+if ! rg -Fq "INPUT_POST_EXCEPTIONAL_LOOP_COMMENT: 'false'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing post_exceptional_loop_comment default."
   exit 1
 fi
 
-if ! rg -Fq "exceptional_loop_comment_issue" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing exceptional_loop_comment_issue input wiring."
+if ! rg -Fq "INPUT_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ''" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing exceptional_loop_comment_issue default."
   exit 1
 fi
 
@@ -9946,38 +9946,38 @@ if ! rg -Fq "INPUT_FOUNDER_FAME_ACTION_QUEUE" ".github/workflows/founder-fame-pa
   exit 1
 fi
 
-if ! rg -Fq "guesting_signal_entries" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing guesting signal entries input."
+if ! rg -Fq "INPUT_GUESTING_SIGNAL_ENTRIES: 'n/a'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing guesting signal entries default."
   exit 1
 fi
 
-if ! rg -Fq "founder_transcript" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder transcript source input."
+if ! rg -Fq "INPUT_FOUNDER_TRANSCRIPT: ''" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder transcript source default."
   exit 1
 fi
 
-if ! rg -Fq "founder_fame_action_queue" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder_fame_action_queue optional input."
+if ! rg -Fq "INPUT_FOUNDER_FAME_ACTION_QUEUE: ''" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder_fame_action_queue default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_primary_char_limit" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder first-48h primary char-limit dispatch input."
+if ! rg -Fq "INPUT_FIRST48H_PRIMARY_CHAR_LIMIT: '280'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder first-48h primary char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_backup_char_limit" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder first-48h backup char-limit dispatch input."
+if ! rg -Fq "INPUT_FIRST48H_BACKUP_CHAR_LIMIT: '500'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder first-48h backup char-limit default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_primary_tone" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder first-48h primary tone dispatch input."
+if ! rg -Fq "INPUT_FIRST48H_PRIMARY_TONE: 'x-punchy'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder first-48h primary tone default."
   exit 1
 fi
 
-if ! rg -Fq "first48h_backup_tone" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing founder first-48h backup tone dispatch input."
+if ! rg -Fq "INPUT_FIRST48H_BACKUP_TONE: 'linkedin-context'" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing founder first-48h backup tone default."
   exit 1
 fi
 
@@ -10231,22 +10231,22 @@ if ! rg -Fq -- "--backup-tone \"\$first48h_backup_tone\"" ".github/workflows/fou
   exit 1
 fi
 
-if ! rg -Fq "creator_target_list:" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing creator target list workflow-dispatch input."
+if ! rg -Fq "INPUT_CREATOR_TARGET_LIST: ''" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing creator target list default."
   exit 1
 fi
 
-if ! rg -Fq "distribution_plan:" ".github/workflows/founder-fame-pack.yml"; then
-  echo "Founder fame workflow is missing distribution plan workflow-dispatch input."
+if ! rg -Fq "INPUT_DISTRIBUTION_PLAN: ''" ".github/workflows/founder-fame-pack.yml"; then
+  echo "Founder fame workflow is missing distribution plan default."
   exit 1
 fi
 
-if ! rg -Fq "INPUT_CREATOR_TARGET_LIST: \${{ github.event.inputs.creator_target_list || '' }}" ".github/workflows/founder-fame-pack.yml"; then
+if ! rg -Fq "INPUT_CREATOR_TARGET_LIST: ''" ".github/workflows/founder-fame-pack.yml"; then
   echo "Founder fame workflow is missing creator target list env wiring."
   exit 1
 fi
 
-if ! rg -Fq "INPUT_DISTRIBUTION_PLAN: \${{ github.event.inputs.distribution_plan || '' }}" ".github/workflows/founder-fame-pack.yml"; then
+if ! rg -Fq "INPUT_DISTRIBUTION_PLAN: ''" ".github/workflows/founder-fame-pack.yml"; then
   echo "Founder fame workflow is missing distribution plan env wiring."
   exit 1
 fi

@@ -38,16 +38,6 @@ on:
         required: false
         default: 'Try this flow and share your first Win Card.'
         type: string
-      audience:
-        description: 'Audience label'
-        required: false
-        default: 'builders, writers, and researchers'
-        type: string
-      asset:
-        description: 'Primary proof asset'
-        required: false
-        default: 'Copy Win Card'
-        type: string
       primary_channel:
         description: 'Primary launch channel'
         required: false
@@ -57,131 +47,6 @@ on:
         description: 'Backup launch channel'
         required: false
         default: 'LinkedIn'
-        type: string
-      primary_audience_region:
-        description: 'Primary audience region (global/us/eu/apac)'
-        required: false
-        default: 'global'
-        type: string
-      backup_audience_region:
-        description: 'Backup audience region (global/us/eu/apac)'
-        required: false
-        default: 'global'
-        type: string
-      channel_roi_preferred_channel:
-        description: 'Preferred lead route (primary/backup/balanced)'
-        required: false
-        default: 'balanced'
-        type: string
-      channel_roi_recommendation:
-        description: 'Optional ROI routing recommendation line'
-        required: false
-        default: ''
-        type: string
-      channel_mix_recommendation:
-        description: 'Optional channel mix recommendation line'
-        required: false
-        default: ''
-        type: string
-      creator_signal_entries:
-        description: 'Creator signal entries captured from comments'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_high_fit:
-        description: 'Creator signal entries with fit score >=70'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_warm_intros:
-        description: 'Creator signal entries with warm intros'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_collab_ready:
-        description: 'Creator signal entries marked collab-ready'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_top_segment:
-        description: 'Top creator signal segment label'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_top_handle:
-        description: 'Top creator signal handle'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_enrichment_score:
-        description: 'Creator signal enrichment score'
-        required: false
-        default: 'n/a'
-        type: string
-      creator_signal_recommendation:
-        description: 'Creator signal recommendation line'
-        required: false
-        default: 'Capture creator signal comments in Monday checklist before Friday review.'
-        type: string
-      founder_transcript:
-        description: 'Optional founder transcript source path (repo-relative) for transcript ingestion quality'
-        required: false
-        default: ''
-        type: string
-      founder_fame_daily_mission:
-        description: 'Optional in-app founder daily mission markdown path (repo-relative) for action-queue mission bridge'
-        required: false
-        default: ''
-        type: string
-      founder_first48h_primary_char_limit:
-        description: 'Founder first-48h primary short-variant char limit'
-        required: false
-        default: '280'
-        type: string
-      founder_first48h_backup_char_limit:
-        description: 'Founder first-48h backup short-variant char limit'
-        required: false
-        default: '500'
-        type: string
-      founder_first48h_primary_tone:
-        description: 'Founder first-48h primary tone profile (x-punchy|x-thread|neutral)'
-        required: false
-        default: 'x-punchy'
-        type: string
-      founder_first48h_backup_tone:
-        description: 'Founder first-48h backup tone profile (linkedin-context|linkedin-operator|neutral)'
-        required: false
-        default: 'linkedin-context'
-        type: string
-      post_founder_fame_war_room_comment:
-        description: 'Upsert founder fame war-room checklist comment after generation'
-        required: false
-        default: false
-        type: boolean
-      founder_fame_war_room_comment_issue:
-        description: 'Optional Monday checklist issue number override for founder war-room comment upsert'
-        required: false
-        default: ''
-        type: string
-      founder_fame_war_room_comment_repo:
-        description: 'Optional repository slug override (owner/repo) for founder war-room comment upsert'
-        required: false
-        default: ''
-        type: string
-      post_founder_fame_exceptional_loop_comment:
-        description: 'Upsert founder fame exceptional-loop checklist comment after generation'
-        required: false
-        default: false
-        type: boolean
-      founder_fame_exceptional_loop_comment_issue:
-        description: 'Optional Monday checklist issue number override for founder exceptional-loop comment upsert'
-        required: false
-        default: ''
-        type: string
-      founder_fame_exceptional_loop_comment_repo:
-        description: 'Optional repository slug override (owner/repo) for founder exceptional-loop comment upsert'
-        required: false
-        default: ''
         type: string
       skip_tests:
         description: 'Skip swift test in launch runner'
@@ -211,35 +76,35 @@ jobs:
           INPUT_METRIC: ${{ inputs.metric }}
           INPUT_WORKFLOW: ${{ inputs.workflow }}
           INPUT_CTA: ${{ inputs.cta }}
-          INPUT_AUDIENCE: ${{ inputs.audience }}
-          INPUT_ASSET: ${{ inputs.asset }}
+          INPUT_AUDIENCE: 'builders, writers, and researchers'
+          INPUT_ASSET: 'Copy Win Card'
           INPUT_PRIMARY_CHANNEL: ${{ inputs.primary_channel }}
           INPUT_BACKUP_CHANNEL: ${{ inputs.backup_channel }}
-          INPUT_PRIMARY_AUDIENCE_REGION: ${{ inputs.primary_audience_region }}
-          INPUT_BACKUP_AUDIENCE_REGION: ${{ inputs.backup_audience_region }}
-          INPUT_CHANNEL_ROI_PREFERRED_CHANNEL: ${{ inputs.channel_roi_preferred_channel }}
-          INPUT_CHANNEL_ROI_RECOMMENDATION: ${{ inputs.channel_roi_recommendation }}
-          INPUT_CHANNEL_MIX_RECOMMENDATION: ${{ inputs.channel_mix_recommendation }}
-          INPUT_CREATOR_SIGNAL_ENTRIES: ${{ inputs.creator_signal_entries }}
-          INPUT_CREATOR_SIGNAL_HIGH_FIT: ${{ inputs.creator_signal_high_fit }}
-          INPUT_CREATOR_SIGNAL_WARM_INTROS: ${{ inputs.creator_signal_warm_intros }}
-          INPUT_CREATOR_SIGNAL_COLLAB_READY: ${{ inputs.creator_signal_collab_ready }}
-          INPUT_CREATOR_SIGNAL_TOP_SEGMENT: ${{ inputs.creator_signal_top_segment }}
-          INPUT_CREATOR_SIGNAL_TOP_HANDLE: ${{ inputs.creator_signal_top_handle }}
-          INPUT_CREATOR_SIGNAL_ENRICHMENT_SCORE: ${{ inputs.creator_signal_enrichment_score }}
-          INPUT_CREATOR_SIGNAL_RECOMMENDATION: ${{ inputs.creator_signal_recommendation }}
-          INPUT_FOUNDER_TRANSCRIPT: ${{ inputs.founder_transcript }}
-          INPUT_FOUNDER_FAME_DAILY_MISSION: ${{ inputs.founder_fame_daily_mission }}
-          INPUT_FOUNDER_FIRST48H_PRIMARY_CHAR_LIMIT: ${{ inputs.founder_first48h_primary_char_limit }}
-          INPUT_FOUNDER_FIRST48H_BACKUP_CHAR_LIMIT: ${{ inputs.founder_first48h_backup_char_limit }}
-          INPUT_FOUNDER_FIRST48H_PRIMARY_TONE: ${{ inputs.founder_first48h_primary_tone }}
-          INPUT_FOUNDER_FIRST48H_BACKUP_TONE: ${{ inputs.founder_first48h_backup_tone }}
-          INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT: ${{ inputs.post_founder_fame_war_room_comment }}
-          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE: ${{ inputs.founder_fame_war_room_comment_issue }}
-          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO: ${{ inputs.founder_fame_war_room_comment_repo }}
-          INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT: ${{ inputs.post_founder_fame_exceptional_loop_comment }}
-          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ${{ inputs.founder_fame_exceptional_loop_comment_issue }}
-          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO: ${{ inputs.founder_fame_exceptional_loop_comment_repo }}
+          INPUT_PRIMARY_AUDIENCE_REGION: 'global'
+          INPUT_BACKUP_AUDIENCE_REGION: 'global'
+          INPUT_CHANNEL_ROI_PREFERRED_CHANNEL: 'balanced'
+          INPUT_CHANNEL_ROI_RECOMMENDATION: ''
+          INPUT_CHANNEL_MIX_RECOMMENDATION: ''
+          INPUT_CREATOR_SIGNAL_ENTRIES: 'n/a'
+          INPUT_CREATOR_SIGNAL_HIGH_FIT: 'n/a'
+          INPUT_CREATOR_SIGNAL_WARM_INTROS: 'n/a'
+          INPUT_CREATOR_SIGNAL_COLLAB_READY: 'n/a'
+          INPUT_CREATOR_SIGNAL_TOP_SEGMENT: 'n/a'
+          INPUT_CREATOR_SIGNAL_TOP_HANDLE: 'n/a'
+          INPUT_CREATOR_SIGNAL_ENRICHMENT_SCORE: 'n/a'
+          INPUT_CREATOR_SIGNAL_RECOMMENDATION: 'Capture creator signal comments in Monday checklist before Friday review.'
+          INPUT_FOUNDER_TRANSCRIPT: ''
+          INPUT_FOUNDER_FAME_DAILY_MISSION: ''
+          INPUT_FOUNDER_FIRST48H_PRIMARY_CHAR_LIMIT: '280'
+          INPUT_FOUNDER_FIRST48H_BACKUP_CHAR_LIMIT: '500'
+          INPUT_FOUNDER_FIRST48H_PRIMARY_TONE: 'x-punchy'
+          INPUT_FOUNDER_FIRST48H_BACKUP_TONE: 'linkedin-context'
+          INPUT_POST_FOUNDER_FAME_WAR_ROOM_COMMENT: 'false'
+          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_ISSUE: ''
+          INPUT_FOUNDER_FAME_WAR_ROOM_COMMENT_REPO: ''
+          INPUT_POST_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT: 'false'
+          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_ISSUE: ''
+          INPUT_FOUNDER_FAME_EXCEPTIONAL_LOOP_COMMENT_REPO: ''
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
           GH_TOKEN: ${{ github.token }}
         run: |

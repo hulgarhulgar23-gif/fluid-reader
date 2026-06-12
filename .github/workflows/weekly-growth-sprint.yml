@@ -55,16 +55,6 @@ on:
         required: false
         default: 'Try this flow and share your first Win Card.'
         type: string
-      audience:
-        description: 'Audience label'
-        required: false
-        default: 'builders, writers, and researchers'
-        type: string
-      asset:
-        description: 'Primary proof asset'
-        required: false
-        default: 'Copy Win Card'
-        type: string
 
 permissions:
   contents: read
@@ -91,8 +81,8 @@ jobs:
           INPUT_METRIC: ${{ inputs.metric }}
           INPUT_WORKFLOW: ${{ inputs.workflow }}
           INPUT_CTA: ${{ inputs.cta }}
-          INPUT_AUDIENCE: ${{ inputs.audience }}
-          INPUT_ASSET: ${{ inputs.asset }}
+          INPUT_AUDIENCE: 'builders, writers, and researchers'
+          INPUT_ASSET: 'Copy Win Card'
         run: |
           set -euo pipefail
 

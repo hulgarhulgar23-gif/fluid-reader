@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_SCRIPT="$ROOT_DIR/scripts/check_swift_safety.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+FALLBACK_PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 
 make_repo() {
   local repo_dir="$1"
@@ -21,7 +22,7 @@ expect_pass() {
   make_repo "$repo_dir"
   printf 'let value = optionalValue as? String\n' > "$repo_dir/Sources/FluidReader/Safe.swift"
 
-  if ! output="$(cd "$repo_dir" && zsh scripts/check_swift_safety.sh 2>&1)"; then
+  if ! output="$(cd "$repo_dir" && PATH="$FALLBACK_PATH" zsh scripts/check_swift_safety.sh 2>&1)"; then
     echo "Expected clean Swift safety fixture to pass."
     echo "$output"
     exit 1
@@ -46,7 +47,7 @@ expect_fail() {
   printf '%s\n' "$content" > "$repo_dir/Sources/FluidReader/Bad.swift"
 
   set +e
-  output="$(cd "$repo_dir" && zsh scripts/check_swift_safety.sh 2>&1)"
+  output="$(cd "$repo_dir" && PATH="$FALLBACK_PATH" zsh scripts/check_swift_safety.sh 2>&1)"
   exit_code=$?
   set -e
 
