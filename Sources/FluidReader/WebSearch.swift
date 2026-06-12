@@ -86,7 +86,8 @@ enum WebSearch {
         }
 
         let lowercased = candidate.lowercased()
-        if !lowercased.contains("://"), candidate.contains(".") {
+        let hasExplicitScheme = lowercased.contains("://")
+        if !hasExplicitScheme, candidate.contains(".") {
             candidate = "https://\(candidate)"
         }
 
@@ -96,6 +97,16 @@ enum WebSearch {
               let host = url.host,
               !host.isEmpty else {
             return nil
+        }
+
+        if !hasExplicitScheme {
+            // Avoid URL-ifying dotted tokens like "3.14" or "1.2.3": only
+            // treat the text as a URL when the synthesized host ends in an
+            // alphabetic top-level domain.
+            let topLevelDomain = host.split(separator: ".").last ?? ""
+            guard topLevelDomain.count >= 2, topLevelDomain.allSatisfy(\.isLetter) else {
+                return nil
+            }
         }
 
         return url

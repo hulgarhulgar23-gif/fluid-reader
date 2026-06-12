@@ -222,9 +222,12 @@ struct CalculatorExpression: Equatable {
                   let salesAndMarketingSpend = Double(tokens[2]),
                   netNewARR >= 0,
                   salesAndMarketingSpend > 0 else { return nil }
+            // Magic number = net new ARR / S&M spend. ARR is already
+            // annualized, so no x4 multiplier (that applies only when
+            // annualizing quarterly net-new revenue).
             return conversationalExpression(
                 expression: query,
-                value: (netNewARR * 4) / salesAndMarketingSpend
+                value: netNewARR / salesAndMarketingSpend
             )
         case "rule40":
             guard tokens.count == 3,

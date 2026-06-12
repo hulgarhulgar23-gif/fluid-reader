@@ -1497,7 +1497,9 @@ enum FameSnapshotRollup {
         displayFormatter.timeZone = calendar.timeZone
         displayFormatter.dateFormat = "yyyy-MM-dd"
 
-        let snapshotDays = recentEntries.compactMap {
+        // Streaks are computed over the full ledger, not the analysis window,
+        // so streaks longer than the window (e.g. 10+ days) are not truncated.
+        let snapshotDays = entries.compactMap {
             snapshotDayDate(from: $0.timestamp, formatter: dayFormatter)
         }
         let uniqueSnapshotDays = Array(Set(snapshotDays.map { calendar.startOfDay(for: $0) })).sorted()
@@ -2196,7 +2198,9 @@ enum FameSnapshotRollup {
         dayFormatter.locale = Locale(identifier: "en_US_POSIX")
         dayFormatter.timeZone = calendar.timeZone
         dayFormatter.dateFormat = "yyyyMMdd"
-        let snapshotDays = recentEntries.compactMap {
+        // Streaks are computed over the full ledger, not the analysis window,
+        // so streaks longer than the window (e.g. 10+ days) are not truncated.
+        let snapshotDays = entries.compactMap {
             snapshotDayDate(from: $0.timestamp, formatter: dayFormatter)
         }
         let uniqueSnapshotDays = Array(Set(snapshotDays.map { calendar.startOfDay(for: $0) })).sorted()

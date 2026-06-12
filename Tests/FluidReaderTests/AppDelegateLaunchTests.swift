@@ -8170,6 +8170,31 @@ final class AppDelegateLaunchTests: XCTestCase {
             2
         )
 
+        // Repeat observations inside the debounce window hold the streak so
+        // rapid menu/status refreshes do not inflate escalation thresholds.
+        XCTAssertEqual(
+            AppDelegate.launchRescueAutoSelfHealAttentionIssueStreakNext(
+                currentIssueToken: "stale-urgency-critical-run-fame-launch-rescue-burst",
+                previousIssueToken: "stale-urgency-critical-run-fame-launch-rescue-burst",
+                previousIssueStreak: 1,
+                now: now,
+                previousStreakUpdatedAt: now.addingTimeInterval(-10)
+            ),
+            1
+        )
+        XCTAssertEqual(
+            AppDelegate.launchRescueAutoSelfHealAttentionIssueStreakNext(
+                currentIssueToken: "stale-urgency-critical-run-fame-launch-rescue-burst",
+                previousIssueToken: "stale-urgency-critical-run-fame-launch-rescue-burst",
+                previousIssueStreak: 1,
+                now: now,
+                previousStreakUpdatedAt: now.addingTimeInterval(
+                    -AppDelegate.launchRescueAutoSelfHealAttentionStreakObservationInterval
+                )
+            ),
+            2
+        )
+
         XCTAssertFalse(
             AppDelegate.shouldSurfaceLaunchRescueAutoSelfHealAttentionNudge(
                 issueToken: "stale-urgency-critical-run-fame-launch-rescue-burst",

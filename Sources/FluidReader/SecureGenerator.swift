@@ -24,10 +24,23 @@ enum SecureGenerator {
     static func string(from bytes: [UInt8], alphabet: String, length: Int) -> String {
         guard length > 0, !alphabet.isEmpty else { return "" }
 
+        // Rejection sampling, matching randomString: discard bytes outside the
+        // largest multiple of the alphabet size so no character is more likely
+        // than another (avoids modulo bias).
         let characters = Array(alphabet)
-        return bytes.prefix(length).map { byte in
-            String(characters[Int(byte) % characters.count])
-        }.joined()
+        let bucketSize = characters.count
+        let upperBound = 256 - (256 % bucketSize)
+        var output = ""
+
+        for byte in bytes {
+            guard Int(byte) < upperBound else { continue }
+            output.append(characters[Int(byte) % bucketSize])
+            if output.count == length {
+                break
+            }
+        }
+
+        return output
     }
 
     static func hexToken(from bytes: [UInt8]) -> String {

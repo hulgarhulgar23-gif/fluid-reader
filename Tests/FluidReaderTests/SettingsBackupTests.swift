@@ -154,6 +154,17 @@ final class SettingsBackupTests: XCTestCase {
         XCTAssertThrowsError(try SettingsBackup.decode("not json"))
     }
 
+    func testBackupFromNewerVersionThrows() throws {
+        let json = try makeBackup().jsonString()
+        let futureJSON = json.replacingOccurrences(
+            of: "\"version\" : \(SettingsBackup.currentVersion)",
+            with: "\"version\" : \(SettingsBackup.currentVersion + 1)"
+        )
+        XCTAssertNotEqual(json, futureJSON)
+
+        XCTAssertThrowsError(try SettingsBackup.decode(futureJSON))
+    }
+
     private func makeBackup() -> SettingsBackup {
         SettingsBackup(
             version: SettingsBackup.currentVersion,

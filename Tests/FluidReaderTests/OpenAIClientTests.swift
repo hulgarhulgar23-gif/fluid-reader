@@ -3,6 +3,30 @@ import XCTest
 @testable import FluidReader
 
 final class OpenAIClientTests: XCTestCase {
+    func testRequestURLUsesFixedResponsesEndpoint() throws {
+        let url = try OpenAIClient.requestURL(
+            provider: "openAIResponses",
+            endpoint: "https://example.com/v1/chat/completions"
+        )
+
+        XCTAssertEqual(url.absoluteString, AppDefaults.openAIResponsesEndpoint)
+    }
+
+    func testRequestURLUsesCustomEndpointForCompatibleChat() throws {
+        let url = try OpenAIClient.requestURL(
+            provider: "openAICompatibleChat",
+            endpoint: "https://example.com/v1/chat/completions"
+        )
+
+        XCTAssertEqual(url.absoluteString, "https://example.com/v1/chat/completions")
+    }
+
+    func testRequestURLFallsBackToDefaultChatEndpointWhenBlank() throws {
+        let url = try OpenAIClient.requestURL(provider: "openAICompatibleChat", endpoint: "   ")
+
+        XCTAssertEqual(url.absoluteString, AppDefaults.openAICompatibleChatEndpoint)
+    }
+
     func testAskBodyUsesDefaultModelAndAddsImage() throws {
         let data = try OpenAIClient.makeAskBody(
             question: "What is this?",

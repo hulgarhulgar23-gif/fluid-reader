@@ -11,6 +11,13 @@ final class SecureGeneratorTests: XCTestCase {
         XCTAssertEqual(SecureGenerator.string(from: [1, 2], alphabet: "", length: 2), "")
     }
 
+    func testStringFromBytesRejectsBiasedBytes() {
+        // With a 3-character alphabet the largest fair bound is 255, so byte
+        // 255 must be discarded instead of mapping to "a" via modulo bias.
+        XCTAssertEqual(SecureGenerator.string(from: [255, 0], alphabet: "abc", length: 1), "a")
+        XCTAssertEqual(SecureGenerator.string(from: [255], alphabet: "abc", length: 1), "")
+    }
+
     func testHexTokenFromBytes() {
         XCTAssertEqual(SecureGenerator.hexToken(from: [0, 15, 255]), "000fff")
     }

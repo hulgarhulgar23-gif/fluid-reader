@@ -43,9 +43,10 @@ enum FrontAppPaster {
             snapshot.restore(to: pasteboard)
             return .eventFailed
         }
+        let pasteChangeCount = pasteboard.changeCount
 
         guard application.activate() else {
-            snapshot.restore(to: pasteboard)
+            snapshot.restore(to: pasteboard, ifChangeCountEquals: pasteChangeCount)
             return .eventFailed
         }
 
@@ -53,12 +54,14 @@ enum FrontAppPaster {
 
         let postPasteShortcut = postPasteShortcut ?? FrontAppPaster.postPasteShortcut
         guard postPasteShortcut() else {
-            snapshot.restore(to: pasteboard)
+            snapshot.restore(to: pasteboard, ifChangeCountEquals: pasteChangeCount)
             return .eventFailed
         }
 
         try? await Task.sleep(nanoseconds: restoreDelayNanoseconds)
-        snapshot.restore(to: pasteboard)
+        // Skip the restore if anything else wrote to the pasteboard while we
+        // waited, so the user's newer clipboard content is not clobbered.
+        snapshot.restore(to: pasteboard, ifChangeCountEquals: pasteChangeCount)
         return .pasted
     }
 

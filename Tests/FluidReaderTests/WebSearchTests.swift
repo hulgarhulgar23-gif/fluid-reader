@@ -21,6 +21,12 @@ final class WebSearchTests: XCTestCase {
         XCTAssertNil(WebSearch.webURL(from: "swift appkit"))
     }
 
+    func testWebURLRejectsDottedNumbers() {
+        XCTAssertNil(WebSearch.webURL(from: "3.14"))
+        XCTAssertNil(WebSearch.webURL(from: "1.2.3"))
+        XCTAssertNil(WebSearch.webURL(from: "127.0.0.1"))
+    }
+
     func testMakeActionOpensSearchURL() throws {
         var openedURL: URL?
         let action = try XCTUnwrap(WebSearch.makeAction(query: "swift appkit") { url in

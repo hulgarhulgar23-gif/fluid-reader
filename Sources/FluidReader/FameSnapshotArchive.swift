@@ -847,7 +847,7 @@ struct FameSnapshotArchive {
         formatter.calendar = calendar
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyyMMdd-HHmm"
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: now)
     }
 
@@ -887,7 +887,9 @@ struct FameSnapshotArchive {
         """
 
         if FileManager.default.fileExists(atPath: ledgerURL.path) {
-            let existing = (try? String(contentsOf: ledgerURL, encoding: .utf8)) ?? ""
+            // Propagate read failures instead of coalescing to "", which would
+            // silently rewrite the ledger and destroy all snapshot history.
+            let existing = try String(contentsOf: ledgerURL, encoding: .utf8)
             let trimmed = existing.trimmingCharacters(in: .whitespacesAndNewlines)
             let next = trimmed.isEmpty ? "\(header)\n\(row)\n" : "\(trimmed)\n\(row)\n"
             try next.write(to: ledgerURL, atomically: true, encoding: .utf8)

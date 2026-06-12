@@ -225,6 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fameExceptionalLoopHotKeyAvailable = true
     private var launchRescueAutoSelfHealAttentionIssueToken: String?
     private var launchRescueAutoSelfHealAttentionIssueStreak = 0
+    private var launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt: Date?
     private var launchRescueAutoSelfHealAttentionLastNudgeAt: Date?
     private var launchRescueAutoSelfHealAttentionLastNudgeIssueToken: String?
     private var cadenceExecutionKitAutopilotCueLastAt: Date?
@@ -311,6 +312,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private nonisolated static let launchRescueAutoSelfHealAttentionMissingGraceWindow: TimeInterval =
         8 * 60
     private nonisolated static let launchRescueAutoSelfHealAttentionNudgeCooldown: TimeInterval = 30 * 60
+    nonisolated static let launchRescueAutoSelfHealAttentionStreakObservationInterval: TimeInterval = 5 * 60
     private nonisolated static let fameNextMoveRunFirstPrompt = "Run Fame Next Move first."
     private nonisolated static let fameNextMoveRunAgainPrompt = "Run Fame Next Move again."
     private nonisolated static let fameNextMoveMissingHandoffError = "No saved next move handoff yet."
@@ -5167,7 +5169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let issueStreak = Self.launchRescueAutoSelfHealAttentionIssueStreakNext(
             currentIssueToken: issueToken,
             previousIssueToken: launchRescueAutoSelfHealAttentionIssueToken,
-            previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak
+            previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak,
+            now: now,
+            previousStreakUpdatedAt: launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt
         )
         let recommendedActionID = Self.launchRescueAutoSelfHealAttentionRecommendedActionID(
             issueToken: issueToken,
@@ -5680,7 +5684,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
         if let date {
             defaults.set(date.timeIntervalSince1970, forKey: fameLaunchThresholdAlertsSnoozeUntilKey)
-            updateFameLaunchThresholdAlertsMenuTitle(now: date)
+            // Render against the current time, not the future snooze expiry,
+            // so the menu immediately shows the active snooze countdown.
+            updateFameLaunchThresholdAlertsMenuTitle()
         } else {
             defaults.removeObject(forKey: fameLaunchThresholdAlertsSnoozeUntilKey)
             updateFameLaunchThresholdAlertsMenuTitle()
@@ -19686,7 +19692,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let handoffURL = try FameSnapshotArchive.latestNextMoveHandoffURL() else {
             return nil
         }
-        return (try? String(contentsOf: handoffURL, encoding: .utf8)) ?? ""
+        // Propagate read failures so callers report an I/O error instead of
+        // misdiagnosing an existing handoff as missing content.
+        return try String(contentsOf: handoffURL, encoding: .utf8)
     }
 
     private func reportNextMoveCopyMissing(
@@ -20636,7 +20644,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     question: prompt,
                     selectedText: text,
                     imageData: imageData,
-                    model: settings.llmModel
+                    model: settings.llmModel,
+                    provider: settings.llmProvider,
+                    endpoint: settings.llmEndpoint
                 )
 
                 await MainActor.run {
@@ -21885,11 +21895,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     nonisolated static func launchRescueAutoSelfHealAttentionIssueStreakNext(
         currentIssueToken: String?,
         previousIssueToken: String?,
-        previousIssueStreak: Int
+        previousIssueStreak: Int,
+        now: Date = Date(),
+        previousStreakUpdatedAt: Date? = nil,
+        minimumObservationInterval: TimeInterval = launchRescueAutoSelfHealAttentionStreakObservationInterval
     ) -> Int {
         guard let currentIssueToken else { return 0 }
         let normalizedPreviousIssueStreak = max(0, previousIssueStreak)
         if previousIssueToken == currentIssueToken {
+            // Debounce repeat observations: menu/status refreshes can re-check
+            // the same issue within seconds, and the streak should count
+            // distinct checks over time, not UI refresh frequency.
+            if let previousStreakUpdatedAt,
+               now.timeIntervalSince(previousStreakUpdatedAt) < max(0, minimumObservationInterval) {
+                return max(1, normalizedPreviousIssueStreak)
+            }
             return max(1, normalizedPreviousIssueStreak + 1)
         }
         return 1
@@ -21979,7 +21999,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let issueStreak = Self.launchRescueAutoSelfHealAttentionIssueStreakNext(
             currentIssueToken: issueToken,
             previousIssueToken: launchRescueAutoSelfHealAttentionIssueToken,
-            previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak
+            previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak,
+            now: now,
+            previousStreakUpdatedAt: launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt
         )
         let recommendedActionID = Self.launchRescueAutoSelfHealAttentionRecommendedActionID(
             issueToken: issueToken,
@@ -22116,12 +22138,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             now: now,
             lastAutoTriggerAt: lastAutoTriggerAt
         )
-        launchRescueAutoSelfHealAttentionIssueStreak =
-            Self.launchRescueAutoSelfHealAttentionIssueStreakNext(
-                currentIssueToken: issueToken,
-                previousIssueToken: launchRescueAutoSelfHealAttentionIssueToken,
-                previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak
-            )
+        let nextIssueStreak = Self.launchRescueAutoSelfHealAttentionIssueStreakNext(
+            currentIssueToken: issueToken,
+            previousIssueToken: launchRescueAutoSelfHealAttentionIssueToken,
+            previousIssueStreak: launchRescueAutoSelfHealAttentionIssueStreak,
+            now: now,
+            previousStreakUpdatedAt: launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt
+        )
+        if nextIssueStreak != launchRescueAutoSelfHealAttentionIssueStreak
+            || issueToken != launchRescueAutoSelfHealAttentionIssueToken {
+            launchRescueAutoSelfHealAttentionIssueStreakUpdatedAt = now
+        }
+        launchRescueAutoSelfHealAttentionIssueStreak = nextIssueStreak
         launchRescueAutoSelfHealAttentionIssueToken = issueToken
 
         guard Self.shouldSurfaceLaunchRescueAutoSelfHealAttentionNudge(

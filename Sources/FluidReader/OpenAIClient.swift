@@ -29,6 +29,22 @@ struct OpenAIClient {
         self.session = session
     }
 
+    static func requestURL(provider: String, endpoint: String) throws -> URL {
+        let endpointValue: String
+        switch LLMProvider.normalized(provider) {
+        case .openAIResponses:
+            // The user-configurable endpoint applies to the compatible chat
+            // provider only; the OpenAI Responses endpoint is fixed.
+            endpointValue = AppDefaults.openAIResponsesEndpoint
+        case .openAICompatibleChat:
+            endpointValue = AppDefaults.value(endpoint, fallback: AppDefaults.openAICompatibleChatEndpoint)
+        }
+        guard let url = URL(string: endpointValue) else {
+            throw OpenAIError.badURL
+        }
+        return url
+    }
+
     func askAboutSelection(
         question: String,
         selectedText: String,
@@ -36,16 +52,14 @@ struct OpenAIClient {
         imageData: Data?,
         model: String,
         provider: String = AppDefaults.llmProvider,
-        endpoint: String = AppDefaults.openAIResponsesEndpoint
+        endpoint: String = AppDefaults.openAICompatibleChatEndpoint
     ) async throws -> String {
         let responseData: Data
         let output: String?
+        let url = try Self.requestURL(provider: provider, endpoint: endpoint)
 
         switch LLMProvider.normalized(provider) {
         case .openAIResponses:
-            guard let url = URL(string: AppDefaults.openAIResponsesEndpoint) else {
-                throw OpenAIError.badURL
-            }
             let data = try Self.makeAskBody(
                 question: question,
                 selectedText: selectedText,
@@ -61,10 +75,6 @@ struct OpenAIClient {
                     .compactMap { $0.text }
                     .joined(separator: "\n")
         case .openAICompatibleChat:
-            let endpointValue = AppDefaults.value(endpoint, fallback: AppDefaults.openAICompatibleChatEndpoint)
-            guard let url = URL(string: endpointValue) else {
-                throw OpenAIError.badURL
-            }
             let data = try Self.makeChatBody(
                 question: question,
                 selectedText: selectedText,

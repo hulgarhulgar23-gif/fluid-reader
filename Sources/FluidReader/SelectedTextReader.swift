@@ -13,13 +13,16 @@ enum SelectedTextReader {
         let step: UInt64 = 25_000_000
         var waited: UInt64 = 0
         var selectedText: String?
+        var copyChangeCount: Int?
 
         while waited < timeoutNanoseconds {
-            if pasteboard.changeCount != oldChangeCount,
+            let currentChangeCount = pasteboard.changeCount
+            if currentChangeCount != oldChangeCount,
                let text = pasteboard.string(forType: .string)?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                !text.isEmpty {
                 selectedText = text
+                copyChangeCount = currentChangeCount
                 break
             }
 
@@ -27,7 +30,14 @@ enum SelectedTextReader {
             waited += step
         }
 
-        snapshot.restore(to: pasteboard)
+        if let copyChangeCount {
+            // Restore only if nothing else has written to the pasteboard since
+            // the copy we observed, so newer clipboard content is preserved.
+            snapshot.restore(to: pasteboard, ifChangeCountEquals: copyChangeCount)
+        } else if pasteboard.changeCount != oldChangeCount {
+            // A copy landed after the timeout; put the original content back.
+            snapshot.restore(to: pasteboard)
+        }
         return selectedText
     }
 

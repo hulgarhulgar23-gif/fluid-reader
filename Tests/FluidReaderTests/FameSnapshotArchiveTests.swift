@@ -7,7 +7,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let date = calendar.date(from: DateComponents(year: 2026, month: 6, day: 9, hour: 12, minute: 34))!
 
-        XCTAssertEqual(FameSnapshotArchive.timestamp(now: date, calendar: calendar), "20260609-1234")
+        XCTAssertEqual(FameSnapshotArchive.timestamp(now: date, calendar: calendar), "20260609-123400")
     }
 
     func testSaveCreatesSnapshotFilesWithStableNames() throws {
@@ -32,15 +32,15 @@ final class FameSnapshotArchiveTests: XCTestCase {
         )
 
         XCTAssertEqual(saved.directoryURL, tempDirectory)
-        XCTAssertEqual(saved.sprintURL.lastPathComponent, "fame-sprint-20260609-0805.md")
-        XCTAssertEqual(saved.packURL.lastPathComponent, "fame-pack-20260609-0805.md")
+        XCTAssertEqual(saved.sprintURL.lastPathComponent, "fame-sprint-20260609-080500.md")
+        XCTAssertEqual(saved.packURL.lastPathComponent, "fame-pack-20260609-080500.md")
         XCTAssertEqual(saved.ledgerURL.lastPathComponent, "fame-snapshot-ledger.md")
         XCTAssertTrue(try String(contentsOf: saved.sprintURL).contains("# Fluid Reader Fame Sprint Today"))
         XCTAssertEqual(try String(contentsOf: saved.packURL), "# Pack")
 
         let ledger = try String(contentsOf: saved.ledgerURL)
         XCTAssertTrue(ledger.contains("# Fluid Reader Fame Snapshot Ledger"))
-        XCTAssertTrue(ledger.contains("| 20260609-0805 | Momentum | 28 | Day 2 | fame-sprint-20260609-0805.md | fame-pack-20260609-0805.md |"))
+        XCTAssertTrue(ledger.contains("| 20260609-080500 | Momentum | 28 | Day 2 | fame-sprint-20260609-080500.md | fame-pack-20260609-080500.md |"))
     }
 
     func testSaveAppendsLedgerRows() throws {
@@ -77,8 +77,40 @@ final class FameSnapshotArchiveTests: XCTestCase {
         )
 
         let ledger = try String(contentsOf: second.ledgerURL)
-        XCTAssertTrue(ledger.contains("| 20260609-0805 | Momentum | 28 | Day 2 | fame-sprint-20260609-0805.md | fame-pack-20260609-0805.md |"))
-        XCTAssertTrue(ledger.contains("| 20260610-0906 | Authority | 40 | Day 3 | fame-sprint-20260610-0906.md | fame-pack-20260610-0906.md |"))
+        XCTAssertTrue(ledger.contains("| 20260609-080500 | Momentum | 28 | Day 2 | fame-sprint-20260609-080500.md | fame-pack-20260609-080500.md |"))
+        XCTAssertTrue(ledger.contains("| 20260610-090600 | Authority | 40 | Day 3 | fame-sprint-20260610-090600.md | fame-pack-20260610-090600.md |"))
+    }
+
+    func testSaveThrowsInsteadOfWipingUnreadableLedger() throws {
+        let tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FluidReaderSnapshotTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+
+        // Invalid UTF-8 bytes: reading the ledger as UTF-8 fails, which must
+        // abort the save instead of rewriting the ledger from scratch.
+        let corruptBytes = Data([0xFF, 0xFE, 0xFA])
+        let ledgerURL = tempDirectory.appendingPathComponent("fame-snapshot-ledger.md")
+        try corruptBytes.write(to: ledgerURL)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let date = calendar.date(from: DateComponents(year: 2026, month: 6, day: 9, hour: 8, minute: 5))!
+
+        XCTAssertThrowsError(
+            try FameSnapshotArchive.save(
+                sprintMarkdown: """
+                Date: 2026-06-09 (Day 2)
+                Stage: Momentum
+                Score target: 28
+                """,
+                packMarkdown: "# Pack",
+                now: date,
+                calendar: calendar,
+                baseDirectory: tempDirectory
+            )
+        )
+
+        XCTAssertEqual(try Data(contentsOf: ledgerURL), corruptBytes)
     }
 
     func testSaveCommandCenterCreatesFileWithStableName() throws {
@@ -96,7 +128,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-command-center-20260611-0704.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-command-center-20260611-070400.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Command Center")
     }
 
@@ -115,7 +147,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-next-move-handoff-20260611-0808.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-next-move-handoff-20260611-080800.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Next-Move Handoff")
     }
 
@@ -134,7 +166,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-next-move-draft-pack-20260611-0819.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-next-move-draft-pack-20260611-081900.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Next-Move Draft Pack")
     }
 
@@ -153,7 +185,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-war-room-20260611-0841.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-war-room-20260611-084100.md")
         XCTAssertEqual(try String(contentsOf: url), "# Founder Fame War Room")
     }
 
@@ -172,7 +204,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-daily-checkpoint-20260612-0633.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-daily-checkpoint-20260612-063300.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Daily Fame Checkpoint")
     }
 
@@ -191,7 +223,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-daily-scorecard-20260612-0645.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-daily-scorecard-20260612-064500.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Daily Fame Scorecard")
     }
 
@@ -210,7 +242,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-scorecard-20260612-0712.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-scorecard-20260612-071200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader First-Week Fame Scorecard")
     }
 
@@ -229,7 +261,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-daily-brief-20260612-0726.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-daily-brief-20260612-072600.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader First-Week Daily Brief")
     }
 
@@ -248,7 +280,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-pulse-nudge-20260613-0741.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-pulse-nudge-20260613-074100.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Pulse Nudge")
     }
 
@@ -267,7 +299,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-nudge-20260613-0802.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-onboarding-nudge-20260613-080200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Onboarding Nudge")
     }
 
@@ -286,7 +318,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-recovery-sprint-20260613-0822.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-recovery-sprint-20260613-082200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Recovery Sprint")
     }
 
@@ -305,7 +337,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-recovery-checklist-20260613-0833.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-recovery-checklist-20260613-083300.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader 2h Recovery Checklist")
     }
 
@@ -324,7 +356,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-recovery-proof-pack-20260613-0844.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-recovery-proof-pack-20260613-084400.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Recovery Proof Pack")
     }
 
@@ -343,7 +375,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-risk-timeline-20260613-0914.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-risk-timeline-20260613-091400.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Risk Timeline")
     }
 
@@ -362,7 +394,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-operator-dashboard-20260613-0936.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-operator-dashboard-20260613-093600.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Operator Dashboard")
     }
 
@@ -381,7 +413,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-morning-brief-20260613-0948.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-morning-brief-20260613-094800.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Morning Fame Brief")
     }
 
@@ -400,7 +432,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-midday-brief-20260613-1208.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-midday-brief-20260613-120800.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Midday Fame Brief")
     }
 
@@ -419,7 +451,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-evening-brief-20260613-2126.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-evening-brief-20260613-212600.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Evening Fame Brief")
     }
 
@@ -438,7 +470,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-escalation-nudge-20260613-2241.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-escalation-nudge-20260613-224100.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Escalation Nudge")
     }
 
@@ -457,7 +489,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-breakthrough-forecast-20260613-2312.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-breakthrough-forecast-20260613-231200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Breakthrough Forecast")
     }
 
@@ -476,7 +508,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-daily-mission-20260614-0605.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-daily-mission-20260614-060500.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Daily Fame Mission")
     }
 
@@ -495,7 +527,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-narrative-lab-20260614-0712.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-narrative-lab-20260614-071200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Founder Fame Narrative Lab")
     }
 
@@ -514,7 +546,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-spotlight-pack-20260614-0736.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-spotlight-pack-20260614-073600.md")
         XCTAssertEqual(try String(contentsOf: url), "# Founder Fame Spotlight Pack")
     }
 
@@ -533,7 +565,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-launch-day-script-20260614-0802.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-launch-day-script-20260614-080200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Founder Fame Launch Day Script")
     }
 
@@ -552,7 +584,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-launch-countdown-20260614-0817.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-launch-countdown-20260614-081700.md")
         XCTAssertEqual(try String(contentsOf: url), "# Founder Fame Launch Countdown")
     }
 
@@ -571,7 +603,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-launch-rescue-burst-20260614-0831.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-launch-rescue-burst-20260614-083100.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Launch Rescue Burst")
     }
 
@@ -590,7 +622,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-launch-control-brief-20260614-0844.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-launch-control-brief-20260614-084400.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Launch Control Brief")
     }
 
@@ -609,7 +641,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-launch-rescue-snapshot-20260614-0851.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-launch-rescue-snapshot-20260614-085100.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Launch Rescue Snapshot")
     }
 
@@ -1519,7 +1551,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-cadence-momentum-brief-20260614-1109.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-cadence-momentum-brief-20260614-110900.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Cadence Momentum Brief")
     }
 
@@ -1571,7 +1603,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-cadence-share-line-20260615-0837.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-cadence-share-line-20260615-083700.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Cadence Share Line")
     }
 
@@ -1623,7 +1655,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-cadence-share-pack-20260615-1006.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-cadence-share-pack-20260615-100600.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Cadence Share Pack")
     }
 
@@ -1675,7 +1707,7 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(url.lastPathComponent, "fame-exceptional-loop-recap-20260616-0722.md")
+        XCTAssertEqual(url.lastPathComponent, "fame-exceptional-loop-recap-20260616-072200.md")
         XCTAssertEqual(try String(contentsOf: url), "# Fluid Reader Fame Exceptional Loop Recap")
     }
 
@@ -1730,10 +1762,10 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(files.checkpointURL.lastPathComponent, "fame-daily-checkpoint-20260614-0518.md")
-        XCTAssertEqual(files.pulseNudgeURL.lastPathComponent, "fame-pulse-nudge-20260614-0518.md")
-        XCTAssertEqual(files.scorecardURL.lastPathComponent, "fame-daily-scorecard-20260614-0518.md")
-        XCTAssertEqual(files.dashboardURL.lastPathComponent, "fame-operator-dashboard-20260614-0518.md")
+        XCTAssertEqual(files.checkpointURL.lastPathComponent, "fame-daily-checkpoint-20260614-051800.md")
+        XCTAssertEqual(files.pulseNudgeURL.lastPathComponent, "fame-pulse-nudge-20260614-051800.md")
+        XCTAssertEqual(files.scorecardURL.lastPathComponent, "fame-daily-scorecard-20260614-051800.md")
+        XCTAssertEqual(files.dashboardURL.lastPathComponent, "fame-operator-dashboard-20260614-051800.md")
         XCTAssertEqual(try String(contentsOf: files.checkpointURL), "# Fluid Reader Daily Fame Checkpoint")
         XCTAssertEqual(try String(contentsOf: files.pulseNudgeURL), "# Fluid Reader Fame Pulse Nudge")
         XCTAssertEqual(try String(contentsOf: files.scorecardURL), "# Fluid Reader Daily Fame Scorecard")
@@ -1758,10 +1790,10 @@ final class FameSnapshotArchiveTests: XCTestCase {
             baseDirectory: tempDirectory
         )
 
-        XCTAssertEqual(files.commandCenterURL.lastPathComponent, "fame-command-center-20260614-0518.md")
-        XCTAssertEqual(files.checkpointURL.lastPathComponent, "fame-daily-checkpoint-20260614-0518.md")
-        XCTAssertEqual(files.riskTimelineURL.lastPathComponent, "fame-risk-timeline-20260614-0518.md")
-        XCTAssertEqual(files.pulseNudgeURL.lastPathComponent, "fame-pulse-nudge-20260614-0518.md")
+        XCTAssertEqual(files.commandCenterURL.lastPathComponent, "fame-command-center-20260614-051800.md")
+        XCTAssertEqual(files.checkpointURL.lastPathComponent, "fame-daily-checkpoint-20260614-051800.md")
+        XCTAssertEqual(files.riskTimelineURL.lastPathComponent, "fame-risk-timeline-20260614-051800.md")
+        XCTAssertEqual(files.pulseNudgeURL.lastPathComponent, "fame-pulse-nudge-20260614-051800.md")
         XCTAssertEqual(try String(contentsOf: files.commandCenterURL), "# Fluid Reader Fame Command Center")
         XCTAssertEqual(try String(contentsOf: files.checkpointURL), "# Fluid Reader Daily Fame Checkpoint")
         XCTAssertEqual(try String(contentsOf: files.riskTimelineURL), "# Fluid Reader Fame Risk Timeline")

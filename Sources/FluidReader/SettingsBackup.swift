@@ -147,7 +147,13 @@ struct SettingsBackup: Codable, Equatable {
         guard let data = cleanText.data(using: .utf8) else {
             throw CocoaError(.coderReadCorrupt)
         }
-        return try JSONDecoder().decode(SettingsBackup.self, from: data)
+        let backup = try JSONDecoder().decode(SettingsBackup.self, from: data)
+        guard backup.version >= 1, backup.version <= currentVersion else {
+            // Reject backups from a newer, unknown format instead of silently
+            // restoring with missing or misread fields.
+            throw CocoaError(.coderReadCorrupt)
+        }
+        return backup
     }
 
     func jsonString() throws -> String {

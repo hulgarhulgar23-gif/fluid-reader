@@ -52,4 +52,37 @@ final class FrontAppPasterTests: XCTestCase {
 
         XCTAssertEqual(pasteboard.string(forType: .string), "old clipboard")
     }
+
+    func testPasteboardSnapshotSkipsRestoreWhenAnotherWriterIntervened() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("FrontAppPasterTests-\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        pasteboard.setString("old clipboard", forType: .string)
+
+        let snapshot = PasteboardSnapshot.capture(from: pasteboard)
+        pasteboard.clearContents()
+        pasteboard.setString("our paste text", forType: .string)
+        let ourChangeCount = pasteboard.changeCount
+
+        // Another writer (e.g. the user copying) modifies the pasteboard
+        // before our delayed restore runs.
+        pasteboard.clearContents()
+        pasteboard.setString("user's new clipboard", forType: .string)
+
+        XCTAssertFalse(snapshot.restore(to: pasteboard, ifChangeCountEquals: ourChangeCount))
+        XCTAssertEqual(pasteboard.string(forType: .string), "user's new clipboard")
+    }
+
+    func testPasteboardSnapshotRestoresWhenChangeCountMatches() {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("FrontAppPasterTests-\(UUID().uuidString)"))
+        pasteboard.clearContents()
+        pasteboard.setString("old clipboard", forType: .string)
+
+        let snapshot = PasteboardSnapshot.capture(from: pasteboard)
+        pasteboard.clearContents()
+        pasteboard.setString("our paste text", forType: .string)
+        let ourChangeCount = pasteboard.changeCount
+
+        XCTAssertTrue(snapshot.restore(to: pasteboard, ifChangeCountEquals: ourChangeCount))
+        XCTAssertEqual(pasteboard.string(forType: .string), "old clipboard")
+    }
 }

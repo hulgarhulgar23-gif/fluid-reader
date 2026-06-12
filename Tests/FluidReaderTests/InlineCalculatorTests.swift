@@ -44,8 +44,8 @@ final class InlineCalculatorTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("net revenue retention 1000 200 100 50")).result, "105%")
         XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("quickratio 120 30 50 10")).result, "2.5")
         XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("quick ratio 120 30 50 10")).result, "2.5")
-        XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("magicnumber 250000 400000")).result, "2.5")
-        XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("magic number 250000 400000")).result, "2.5")
+        XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("magicnumber 300000 400000")).result, "0.75")
+        XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("magic number 300000 400000")).result, "0.75")
         XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("rule40 35 10")).result, "45%")
         XCTAssertEqual(try XCTUnwrap(CalculatorExpression.evaluate("rule of 40 35 10")).result, "45%")
     }
