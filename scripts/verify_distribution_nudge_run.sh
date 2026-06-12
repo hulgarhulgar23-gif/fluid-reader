@@ -394,9 +394,11 @@ duplicate_nudge_cleared="$(extract_trace_field "$trace_path" "Duplicate nudge co
 duplicate_action_items_cleared="$(extract_trace_field "$trace_path" "Duplicate action-items comments cleared")"
 
 if [[ -z "$issue_number" ]]; then
-  if [[ "$trace_issue_number" =~ ^[0-9]+$ ]]; then
+  if [[ "$trace_issue_number" =~ ^[0-9]+$ && ( "$verification_mode" == "live" || "$strict_mode" == "1" || "$sample_mode" == "1" ) ]]; then
     issue_number="$trace_issue_number"
     issue_source="trace"
+  elif [[ "$trace_issue_number" =~ ^[0-9]+$ ]]; then
+    issue_source="trace-skipped"
   else
     issue_source="none"
   fi

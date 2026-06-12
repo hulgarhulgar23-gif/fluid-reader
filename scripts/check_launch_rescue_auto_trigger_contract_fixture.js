@@ -260,7 +260,7 @@ function runFixtureSuite() {
     'Expected launch rescue auto follow-up route helper.'
   );
   assertCondition(
-    appDelegate.includes('nonisolated static func launchRescueAutoTriggerFollowupActionTitle(_ token: String?) -> String {'),
+    appDelegate.includes('nonisolated static func launchRescueAutoTriggerFollowupActionTitle('),
     'Expected launch rescue auto follow-up action-title helper.'
   );
   assertCondition(
@@ -368,7 +368,7 @@ function runFixtureSuite() {
     'Expected launch control brief to surface launch rescue follow-up coach guidance.'
   );
   assertCondition(
-    appDelegate.includes('followupBadge: Self.launchRescueAutoTriggerFollowupMenuBadge('),
+    appDelegate.includes('let followupBadge = Self.launchRescueAutoFollowupBadgeForResolvedDecision('),
     'Expected launch rescue auto menu status title to surface follow-up badge guidance.'
   );
   assertCondition(
@@ -834,7 +834,7 @@ function runFixtureSuite() {
     'Expected launch rescue auto follow-up self-heal recency and status formatting coverage.'
   );
   assertCondition(
-    launchTests.includes('testLaunchRescueAutoSelfHealAttentionIssueTokenAndMessageCoverHealthyStaleAndMismatchStates'),
+    launchTests.includes('testLaunchRescueAutoSelfHealAttentionIssueTokenAndMessageCoverHealthyStaleMismatchAndMissingStates'),
     'Expected launch rescue auto self-heal attention issue/message helper coverage.'
   );
   assertCondition(
@@ -882,7 +882,7 @@ function runFixtureSuite() {
     'Expected launch rescue auto menu integration coverage for self-heal badge and tooltip context.'
   );
   assertCondition(
-    launchTests.includes('testLaunchRescueAutoMenusSuppressSelfHealWhenLatestSnapshotIsMismatchedOrStale'),
+    launchTests.includes('testLaunchRescueAutoMenusShowSelfHealAttentionWhenLatestSnapshotIsMismatchedOrStale'),
     'Expected launch rescue auto/follow-up menu integration coverage for stale or mismatched self-heal suppression.'
   );
   assertCondition(

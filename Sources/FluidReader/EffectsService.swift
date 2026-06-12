@@ -2,9 +2,67 @@ import AppKit
 import AVFoundation
 import Foundation
 
+struct EffectBurstLimiter<Event: Hashable> {
+    let windowSeconds: TimeInterval
+    let maxEvents: Int
+    let muteSeconds: TimeInterval
+    let defaultMinimumGapSeconds: TimeInterval
+    let minimumGapSecondsByEvent: [Event: TimeInterval]
+
+    private var recentEventTimes: [Date] = []
+    private var lastEventTimeByEvent: [Event: Date] = [:]
+    private var mutedUntil: Date?
+
+    init(
+        windowSeconds: TimeInterval,
+        maxEvents: Int,
+        muteSeconds: TimeInterval,
+        defaultMinimumGapSeconds: TimeInterval = 0,
+        minimumGapSecondsByEvent: [Event: TimeInterval] = [:]
+    ) {
+        self.windowSeconds = windowSeconds
+        self.maxEvents = maxEvents
+        self.muteSeconds = muteSeconds
+        self.defaultMinimumGapSeconds = defaultMinimumGapSeconds
+        self.minimumGapSecondsByEvent = minimumGapSecondsByEvent
+    }
+
+    mutating func shouldAllow(_ event: Event, now: Date = Date()) -> Bool {
+        if let mutedUntil {
+            guard now >= mutedUntil else { return false }
+            self.mutedUntil = nil
+            recentEventTimes.removeAll()
+        }
+
+        let minimumGap = minimumGapSecondsByEvent[event] ?? defaultMinimumGapSeconds
+        if minimumGap > 0,
+           let lastEventTime = lastEventTimeByEvent[event],
+           now.timeIntervalSince(lastEventTime) < minimumGap {
+            return false
+        }
+
+        let activeWindowSeconds = windowSeconds
+        recentEventTimes.removeAll { now.timeIntervalSince($0) > activeWindowSeconds }
+        guard recentEventTimes.count < maxEvents else {
+            mutedUntil = now.addingTimeInterval(muteSeconds)
+            recentEventTimes.removeAll()
+            return false
+        }
+
+        recentEventTimes.append(now)
+        lastEventTimeByEvent[event] = now
+        return true
+    }
+}
+
 @MainActor
 final class EffectsService {
     static let availableStyles = ["soft", "glass", "jackpot"]
+    private static let maxActivePlayers = 8
+    private static let riffChunk: [UInt8] = [0x52, 0x49, 0x46, 0x46]
+    private static let waveChunk: [UInt8] = [0x57, 0x41, 0x56, 0x45]
+    private static let formatChunk: [UInt8] = [0x66, 0x6d, 0x74, 0x20]
+    private static let dataChunk: [UInt8] = [0x64, 0x61, 0x74, 0x61]
 
     enum Effect: Hashable {
         case wake
@@ -32,6 +90,27 @@ final class EffectsService {
     private var players: [AVAudioPlayer] = []
     private var warmPlayer: AVAudioPlayer?
     private var didWarmAudioPath = false
+    private var soundLimiter = EffectBurstLimiter<Effect>(
+        windowSeconds: 1.5,
+        maxEvents: 12,
+        muteSeconds: 3.0,
+        defaultMinimumGapSeconds: 0.03,
+        minimumGapSecondsByEvent: [
+            .wake: 0.12,
+            .drawStart: 0.12,
+            .capture: 0.12,
+            .success: 0.22,
+            .scanTick: 0.09,
+            .tap: 0.08,
+            .error: 0.25
+        ]
+    )
+    private var hapticLimiter = EffectBurstLimiter<String>(
+        windowSeconds: 1.5,
+        maxEvents: 10,
+        muteSeconds: 3.0,
+        defaultMinimumGapSeconds: 0.06
+    )
 
     func preload(style: String) {
         let style = normalizedStyle(style)
@@ -48,6 +127,7 @@ final class EffectsService {
     }
 
     func warmAudioPath() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         guard !didWarmAudioPath else { return }
         didWarmAudioPath = true
 
@@ -70,9 +150,16 @@ final class EffectsService {
     }
 
     func play(_ effect: Effect, settings: SettingsStore) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         guard settings.soundEffectsEnabled else { return }
+        guard soundLimiter.shouldAllow(effect) else { return }
         warmAudioPath()
         players.removeAll { !$0.isPlaying }
+        if players.count >= Self.maxActivePlayers {
+            let overflowCount = players.count - Self.maxActivePlayers + 1
+            players.prefix(overflowCount).forEach { $0.stop() }
+            players.removeFirst(overflowCount)
+        }
 
         do {
             let style = normalizedStyle(settings.soundStyle)
@@ -93,15 +180,27 @@ final class EffectsService {
     }
 
     func haptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern = .generic, settings: SettingsStore) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         guard settings.hapticFeedbackEnabled else { return }
+        guard hapticLimiter.shouldAllow("haptic") else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+    }
+
+    func stopActiveSounds() {
+        players.forEach { $0.stop() }
+        players.removeAll()
+        warmPlayer?.stop()
+        warmPlayer = nil
     }
 
     func hit(_ effect: Effect, settings: SettingsStore, haptic pattern: NSHapticFeedbackManager.FeedbackPattern = .generic) {
         play(effect, settings: settings)
         haptic(pattern, settings: settings)
 
-        if effect == .success, settings.hapticFeedbackEnabled, settings.feelIntensity > 0.78 {
+        if !RuntimeEnvironment.suppressesExternalEffects,
+           effect == .success,
+           settings.hapticFeedbackEnabled,
+           settings.feelIntensity > 0.78 {
             Task {
                 try? await Task.sleep(nanoseconds: 82_000_000)
                 NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
@@ -310,7 +409,7 @@ final class EffectsService {
 
     private func makeWav(duration: Double, tones: [Tone]) -> Data {
         let sampleRate = 44_100
-        let frameCount = Int(duration * Double(sampleRate))
+        let frameCount = max(0, Int(duration * Double(sampleRate)))
         var samples = [Int16]()
         samples.reserveCapacity(frameCount)
 
@@ -338,10 +437,10 @@ final class EffectsService {
         var data = Data()
         let byteCount = samples.count * MemoryLayout<Int16>.size
 
-        data.append("RIFF".data(using: .ascii)!)
+        data.append(contentsOf: Self.riffChunk)
         appendUInt32(UInt32(36 + byteCount), to: &data)
-        data.append("WAVE".data(using: .ascii)!)
-        data.append("fmt ".data(using: .ascii)!)
+        data.append(contentsOf: Self.waveChunk)
+        data.append(contentsOf: Self.formatChunk)
         appendUInt32(16, to: &data)
         appendUInt16(1, to: &data)
         appendUInt16(1, to: &data)
@@ -349,7 +448,7 @@ final class EffectsService {
         appendUInt32(UInt32(sampleRate * MemoryLayout<Int16>.size), to: &data)
         appendUInt16(UInt16(MemoryLayout<Int16>.size), to: &data)
         appendUInt16(16, to: &data)
-        data.append("data".data(using: .ascii)!)
+        data.append(contentsOf: Self.dataChunk)
         appendUInt32(UInt32(byteCount), to: &data)
 
         samples.withUnsafeBufferPointer { buffer in
@@ -367,5 +466,9 @@ final class EffectsService {
     private func appendUInt32(_ value: UInt32, to data: inout Data) {
         var littleEndian = value.littleEndian
         withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
+    }
+
+    func soundDataForTesting(effect: Effect, style: String) -> Data {
+        makeSound(for: effect, style: style)
     }
 }

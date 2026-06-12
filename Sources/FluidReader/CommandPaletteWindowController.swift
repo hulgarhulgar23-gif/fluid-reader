@@ -13575,7 +13575,8 @@ final class CommandPaletteWindow {
     private let actions: () -> [CommandPaletteAction]
     private let inlineActions: (String) -> [CommandPaletteAction]
     private let onShow: () -> Void
-    private var window: NSPanel!
+    private var window: NSPanel?
+    private var testIsVisible = false
 
     init(
         state: ReaderState,
@@ -13595,12 +13596,15 @@ final class CommandPaletteWindow {
         self.inlineActions = inlineActions
         self.onShow = onShow
 
-        window = NSPanel(
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+
+        let window = NSPanel(
             contentRect: NSRect(origin: .zero, size: Self.preferredContentSize),
             styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
+        self.window = window
         window.title = "Commands"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -13639,6 +13643,11 @@ final class CommandPaletteWindow {
     func show() {
         onShow()
         session.beginOpen()
+        guard !RuntimeEnvironment.suppressesExternalEffects else {
+            testIsVisible = true
+            return
+        }
+        guard let window else { return }
         WindowBounds.reset(
             window,
             preferredContentSize: Self.preferredContentSize,
@@ -13651,7 +13660,7 @@ final class CommandPaletteWindow {
     }
 
     func toggle() {
-        if window.isVisible {
+        if isVisible {
             hide()
         } else {
             show()
@@ -13659,7 +13668,10 @@ final class CommandPaletteWindow {
     }
 
     var isVisible: Bool {
-        window.isVisible
+        if RuntimeEnvironment.suppressesExternalEffects {
+            return testIsVisible
+        }
+        return window?.isVisible ?? false
     }
 
     func requestRefresh() {
@@ -13679,10 +13691,15 @@ final class CommandPaletteWindow {
     }
 
     private func hide() {
-        window.orderOut(nil)
+        guard !RuntimeEnvironment.suppressesExternalEffects else {
+            testIsVisible = false
+            return
+        }
+        window?.orderOut(nil)
     }
 
     private func placeNearTopOfScreen() {
+        guard let window else { return }
         let screenFrame = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
         guard screenFrame != .zero else {
             window.center()

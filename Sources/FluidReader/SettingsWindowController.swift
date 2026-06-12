@@ -53,6 +53,7 @@ final class SettingsWindowController {
     }
 
     func show() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         WindowBounds.apply(
             to: window,
             preferredContentSize: Self.preferredContentSize,

@@ -16,6 +16,7 @@ final class RewardHUDController {
     private var hideTask: Task<Void, Never>?
 
     func show(_ title: String, mood: Mood, intensity: Double = 0.84) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         hideTask?.cancel()
 
         let view = RewardHUDView(title: title, mood: mood, intensity: intensity)

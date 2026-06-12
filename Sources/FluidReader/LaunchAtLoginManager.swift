@@ -87,6 +87,7 @@ enum LaunchAtLoginManager {
     }
 
     static func openSettings() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         SMAppService.openSystemSettingsLoginItems()
     }
 }

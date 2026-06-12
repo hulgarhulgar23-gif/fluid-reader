@@ -1,7 +1,27 @@
 import XCTest
+import ApplicationServices
 @testable import FluidReader
 
 final class FrontWindowManagerTests: XCTestCase {
+    func testAccessibilityElementRejectsWrongType() {
+        XCTAssertNil(FrontWindowManager.accessibilityElement(from: nil))
+        XCTAssertNil(FrontWindowManager.accessibilityElement(from: "not a window" as CFString))
+
+        let appElement = AXUIElementCreateApplication(ProcessInfo.processInfo.processIdentifier)
+        XCTAssertNotNil(FrontWindowManager.accessibilityElement(from: appElement))
+    }
+
+    func testAccessibilityValueRejectsWrongTypeAndWrongValueKind() throws {
+        XCTAssertNil(FrontWindowManager.accessibilityValue(from: nil, expectedType: .cgPoint))
+        XCTAssertNil(FrontWindowManager.accessibilityValue(from: "not a value" as CFString, expectedType: .cgPoint))
+
+        var point = CGPoint(x: 10, y: 20)
+        let pointValue = try XCTUnwrap(AXValueCreate(.cgPoint, &point))
+
+        XCTAssertNotNil(FrontWindowManager.accessibilityValue(from: pointValue, expectedType: .cgPoint))
+        XCTAssertNil(FrontWindowManager.accessibilityValue(from: pointValue, expectedType: .cgSize))
+    }
+
     func testHalfWindowFrames() {
         let screen = CGRect(x: 0, y: 24, width: 1440, height: 876)
 

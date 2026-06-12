@@ -8,7 +8,7 @@ final class SetupChecklistWindow {
     private let session = SetupSession()
     private let report: () -> SetupChecklistReport
     private let handleAction: (SetupChecklistAction) -> Void
-    private var window: NSPanel!
+    private let window: NSPanel
 
     init(
         report: @escaping () -> SetupChecklistReport,
@@ -51,6 +51,7 @@ final class SetupChecklistWindow {
     }
 
     func show() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         session.beginOpen()
         WindowBounds.reset(
             window,

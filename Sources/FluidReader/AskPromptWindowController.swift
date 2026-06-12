@@ -7,7 +7,7 @@ final class AskPromptWindow {
 
     private let session = AskSession()
     private let submit: (String) -> Void
-    private var window: NSPanel!
+    private let window: NSPanel
 
     init(submit: @escaping (String) -> Void) {
         self.submit = submit
@@ -48,6 +48,7 @@ final class AskPromptWindow {
     }
 
     func show() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         session.beginOpen()
         WindowBounds.reset(
             window,

@@ -5,9 +5,24 @@ Use this checklist before every public release.
 ## 1) Product Readiness
 
 - [ ] `swift test` passes.
+- [ ] `git diff --check` passes.
+- [ ] `zsh scripts/check_ci_hardening.sh` passes after CI changes.
+- [ ] `zsh scripts/check_ci_hardening_fixture.sh` passes after CI hardening script changes.
+- [ ] `zsh scripts/check_swift_safety.sh` passes.
+- [ ] `zsh scripts/check_swift_safety_fixture.sh` passes after Swift-safety script changes.
+- [ ] `zsh scripts/check_public_release_safety.sh` passes.
+- [ ] `zsh scripts/check_open_source_ready.sh` passes.
+- [ ] `zsh scripts/check_open_source_ready_fixture.sh` passes after open-source readiness script changes.
+- [ ] `zsh scripts/check_public_publish_ready.sh` passes before making the GitHub repository public.
+- [ ] `zsh scripts/check_public_publish_ready_fixture.sh` passes after public-publish script changes.
+- [ ] `zsh scripts/check_submission_live.sh` passes before submitting to an OSS program.
+- [ ] `zsh scripts/check_submission_live_fixture.sh` passes after live submission script changes.
+- [ ] `zsh scripts/check_public_release_safety_fixture.sh` passes after public-safety script changes.
+- [ ] `zsh scripts/check_release_exact_cleanup_fixture.sh` passes after release cleanup changes.
 - [ ] `zsh scripts/check_fast.sh` passes.
 - [ ] `zsh scripts/check_docs.sh` passes.
 - [ ] `zsh scripts/check_growth.sh` passes.
+- [ ] `zsh scripts/verify_release.sh` passes before sharing a zip.
 - [ ] `Top Picks` default flow still shows a share action.
 - [ ] `Copy Win Card` and `Copy Win Recap` both work.
 

@@ -36,6 +36,7 @@ final class AniPetWindowController {
     }
 
     func show() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         WindowBounds.reset(
             panel,
             preferredContentSize: Self.preferredContentSize,

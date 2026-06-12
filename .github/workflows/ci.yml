@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build and test
@@ -21,6 +24,33 @@ jobs:
       - name: Run tests
         run: swift test
 
+      - name: Check whitespace
+        run: git diff --check
+
+      - name: Check CI hardening
+        run: zsh scripts/check_ci_hardening.sh
+
+      - name: Check CI hardening fixtures
+        run: zsh scripts/check_ci_hardening_fixture.sh
+
+      - name: Check Swift safety
+        run: zsh scripts/check_swift_safety.sh
+
+      - name: Check Swift safety fixtures
+        run: zsh scripts/check_swift_safety_fixture.sh
+
+      - name: Check public release safety
+        run: zsh scripts/check_public_release_safety.sh
+
+      - name: Check public release safety fixtures
+        run: zsh scripts/check_public_release_safety_fixture.sh
+
+      - name: Check open-source readiness
+        run: zsh scripts/check_open_source_ready.sh
+
+      - name: Check open-source readiness fixtures
+        run: zsh scripts/check_open_source_ready_fixture.sh
+
       - name: Check docs
         run: zsh scripts/check_docs.sh
 
@@ -29,3 +59,12 @@ jobs:
 
       - name: Check app build
         run: zsh scripts/check_fast.sh
+
+      - name: Check release script fixtures
+        run: zsh scripts/check_release_packaging_fixture.sh
+
+      - name: Check exact release cleanup fixture
+        run: zsh scripts/check_release_exact_cleanup_fixture.sh
+
+      - name: Check release package
+        run: FLUID_READER_SKIP_TESTS=1 FLUID_READER_SKIP_LAUNCH_CHECK=1 zsh scripts/verify_release.sh

@@ -70,7 +70,10 @@ enum SecureGenerator {
 
         var bytes = [UInt8](repeating: 0, count: count)
         let status = bytes.withUnsafeMutableBytes { buffer in
-            SecRandomCopyBytes(kSecRandomDefault, count, buffer.baseAddress!)
+            guard let baseAddress = buffer.baseAddress else {
+                return errSecParam
+            }
+            return SecRandomCopyBytes(kSecRandomDefault, count, baseAddress)
         }
 
         if status == errSecSuccess {

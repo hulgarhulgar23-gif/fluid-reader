@@ -30,18 +30,130 @@ FLUID_READER_SIGN_IDENTITY="Apple Development: Your Name" zsh scripts/build_app.
 swift test
 ```
 
+Check whitespace:
+
+```sh
+git diff --check
+```
+
+If you change CI, check its safety gates:
+
+```sh
+zsh scripts/check_ci_hardening.sh
+```
+
+If you change CI hardening checks, run the fixture too:
+
+```sh
+zsh scripts/check_ci_hardening_fixture.sh
+```
+
 Check speed and app size:
 
 ```sh
 zsh scripts/check_fast.sh
 ```
 
-This fails if the app is larger than `1024K`.
+This fails if the app executable is larger than `2816K`.
+
+Check for high-risk Swift code:
+
+```sh
+zsh scripts/check_swift_safety.sh
+```
+
+This fails on forced casts, forced try, and crash-only failures.
+
+If you change Swift safety checks, run the fixture too:
+
+```sh
+zsh scripts/check_swift_safety_fixture.sh
+```
+
+Check for public-release safety:
+
+```sh
+zsh scripts/check_public_release_safety.sh
+```
+
+This fails on real key formats and local secret files.
+
+Check open-source and submission readiness:
+
+```sh
+zsh scripts/check_open_source_ready.sh
+```
+
+This fails if required community files or privacy/submission notes are missing.
+
+Before submitting to an OSS program, run the live repository check:
+
+```sh
+zsh scripts/check_submission_live.sh
+```
+
+This fails if the documented GitHub repository is not public or reachable.
+
+Before making the GitHub repository public, run:
+
+```sh
+zsh scripts/check_public_publish_ready.sh
+```
+
+This fails if `main` is dirty, not pushed, or the release checks do not pass.
+
+If you change the open-source readiness check, run the fixture too:
+
+```sh
+zsh scripts/check_open_source_ready_fixture.sh
+```
+
+If you change the live submission check, run the fixture too:
+
+```sh
+zsh scripts/check_submission_live_fixture.sh
+```
+
+If you change the public-publish readiness check, run the fixture too:
+
+```sh
+zsh scripts/check_public_publish_ready_fixture.sh
+```
+
+If you change public safety checks, run the fixture too:
+
+```sh
+zsh scripts/check_public_release_safety_fixture.sh
+```
 
 Check docs links:
 
 ```sh
 zsh scripts/check_docs.sh
+```
+
+Check growth docs and workflow fixtures:
+
+```sh
+zsh scripts/check_growth.sh
+```
+
+Check release script fixtures:
+
+```sh
+zsh scripts/check_release_packaging_fixture.sh
+```
+
+If you change release launch or cleanup logic, run:
+
+```sh
+zsh scripts/check_release_exact_cleanup_fixture.sh
+```
+
+Before a release, check the app bundle, zip, metadata, size, and launch:
+
+```sh
+zsh scripts/verify_release.sh
 ```
 
 Pull requests run these checks in GitHub Actions on macOS.

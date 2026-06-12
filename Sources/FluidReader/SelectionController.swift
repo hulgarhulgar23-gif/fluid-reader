@@ -19,6 +19,10 @@ final class SelectionController {
         onCancel: @escaping () -> Void,
         completion: @escaping (SelectedImage) -> Void
     ) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else {
+            onCancel()
+            return
+        }
         guard windows.isEmpty else { return }
         self.completion = completion
         onCancelEffect = onCancel
@@ -126,6 +130,7 @@ final class SelectionController {
 
         if alert.runModal() == .alertFirstButtonReturn,
            let url = AppDefaults.screenRecordingSettingsURL {
+            guard !RuntimeEnvironment.suppressesExternalEffects else { return }
             NSWorkspace.shared.open(url)
         }
     }

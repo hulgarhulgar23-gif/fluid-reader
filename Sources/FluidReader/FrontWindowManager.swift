@@ -527,8 +527,8 @@ enum FrontWindowManager {
             kAXFocusedWindowAttribute as CFString,
             &focusedValue
         ) == .success,
-           let window = focusedValue {
-            return (window as! AXUIElement)
+           let window = accessibilityElement(from: focusedValue) {
+            return window
         }
 
         var windowsValue: CFTypeRef?
@@ -580,8 +580,7 @@ enum FrontWindowManager {
             return nil
         }
 
-        let axValue = value as! AXValue
-        guard AXValueGetType(axValue) == .cgPoint else {
+        guard let axValue = accessibilityValue(from: value, expectedType: .cgPoint) else {
             return nil
         }
 
@@ -597,13 +596,30 @@ enum FrontWindowManager {
             return nil
         }
 
-        let axValue = value as! AXValue
-        guard AXValueGetType(axValue) == .cgSize else {
+        guard let axValue = accessibilityValue(from: value, expectedType: .cgSize) else {
             return nil
         }
 
         var size = CGSize.zero
         return AXValueGetValue(axValue, .cgSize, &size) ? size : nil
+    }
+
+    static func accessibilityElement(from value: CFTypeRef?) -> AXUIElement? {
+        guard let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
+            return nil
+        }
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
+
+    static func accessibilityValue(from value: CFTypeRef?, expectedType: AXValueType) -> AXValue? {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else {
+            return nil
+        }
+        let axValue = unsafeBitCast(value, to: AXValue.self)
+        guard AXValueGetType(axValue) == expectedType else {
+            return nil
+        }
+        return axValue
     }
 
     @MainActor

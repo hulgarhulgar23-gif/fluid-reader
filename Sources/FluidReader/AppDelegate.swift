@@ -9056,9 +9056,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     ) -> String {
         let normalizedDraftPackArtifactName = nextMoveDraftPackArtifactName?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let nextMoveDraftPackDisplay = normalizedDraftPackArtifactName?.isEmpty == false
-            ? normalizedDraftPackArtifactName!
-            : "Not saved (handoff fallback)"
+        let nextMoveDraftPackDisplay: String
+        if let normalizedDraftPackArtifactName, !normalizedDraftPackArtifactName.isEmpty {
+            nextMoveDraftPackDisplay = normalizedDraftPackArtifactName
+        } else {
+            nextMoveDraftPackDisplay = "Not saved (handoff fallback)"
+        }
         let draftPackReadyTitle = draftPackReady ? "Yes" : "No"
         return """
         # Fluid Reader Launch Rescue Burst
@@ -11205,14 +11208,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let nextMoveFragment = normalizedNextMoveLabel.isEmpty
             ? "next move"
             : normalizedNextMoveLabel
-        let standardLine = normalizedShareLine?.isEmpty == false
-            ? normalizedShareLine!
-            : cadenceExecutionKitMomentumShareLine(
+        let standardLine: String
+        if let normalizedShareLine, !normalizedShareLine.isEmpty {
+            standardLine = normalizedShareLine
+        } else {
+            standardLine = cadenceExecutionKitMomentumShareLine(
                 momentumTitle: momentumFragment,
                 nextMoveLabel: nextMoveFragment,
                 recoveryWinsTitle: recoveryWinsFragment,
                 momentumDeltaTitle: momentumDeltaFragment
             )
+        }
 
         let shortLine = "Fame snapshot: \(momentumFragment) · \(momentumDeltaFragment) · Next \(nextMoveFragment)."
         let hypeLine = "Fame breakout mode: \(momentumFragment) — \(recoveryWinsFragment) — \(momentumDeltaFragment). Shipping \(nextMoveFragment) now."
@@ -11315,9 +11321,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let bestChannelSection: String
         if let bestChannelTitle = normalizedBestChannelTitle, !bestChannelTitle.isEmpty {
-            let reasonLine = normalizedBestChannelReason?.isEmpty == false
-                ? normalizedBestChannelReason!
-                : "This channel has the strongest immediate cadence signal."
+            let reasonLine: String
+            if let normalizedBestChannelReason, !normalizedBestChannelReason.isEmpty {
+                reasonLine = normalizedBestChannelReason
+            } else {
+                reasonLine = "This channel has the strongest immediate cadence signal."
+            }
             let bestChannelDraftLine: String
             if let bestChannelDraft = pack.channelBlocks
                 .first(where: { block in
@@ -11347,12 +11356,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }.joined(separator: "\n\n")
         let normalizedChecklistComment = pack.checklistComment?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let checklistSection = normalizedChecklistComment?.isEmpty == false
-            ? """
-            ### Checklist Comment
-            - \(normalizedChecklistComment!)
+        let checklistSection = if let normalizedChecklistComment, !normalizedChecklistComment.isEmpty {
             """
-            : ""
+            ### Checklist Comment
+            - \(normalizedChecklistComment)
+            """
+        } else {
+            ""
+        }
         let postReadySection: String
         if channelBlocksText.isEmpty && checklistSection.isEmpty {
             postReadySection = ""
@@ -11418,31 +11429,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedRecoveryWinsSubtitle = recoveryWinsSubtitle?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let recoveryWinsTitleLine = normalizedRecoveryWinsTitle?.isEmpty == false
-            ? normalizedRecoveryWinsTitle!
-            : "Recovery wins: warming up."
-        let recoveryWinsSubtitleLine = normalizedRecoveryWinsSubtitle?.isEmpty == false
-            ? normalizedRecoveryWinsSubtitle!
-            : "Launch recovery wins appear after a few palette opens. Keep using ⌥⇧L and the top recovery action."
+        let recoveryWinsTitleLine: String
+        if let normalizedRecoveryWinsTitle, !normalizedRecoveryWinsTitle.isEmpty {
+            recoveryWinsTitleLine = normalizedRecoveryWinsTitle
+        } else {
+            recoveryWinsTitleLine = "Recovery wins: warming up."
+        }
+        let recoveryWinsSubtitleLine: String
+        if let normalizedRecoveryWinsSubtitle, !normalizedRecoveryWinsSubtitle.isEmpty {
+            recoveryWinsSubtitleLine = normalizedRecoveryWinsSubtitle
+        } else {
+            recoveryWinsSubtitleLine = "Launch recovery wins appear after a few palette opens. Keep using ⌥⇧L and the top recovery action."
+        }
         let normalizedMomentumDeltaTitle = momentumDeltaTitle?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedMomentumDeltaSubtitle = momentumDeltaSubtitle?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let momentumDeltaTitleLine = normalizedMomentumDeltaTitle?.isEmpty == false
-            ? normalizedMomentumDeltaTitle!
-            : "Fame momentum delta: warming up."
-        let momentumDeltaSubtitleLine = normalizedMomentumDeltaSubtitle?.isEmpty == false
-            ? normalizedMomentumDeltaSubtitle!
-            : "Need two recovery windows before delta can be computed. Keep using launch recovery to build trend evidence."
+        let momentumDeltaTitleLine: String
+        if let normalizedMomentumDeltaTitle, !normalizedMomentumDeltaTitle.isEmpty {
+            momentumDeltaTitleLine = normalizedMomentumDeltaTitle
+        } else {
+            momentumDeltaTitleLine = "Fame momentum delta: warming up."
+        }
+        let momentumDeltaSubtitleLine: String
+        if let normalizedMomentumDeltaSubtitle, !normalizedMomentumDeltaSubtitle.isEmpty {
+            momentumDeltaSubtitleLine = normalizedMomentumDeltaSubtitle
+        } else {
+            momentumDeltaSubtitleLine = "Need two recovery windows before delta can be computed. Keep using launch recovery to build trend evidence."
+        }
         let normalizedShareLine = shareLine?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let shareLineText = normalizedShareLine?.isEmpty == false
-            ? normalizedShareLine!
-            : cadenceExecutionKitMomentumShareLine(
+        let shareLineText: String
+        if let normalizedShareLine, !normalizedShareLine.isEmpty {
+            shareLineText = normalizedShareLine
+        } else {
+            shareLineText = cadenceExecutionKitMomentumShareLine(
                 momentumTitle: momentumTitle,
                 nextMoveLabel: nextMoveLabel,
                 recoveryWinsTitle: recoveryWinsTitleLine,
                 momentumDeltaTitle: momentumDeltaTitleLine
             )
+        }
         return """
         # Fluid Reader Cadence Momentum Brief
 
@@ -20233,6 +20259,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func openSystemSettings(url: URL?) {
         guard let url else { return }
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         NSWorkspace.shared.open(url)
     }
 
@@ -20242,11 +20269,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func openURL(_ url: URL) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         NSWorkspace.shared.open(url)
         recordActivity(category: "open", detail: "open-url")
     }
 
     private func revealURL(_ url: URL) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
         recordActivity(category: "open", detail: "reveal-path")
     }
@@ -20776,6 +20805,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func cancelPreviewFlow() {
         previewFeelTask?.cancel()
         previewFeelTask = nil
+        effects.stopActiveSounds()
         restoreCompareSettings()
     }
 

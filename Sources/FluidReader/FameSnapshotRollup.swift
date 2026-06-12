@@ -3034,7 +3034,7 @@ enum FameSnapshotRollup {
 
         let nextEvent = timelineEvents.first {
             launchAnchor.addingTimeInterval(TimeInterval($0.offsetMinutes * 60)) >= now
-        } ?? timelineEvents.last!
+        } ?? timelineEvents[timelineEvents.count - 1]
         let nextAction = "\(launchOffsetLabel(minutes: nextEvent.offsetMinutes)): \(nextEvent.action)"
 
         let statusLines = timelineEvents.enumerated().map { index, event in

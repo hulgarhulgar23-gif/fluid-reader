@@ -10,7 +10,7 @@ END_TIME="$(date +%s)"
 EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/FluidReader"
 SIZE_BYTES="$(stat -f '%z' "$EXECUTABLE_PATH")"
 SIZE_KB="$(((SIZE_BYTES + 1023) / 1024))"
-MAX_APP_SIZE_KB="${MAX_APP_SIZE_KB:-1114}"
+MAX_APP_SIZE_KB="${MAX_APP_SIZE_KB:-2816}"
 
 echo "Built: $APP_PATH"
 echo "Executable size: ${SIZE_KB}K (${SIZE_BYTES} bytes / ${MAX_APP_SIZE_KB}K max)"

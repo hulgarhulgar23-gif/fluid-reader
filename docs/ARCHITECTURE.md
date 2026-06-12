@@ -57,7 +57,21 @@ Run these before sending a pull request:
 
 ```sh
 swift test
+git diff --check
+zsh scripts/check_ci_hardening.sh
+zsh scripts/check_ci_hardening_fixture.sh
+zsh scripts/check_swift_safety.sh
+zsh scripts/check_swift_safety_fixture.sh
+zsh scripts/check_public_release_safety.sh
+zsh scripts/check_open_source_ready.sh
+zsh scripts/check_open_source_ready_fixture.sh
+zsh scripts/check_public_publish_ready_fixture.sh
+zsh scripts/check_submission_live_fixture.sh
+zsh scripts/check_public_release_safety_fixture.sh
 zsh scripts/check_docs.sh
+zsh scripts/check_growth.sh
+zsh scripts/check_release_packaging_fixture.sh
+zsh scripts/check_release_exact_cleanup_fixture.sh
 zsh scripts/check_fast.sh
 ```
 
@@ -69,4 +83,6 @@ zsh scripts/verify_release.sh
 
 The app has a tight size gate. Avoid large bundled assets, provider SDKs, or broad dependencies.
 
-`check_fast.sh` fails if the release executable is larger than `1114K` by default.
+`check_fast.sh` fails if the release executable is larger than `2816K` by default.
+
+`verify_release.sh` also checks app metadata, bundle size, zip size, and launch.
