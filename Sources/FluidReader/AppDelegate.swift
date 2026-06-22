@@ -393,40 +393,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.handleSetupChecklistAction(action)
         }
     )
-    private lazy var commandPalette = CommandPaletteWindow(
-        state: readerState,
-        settings: settings,
-        actions: { [weak self] in
-            self?.commandPaletteActions() ?? []
-        },
-        browseActions: { [weak self] in
-            self?.visibleCommandPaletteActions() ?? []
-        },
-        browseSummary: { [weak self] in
-            self?.commandPaletteBrowseSummary() ?? .empty
-        },
-        inlineActions: { [weak self] query in
-            self?.commandPaletteInlineActions(query) ?? []
-        },
-        onShow: { [weak self] in
-            guard let self else { return }
-            self.pendingCommandPalettePasteTarget = nil
-            self.lastCommandPaletteFrontApp = self.frontPasteTarget()
-            self.refreshFameLaunchCountdownForTopCard()
-        },
-        prepareRun: { [weak self] actionID in
-            self?.prepareCommandPaletteInteraction(actionID: actionID)
-        },
-        topPickMilestone: { [weak self] milestone in
-            self?.handleTopPickMilestoneFeedback(milestone)
-        },
-        recordBestChannelLaunchPackPressureActivity: { [weak self] activity in
-            self?.recordBestChannelLaunchPackPressureActivity(activity)
-        },
-        recordRun: { [weak self] action in
-            self?.recordCommandAction(action.id)
-        }
-    )
+    private var isInitializingCommandPalette = false
+    private lazy var commandPalette: CommandPaletteWindow = { [unowned self] in
+        isInitializingCommandPalette = true
+        defer { isInitializingCommandPalette = false }
+        return CommandPaletteWindow(
+            state: readerState,
+            settings: settings,
+            actions: { [weak self] in
+                self?.commandPaletteActions() ?? []
+            },
+            browseActions: { [weak self] in
+                self?.visibleCommandPaletteActions() ?? []
+            },
+            browseSummary: { [weak self] in
+                self?.commandPaletteBrowseSummary() ?? .empty
+            },
+            inlineActions: { [weak self] query in
+                self?.commandPaletteInlineActions(query) ?? []
+            },
+            onShow: { [weak self] in
+                guard let self else { return }
+                self.pendingCommandPalettePasteTarget = nil
+                self.lastCommandPaletteFrontApp = self.frontPasteTarget()
+                self.refreshFameLaunchCountdownForTopCard()
+            },
+            prepareRun: { [weak self] actionID in
+                self?.prepareCommandPaletteInteraction(actionID: actionID)
+            },
+            topPickMilestone: { [weak self] milestone in
+                self?.handleTopPickMilestoneFeedback(milestone)
+            },
+            recordBestChannelLaunchPackPressureActivity: { [weak self] activity in
+                self?.recordBestChannelLaunchPackPressureActivity(activity)
+            },
+            recordRun: { [weak self] action in
+                self?.recordCommandAction(action.id)
+            }
+        )
+    }()
     private var statusItem: NSStatusItem?
     private var statusFlashTask: Task<Void, Never>?
     private var famePulseBadgeTask: Task<Void, Never>?
@@ -452,6 +457,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var readSelectedTextProviderForTesting: (@Sendable () async -> String?)?
     private var clipboardTextProviderForTesting: (() -> String?)?
     private var frontPasteTargetProviderForTesting: (() -> NSRunningApplication?)?
+    private var commandPaletteVisibilityProviderForTesting: (() -> Bool)?
     private var quickLLMPreparationTask: Task<Void, Never>?
     private var quickLLMPreparationRequestID: UInt64 = 0
     private var startPickHandlerForTesting: ((SelectionCaptureMode) -> Void)?
@@ -3390,7 +3396,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let hasAnyResult = hasAnswer || hasText
         let searchQuery = searchSeedText()
         let hasSearchQuery = !searchQuery.isEmpty
-        let windowTargetApplication = commandPalette.isVisible
+        let paletteIsVisible = commandPaletteIsVisibleForActionContext()
+        let windowTargetApplication = paletteIsVisible
             ? lastCommandPaletteFrontApp
             : frontPasteTarget()
         let autoOpsBundleStatus = autoOpsBundleEscalationStatus()
@@ -5130,6 +5137,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return personalizedCommandPaletteActions(actions)
     }
 
+    private func commandPaletteIsVisibleForActionContext() -> Bool {
+        guard !isInitializingCommandPalette else { return false }
+        if let commandPaletteVisibilityProviderForTesting {
+            return commandPaletteVisibilityProviderForTesting()
+        }
+        return commandPalette.isVisible
+    }
+
     private func windowPaletteActions(
         targetApplication: NSRunningApplication?
     ) -> [CommandPaletteAction] {
@@ -5821,6 +5836,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func setFrontPasteTargetProviderForTesting(_ provider: (() -> NSRunningApplication?)?) {
         frontPasteTargetProviderForTesting = provider
+    }
+
+    func commandPaletteVisibilityForActionsForTesting(
+        initializingPalette: Bool,
+        visibilityProvider: (() -> Bool)?
+    ) -> Bool {
+        let previousInitializationState = isInitializingCommandPalette
+        let previousVisibilityProvider = commandPaletteVisibilityProviderForTesting
+        isInitializingCommandPalette = initializingPalette
+        commandPaletteVisibilityProviderForTesting = visibilityProvider
+        defer {
+            isInitializingCommandPalette = previousInitializationState
+            commandPaletteVisibilityProviderForTesting = previousVisibilityProvider
+        }
+        return commandPaletteIsVisibleForActionContext()
     }
 
     func setStartPickHandlerForTesting(_ handler: ((SelectionCaptureMode) -> Void)?) {

@@ -4747,6 +4747,34 @@ final class AppDelegateLaunchTests: XCTestCase {
     }
 
     @MainActor
+    func testCommandPaletteVisibilityLookupShortCircuitsDuringInitialization() {
+        let delegate = AppDelegate()
+        var visibilityProbeCallCount = 0
+
+        let visibilityWhileInitializing = delegate.commandPaletteVisibilityForActionsForTesting(
+            initializingPalette: true,
+            visibilityProvider: {
+                visibilityProbeCallCount += 1
+                return true
+            }
+        )
+
+        XCTAssertFalse(visibilityWhileInitializing)
+        XCTAssertEqual(visibilityProbeCallCount, 0)
+
+        let visibilityAfterInitialization = delegate.commandPaletteVisibilityForActionsForTesting(
+            initializingPalette: false,
+            visibilityProvider: {
+                visibilityProbeCallCount += 1
+                return true
+            }
+        )
+
+        XCTAssertTrue(visibilityAfterInitialization)
+        XCTAssertEqual(visibilityProbeCallCount, 1)
+    }
+
+    @MainActor
     func testVisiblePaletteSearchUsesCustomCommandAlias() {
         let delegate = AppDelegate()
         _ = delegate.setCommandAliasesForTesting(actionID: "pick-and-read", aliasText: "screen grab")
