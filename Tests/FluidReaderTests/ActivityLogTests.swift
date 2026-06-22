@@ -74,6 +74,41 @@ final class ActivityLogTests: XCTestCase {
         XCTAssertEqual(store.items.first?.detail, "copy activity log")
     }
 
+    func testLoadSanitizesPersistedCategoryAndDetailValues() throws {
+        let defaults = makeDefaults()
+        let longCategory = String(repeating: "a", count: 140)
+        let seededItems = [
+            ActivityLogItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 1),
+                category: " \n\t ",
+                detail: " \r\n "
+            ),
+            ActivityLogItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 2),
+                category: "command\nrun",
+                detail: "copy\t\tactivity\nlog"
+            ),
+            ActivityLogItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 3),
+                category: longCategory,
+                detail: "ok"
+            )
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "activity")
+
+        let store = ActivityLogStore(defaults: defaults, storageKey: "activity")
+
+        XCTAssertEqual(store.items.count, 3)
+        XCTAssertEqual(store.items[0].category, "event")
+        XCTAssertEqual(store.items[0].detail, "ok")
+        XCTAssertEqual(store.items[1].category, "command run")
+        XCTAssertEqual(store.items[1].detail, "copy activity log")
+        XCTAssertEqual(store.items[2].category, "\(String(repeating: "a", count: 120))...")
+    }
+
     func testMarkdownIncludesSafeNoteAndEvents() {
         let items = [
             ActivityLogItem(

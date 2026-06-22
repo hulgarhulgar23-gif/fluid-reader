@@ -1,7 +1,65 @@
 import XCTest
+import CoreGraphics
 @testable import FluidReader
 
 final class AppDelegateLaunchTests: XCTestCase {
+    func testReaderPaletteActionOrderKeepsIdleSurfacePlatformFirst() {
+        XCTAssertEqual(
+            AppDelegate.readerPaletteActionOrder(
+                hasText: false,
+                hasAnswer: false,
+                hasSearchQuery: false
+            ),
+            [
+                "pick-and-read",
+                "screenshot-line",
+                "read-selected",
+                "ask-anything",
+                "run-best-local-action",
+                "show-reader",
+                "open-notes-workspace",
+                "open-extensions-workspace",
+                "refresh-app-launcher",
+                "window-settings",
+                "toggle-menu-bar-item",
+                "setup-checklist",
+                "settings",
+                "stop",
+            ]
+        )
+    }
+
+    func testReaderPaletteActionOrderInsertsContextualResultActionsAfterShowReader() {
+        XCTAssertEqual(
+            AppDelegate.readerPaletteActionOrder(
+                hasText: true,
+                hasAnswer: true,
+                hasSearchQuery: true
+            ),
+            [
+                "pick-and-read",
+                "screenshot-line",
+                "read-selected",
+                "ask-anything",
+                "run-best-local-action",
+                "show-reader",
+                "read-last-text",
+                "copy-last-text",
+                "copy-answer",
+                "save-answer",
+                "search-selected-web",
+                "open-notes-workspace",
+                "open-extensions-workspace",
+                "refresh-app-launcher",
+                "window-settings",
+                "toggle-menu-bar-item",
+                "setup-checklist",
+                "settings",
+                "stop",
+            ]
+        )
+    }
+
     func testMorningBriefLaunchDecisionSkipsWhenDisabled() {
         let decision = AppDelegate.morningBriefLaunchDecision(
             isEnabled: false,
@@ -4686,6 +4744,538 @@ final class AppDelegateLaunchTests: XCTestCase {
         XCTAssertTrue(actionIDs.contains("run-fame-onboarding-scorecard"))
         XCTAssertTrue(actionIDs.contains("run-fame-onboarding-nudge"))
         XCTAssertTrue(actionIDs.contains("open-latest-onboarding-suite"))
+    }
+
+    @MainActor
+    func testVisiblePaletteSearchUsesCustomCommandAlias() {
+        let delegate = AppDelegate()
+        _ = delegate.setCommandAliasesForTesting(actionID: "pick-and-read", aliasText: "screen grab")
+
+        let matchedActionIDs = delegate.filteredVisibleCommandPaletteActionIDsForTesting(
+            query: "screen grab"
+        )
+
+        XCTAssertEqual(matchedActionIDs.first, "pick-and-read")
+        XCTAssertEqual(
+            delegate.commandPaletteActionAliasBadgeTitleForTesting(id: "pick-and-read"),
+            "↪ screen grab"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteShowsCustomHotKeyBadge() {
+        let delegate = AppDelegate()
+        _ = delegate.setCommandHotKeyForTesting(actionID: "settings", shortcutText: "cmd+shift+p")
+
+        XCTAssertEqual(
+            delegate.commandPaletteActionHotKeyBadgeTitleForTesting(id: "settings"),
+            "⇧⌘P"
+        )
+    }
+
+    @MainActor
+    func testRegisteredLauncherHotKeyFallsBackToDefaultWhenCustomShortcutConflicts() {
+        let delegate = AppDelegate()
+        _ = delegate.setCommandHotKeyForTesting(
+            actionID: LauncherHotKeyCatalog.commands.id,
+            shortcutText: LauncherHotKeyCatalog.screenshot.defaultShortcutDisplayText
+        )
+
+        XCTAssertEqual(
+            delegate.registeredLauncherHotKeyDisplayTextForTesting(
+                actionID: LauncherHotKeyCatalog.commands.id
+            ),
+            LauncherHotKeyCatalog.commands.defaultShortcutDisplayText
+        )
+        XCTAssertEqual(
+            delegate.registeredLauncherHotKeyDisplayTextForTesting(
+                actionID: LauncherHotKeyCatalog.screenshot.id
+            ),
+            LauncherHotKeyCatalog.screenshot.defaultShortcutDisplayText
+        )
+    }
+
+    @MainActor
+    func testCustomCommandHotKeyRegistrationsSkipDedicatedLauncherRowsAndReservedConflicts() {
+        let delegate = AppDelegate()
+        _ = delegate.setCommandHotKeyForTesting(actionID: "pick-and-read", shortcutText: "cmd+shift+r")
+        _ = delegate.setCommandHotKeyForTesting(
+            actionID: "settings",
+            shortcutText: LauncherHotKeyCatalog.commands.defaultShortcutDisplayText
+        )
+        _ = delegate.setCommandHotKeyForTesting(actionID: "window-settings", shortcutText: "cmd+shift+w")
+
+        XCTAssertEqual(
+            delegate.customCommandHotKeyActionIDsForTesting(),
+            ["window-settings"]
+        )
+    }
+
+    @MainActor
+    func testMenuBarItemVisibilityToggleCanHideAndRestoreStatusItem() {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+        let originalValue = settings.showMenuBarItem
+
+        defer {
+            delegate.setShowMenuBarItemForTesting(originalValue)
+        }
+
+        delegate.setShowMenuBarItemForTesting(true)
+        XCTAssertTrue(delegate.isMenuBarItemVisibleForTesting())
+
+        delegate.setShowMenuBarItemForTesting(false)
+        XCTAssertFalse(delegate.isMenuBarItemVisibleForTesting())
+
+        delegate.setShowMenuBarItemForTesting(true)
+        XCTAssertTrue(delegate.isMenuBarItemVisibleForTesting())
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesMenuBarVisibilityAction() {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+        let originalValue = settings.showMenuBarItem
+
+        defer {
+            delegate.setShowMenuBarItemForTesting(originalValue)
+        }
+
+        delegate.setShowMenuBarItemForTesting(true)
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "hide menu bar").first,
+            "toggle-menu-bar-item"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "toggle-menu-bar-item"),
+            "Keep Fluid Reader quieter in the background; launcher shortcuts still work"
+        )
+
+        delegate.setShowMenuBarItemForTesting(false)
+        XCTAssertEqual(
+            delegate.commandPaletteActionTitleForTesting(id: "toggle-menu-bar-item"),
+            "Show Menu Bar Item"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesScriptCommandManagementActions() {
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("open-script-commands-folder"))
+        XCTAssertTrue(actionIDs.contains("refresh-script-commands"))
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "open-script-commands-folder"),
+            "Reveal user automation scripts"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "refresh-script-commands"),
+            "Reload user automation scripts"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesScreenshotCommand() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "screenshot").first,
+            "screenshot-line"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "screenshot-line"),
+            "Capture a highlighted screenshot line"
+        )
+    }
+
+    @MainActor
+    func testVisiblePaletteIncludesPlatformHubActions() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.filteredVisibleCommandPaletteActionIDsForTesting(query: "notes workspace").first,
+            "open-notes-workspace"
+        )
+        XCTAssertEqual(
+            delegate.filteredVisibleCommandPaletteActionIDsForTesting(query: "extensions workspace").first,
+            "open-extensions-workspace"
+        )
+        XCTAssertEqual(
+            delegate.filteredVisibleCommandPaletteActionIDsForTesting(query: "window settings").first,
+            "window-settings"
+        )
+    }
+
+    @MainActor
+    func testVisiblePaletteUsesCuratedIdleOrder() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.filteredVisibleCommandPaletteActionIDsForTesting(query: ""),
+            [
+                "pick-and-read",
+                "screenshot-line",
+                "read-selected",
+                "ask-anything",
+                "run-best-local-action",
+                "show-reader",
+                "open-notes-workspace",
+                "open-extensions-workspace",
+                "refresh-app-launcher",
+                "window-settings",
+                "toggle-menu-bar-item",
+                "setup-checklist",
+                "settings",
+                "stop",
+            ]
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesBestLocalAction() {
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("run-best-local-action"))
+        let subtitle = delegate.commandPaletteActionSubtitleForTesting(id: "run-best-local-action") ?? ""
+        XCTAssertTrue(subtitle.hasPrefix("Route across "))
+        XCTAssertTrue(subtitle.contains("AI commands and local scripts"))
+        XCTAssertEqual(
+            delegate.commandPaletteActionSecondaryActionTitlesForTesting(id: "run-best-local-action"),
+            ["Open Extensions Workspace", "Open Ask Anything", "Open LLM Settings"]
+        )
+        XCTAssertEqual(
+            delegate.filteredVisibleCommandPaletteActionIDsForTesting(query: "best local action").first,
+            "run-best-local-action"
+        )
+    }
+
+    @MainActor
+    func testInlineRouteActionAppearsForPrefixedIntent() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.commandPaletteInlineActionIDsForTesting(query: "route: meeting minutes").first,
+            "inline-route"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteInlineActionIDsForTesting(query: "do deploy preview").first,
+            "inline-route"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesNotesWorkspaceAction() {
+        let defaults = UserDefaults.standard
+        let previousSnippets = defaults.object(forKey: "readerSnippetItems")
+        defer {
+            restoreDefaultsObject(previousSnippets, forKey: "readerSnippetItems")
+        }
+        defaults.removeObject(forKey: "readerSnippetItems")
+
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("open-notes-workspace"))
+        let subtitle = delegate.commandPaletteActionSubtitleForTesting(id: "open-notes-workspace") ?? ""
+        XCTAssertFalse(subtitle.isEmpty)
+        XCTAssertTrue(subtitle.contains("workspace"))
+        XCTAssertTrue(
+            subtitle.contains("note")
+                || subtitle.contains("notes")
+                || subtitle.contains("link")
+                || subtitle.contains("clipboard")
+                || subtitle.contains("recent")
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "notes workspace").first,
+            "open-notes-workspace"
+        )
+    }
+
+    @MainActor
+    func testPlatformFirstSearchPrefersNotesWorkspaceForGenericNotesQuery() {
+        let settings = SettingsStore.shared
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+
+        defer {
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.filteredPlatformFirstCommandPaletteActionIDsForTesting(query: "notes").first,
+            "open-notes-workspace"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesExtensionsWorkspaceAction() {
+        let delegate = AppDelegate()
+        delegate.setScriptCommandItemsForTesting([])
+        defer { delegate.setScriptCommandItemsForTesting(nil) }
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("open-extensions-workspace"))
+        XCTAssertTrue(actionIDs.contains("import-extension-pack"))
+        let extensionsSubtitle =
+            delegate.commandPaletteActionSubtitleForTesting(id: "open-extensions-workspace") ?? ""
+        XCTAssertFalse(extensionsSubtitle.isEmpty)
+        XCTAssertTrue(extensionsSubtitle.contains("AI"))
+        XCTAssertTrue(extensionsSubtitle.contains("scripts"))
+        XCTAssertTrue(extensionsSubtitle.contains("starters"))
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "import-extension-pack"),
+            "Install a local script-extension pack into Extensions Workspace"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSecondaryActionTitlesForTesting(id: "open-extensions-workspace"),
+            ["Open Script Commands Folder", "Refresh Script Commands", "Open Settings"]
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSecondaryActionTitlesForTesting(id: "import-extension-pack"),
+            ["Open Extensions Workspace"]
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "extensions workspace").first,
+            "open-extensions-workspace"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "starter extension").first,
+            "open-extensions-workspace"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "extension pack").first,
+            "import-extension-pack"
+        )
+    }
+
+    @MainActor
+    func testPlatformFirstSearchKeepsSpecificExtensionPackQueryFocused() {
+        let delegate = AppDelegate()
+
+        XCTAssertEqual(
+            delegate.filteredPlatformFirstCommandPaletteActionIDsForTesting(query: "extensions").first,
+            "open-extensions-workspace"
+        )
+        XCTAssertEqual(
+            delegate.filteredPlatformFirstCommandPaletteActionIDsForTesting(query: "extension pack").first,
+            "import-extension-pack"
+        )
+    }
+
+    @MainActor
+    func testRefreshAppsAndFilesActionReflectsIndexedRootCount() {
+        let settings = SettingsStore.shared
+        let originalIndexedRootPaths = settings.launcherIndexedRootPaths
+
+        defer {
+            settings.launcherIndexedRootPaths = originalIndexedRootPaths
+        }
+
+        settings.launcherIndexedRootPaths = [
+            "/Users/test/Documents",
+            "/Users/test/Projects"
+        ]
+
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("refresh-app-launcher"))
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "refresh-app-launcher"),
+            "Reload installed apps, folders, and files from 2 indexed roots"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSecondaryActionTitlesForTesting(id: "refresh-app-launcher"),
+            ["Open Settings"]
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "indexed roots").first,
+            "refresh-app-launcher"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesWindowManagementActions() {
+        let defaults = UserDefaults.standard
+        let previousGap = defaults.object(forKey: AppDefaults.frontWindowGapPointsKey)
+        let previousProfile = defaults.object(forKey: AppDefaults.frontWindowCycleProfileKey)
+        let previousCustomCommands = defaults.object(forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey)
+
+        defer {
+            restoreDefaultsObject(previousGap, forKey: AppDefaults.frontWindowGapPointsKey)
+            restoreDefaultsObject(previousProfile, forKey: AppDefaults.frontWindowCycleProfileKey)
+            restoreDefaultsObject(
+                previousCustomCommands,
+                forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey
+            )
+        }
+
+        defaults.set(16, forKey: AppDefaults.frontWindowGapPointsKey)
+        defaults.set(FrontWindowCycleProfile.focus.rawValue, forKey: AppDefaults.frontWindowCycleProfileKey)
+        defaults.set(
+            [FrontWindowLayoutCommand.leftHalf.rawValue, FrontWindowLayoutCommand.maximize.rawValue],
+            forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey
+        )
+
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("window-settings"))
+        XCTAssertTrue(actionIDs.contains("window-left-half"))
+        XCTAssertTrue(actionIDs.contains("window-cycle-layout"))
+        XCTAssertTrue(actionIDs.contains("window-previous-layout"))
+        XCTAssertTrue(actionIDs.contains("window-next-display"))
+        XCTAssertTrue(actionIDs.contains("window-cycle-profile-custom"))
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: "window-settings"),
+            "Adjust gap (16 pt), cycle profile (Focus), and 4 cycle layouts"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSignalBadgeTitleForTesting(id: "window-cycle-profile-focus"),
+            "Active"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "tile left").first,
+            "window-left-half"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "cycle profile custom").first,
+            "window-cycle-profile-custom"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "window hotkey").first,
+            "window-settings"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteIncludesAICommandPromptActions() {
+        let settings = SettingsStore.shared
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+
+        defer {
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+
+        let delegate = AppDelegate()
+        let actionIDs = delegate.commandPaletteActionIDsForTesting()
+
+        XCTAssertTrue(actionIDs.contains("prompt-summarize"))
+        XCTAssertTrue(actionIDs.contains("prompt-notes"))
+        XCTAssertTrue(actionIDs.contains("prompt-actions"))
+        XCTAssertTrue(actionIDs.contains("prompt-code-help"))
+        XCTAssertTrue(actionIDs.contains("prompt-launch-post"))
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "tldr").first,
+            "prompt-summarize"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "meeting minutes").first,
+            "prompt-notes"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "fix bug").first,
+            "prompt-code-help"
+        )
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "launch announcement").first,
+            "prompt-launch-post"
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteInjectedScriptCommandSupportsAliasesAndHotKeys() throws {
+        let scriptURL = try makeTempScript(
+            name: "launch-helper.sh",
+            contents: """
+            #!/bin/sh
+            echo ready
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
+        let item = ScriptCommandItem(
+            url: scriptURL,
+            title: "Launch Helper",
+            subtitle: "Run the launch checklist",
+            keywords: ["launch", "helper", "checklist"],
+            systemImage: "terminal",
+            displayPath: scriptURL.path
+        )
+        let delegate = AppDelegate()
+        delegate.setScriptCommandItemsForTesting([item])
+        defer { delegate.setScriptCommandItemsForTesting(nil) }
+
+        XCTAssertTrue(delegate.commandPaletteActionIDsForTesting().contains(item.actionID))
+        XCTAssertEqual(delegate.commandPaletteActionTitleForTesting(id: item.actionID), "Launch Helper")
+        XCTAssertEqual(
+            delegate.commandPaletteActionSubtitleForTesting(id: item.actionID),
+            "Run the launch checklist"
+        )
+        XCTAssertEqual(delegate.commandPaletteActionIsEnabledForTesting(id: item.actionID), true)
+        XCTAssertNil(delegate.commandPaletteActionDisabledReasonForTesting(id: item.actionID))
+
+        _ = delegate.setCommandAliasesForTesting(actionID: item.actionID, aliasText: "launch helper")
+        _ = delegate.setCommandHotKeyForTesting(actionID: item.actionID, shortcutText: "cmd+shift+j")
+
+        XCTAssertEqual(
+            delegate.filteredCommandPaletteActionIDsForTesting(query: "launch helper").first,
+            item.actionID
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionAliasBadgeTitleForTesting(id: item.actionID),
+            "↪ launch helper"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionHotKeyBadgeTitleForTesting(id: item.actionID),
+            "⇧⌘J"
+        )
+        XCTAssertEqual(
+            delegate.commandPaletteActionSecondaryActionTitlesForTesting(id: item.actionID),
+            ["Reveal Script in Finder", "Copy Script Path"]
+        )
+    }
+
+    @MainActor
+    func testCommandPaletteDisablesInjectedScriptCommandWhenInterpreterIsMissing() throws {
+        let scriptURL = try makeTempScript(
+            name: "broken-helper",
+            contents: """
+            #!/missing/interpreter
+            echo nope
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
+        let item = ScriptCommandItem(
+            url: scriptURL,
+            title: "Broken Helper",
+            subtitle: "Run missing interpreter script",
+            keywords: ["broken", "helper"],
+            systemImage: "terminal",
+            displayPath: scriptURL.path
+        )
+        let delegate = AppDelegate()
+        delegate.setScriptCommandItemsForTesting([item])
+        defer { delegate.setScriptCommandItemsForTesting(nil) }
+
+        XCTAssertEqual(delegate.commandPaletteActionIsEnabledForTesting(id: item.actionID), false)
+        XCTAssertEqual(
+            delegate.commandPaletteActionDisabledReasonForTesting(id: item.actionID),
+            "Interpreter /missing/interpreter was not found."
+        )
     }
 
     @MainActor
@@ -16032,6 +16622,51 @@ final class AppDelegateLaunchTests: XCTestCase {
         )
     }
 
+    func testBestChannelLaunchPackPressureModeTransitionSummarySaturatesPersistedCountAndMomentum() throws {
+        let suiteName = "FluidReaderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            Int.max,
+            forKey: AppDefaults.fameBestChannelLaunchPackPressureModeTransitionCountKey
+        )
+        defaults.set(
+            Int.min,
+            forKey: AppDefaults.fameBestChannelLaunchPackPressureModeMomentumStreakKey
+        )
+
+        let summary = AppDelegate.incrementBestChannelLaunchPackPressureModeTransitionSummary(
+            CommandPaletteBestChannelLaunchPackPressureActivity(
+                kind: .modeTransition,
+                tone: .alert,
+                opportunities: 8,
+                conversions: 3,
+                streak: 0,
+                bestStreak: 3,
+                previousTrend: .compounding,
+                trend: .rebuilding
+            ),
+            defaults: defaults
+        )
+        XCTAssertEqual(summary?.count, Int.max)
+        XCTAssertEqual(summary?.latest, "compounding-to-rebuilding")
+        XCTAssertEqual(summary?.momentumStreak, -Int.max)
+        XCTAssertEqual(
+            defaults.integer(
+                forKey: AppDefaults.fameBestChannelLaunchPackPressureModeTransitionCountKey
+            ),
+            Int.max
+        )
+        XCTAssertEqual(
+            defaults.integer(
+                forKey: AppDefaults.fameBestChannelLaunchPackPressureModeMomentumStreakKey
+            ),
+            -Int.max
+        )
+    }
+
     func testLaunchControlBriefLaunchAlertUsesFallbackWhenCountdownMissing() {
         let launchAlert = AppDelegate.launchControlBriefLaunchAlert(nil)
 
@@ -16311,6 +16946,60 @@ final class AppDelegateLaunchTests: XCTestCase {
                     dayStamp: dayTwoStamp,
                     watchToRiskCount: 0,
                     riskToReadyCount: 1
+                )
+            ]
+        )
+    }
+
+    func testLaunchControlHealthTransitionCountsSaturateAtIntMax() throws {
+        let suiteName = "FluidReaderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let now = Date(timeIntervalSince1970: 86_400 * 8 + 1_000)
+        let dayStamp = AppDelegate.launchControlHealthTransitionCountDayStamp(now: now)
+        defaults.set(dayStamp, forKey: AppDefaults.fameLaunchHealthTransitionCountDayKey)
+        defaults.set(
+            Int.max,
+            forKey: AppDefaults.fameLaunchHealthTransitionWatchToRiskCountKey
+        )
+        defaults.set(
+            Int.max,
+            forKey: AppDefaults.fameLaunchHealthTransitionRiskToReadyCountKey
+        )
+
+        let watchIncrement = AppDelegate.incrementLaunchControlHealthTransitionCounts(
+            AppDelegate.LaunchControlHealthTransition(from: .watch, to: .risk),
+            now: now,
+            defaults: defaults
+        )
+        XCTAssertEqual(watchIncrement?.watchToRiskCount, Int.max)
+        XCTAssertEqual(watchIncrement?.riskToReadyCount, Int.max)
+
+        let readyIncrement = AppDelegate.incrementLaunchControlHealthTransitionCounts(
+            AppDelegate.LaunchControlHealthTransition(from: .risk, to: .ready),
+            now: now,
+            defaults: defaults
+        )
+        XCTAssertEqual(readyIncrement?.watchToRiskCount, Int.max)
+        XCTAssertEqual(readyIncrement?.riskToReadyCount, Int.max)
+
+        XCTAssertEqual(
+            defaults.integer(forKey: AppDefaults.fameLaunchHealthTransitionWatchToRiskCountKey),
+            Int.max
+        )
+        XCTAssertEqual(
+            defaults.integer(forKey: AppDefaults.fameLaunchHealthTransitionRiskToReadyCountKey),
+            Int.max
+        )
+        XCTAssertEqual(
+            AppDelegate.launchControlHealthTransitionHistory(defaults: defaults),
+            [
+                AppDelegate.LaunchControlHealthTransitionHistoryDay(
+                    dayStamp: dayStamp,
+                    watchToRiskCount: Int.max,
+                    riskToReadyCount: Int.max
                 )
             ]
         )
@@ -16849,6 +17538,750 @@ final class AppDelegateLaunchTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testAskLLMRequestVersioningMarksOnlyLatestRequestAsCurrent() {
+        let delegate = AppDelegate()
+
+        let firstRequest = delegate.beginAskLLMRequestForTesting()
+        XCTAssertTrue(delegate.isCurrentAskLLMRequestForTesting(firstRequest))
+
+        let secondRequest = delegate.beginAskLLMRequestForTesting()
+        XCTAssertGreaterThan(secondRequest, firstRequest)
+        XCTAssertFalse(delegate.isCurrentAskLLMRequestForTesting(firstRequest))
+        XCTAssertTrue(delegate.isCurrentAskLLMRequestForTesting(secondRequest))
+
+        let thirdRequest = delegate.beginAskLLMRequestForTesting()
+        XCTAssertGreaterThan(thirdRequest, secondRequest)
+        XCTAssertFalse(delegate.isCurrentAskLLMRequestForTesting(secondRequest))
+        XCTAssertTrue(delegate.isCurrentAskLLMRequestForTesting(thirdRequest))
+    }
+
+    @MainActor
+    func testAskLLMStaleCompletionDoesNotOverrideLatestAnswer() async throws {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        let stub = AskLLMAnswerProviderStub()
+        delegate.setAskLLMAnswerProviderForTesting { prompt, _, _ in
+            try await stub.answer(prompt: prompt)
+        }
+
+        delegate.askLLMForTesting(question: "first")
+        try await stub.waitUntilStarted(prompt: "first")
+
+        delegate.askLLMForTesting(question: "second")
+        try await stub.waitUntilStarted(prompt: "second")
+
+        await stub.resume(prompt: "second", answer: "second-answer")
+        await delegate.waitForAskLLMTaskForTesting()
+
+        var state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "second-answer")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+
+        await stub.resume(prompt: "first", answer: "first-answer")
+        try await Task.sleep(nanoseconds: 70_000_000)
+
+        state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "second-answer")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testQuickLLMCommandUsesSelectedTextFallbackWhenReaderIsEmpty() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setFrontPasteTargetProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        delegate.setReadSelectedTextProviderForTesting {
+            "selected fallback text"
+        }
+
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Turn this into short bullet notes.")
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "notes-ready"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Turn this into short bullet notes.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "notes-ready")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testQuickLLMCommandWithReadyContextRefreshesPasteTarget() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setFrontPasteTargetProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        delegate.setFrontPasteTargetProviderForTesting { NSRunningApplication.current }
+        delegate.setReadSelectedTextProviderForTesting {
+            "selected fallback text"
+        }
+        delegate.setAskLLMAnswerProviderForTesting { _, selectedText, _ in
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "first-answer"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Turn this into short bullet notes.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        XCTAssertTrue(delegate.hasCapturedPasteTargetForTesting())
+
+        delegate.setFrontPasteTargetProviderForTesting { nil }
+        delegate.setAskLLMAnswerProviderForTesting { _, selectedText, _ in
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "second-answer"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Summarize this in a short, clear way.")
+        await delegate.waitForAskLLMTaskForTesting()
+
+        XCTAssertFalse(delegate.hasCapturedPasteTargetForTesting())
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "second-answer")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testQuickLLMCommandUsesCommandPaletteOriginWhenFluidReaderIsFrontmost() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setFrontPasteTargetProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        delegate.prepareCommandPaletteRunForTesting(
+            actionID: "prompt-notes",
+            frontApp: NSRunningApplication.current
+        )
+        delegate.setFrontPasteTargetProviderForTesting { nil }
+        delegate.setReadSelectedTextProviderForTesting {
+            "selected fallback text"
+        }
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Turn this into short bullet notes.")
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "notes-ready"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Turn this into short bullet notes.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        XCTAssertTrue(delegate.hasCapturedPasteTargetForTesting())
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "notes-ready")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testAskAnythingUsesCommandPaletteOriginForSubmittedPrompt() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setFrontPasteTargetProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        delegate.prepareCommandPaletteRunForTesting(
+            actionID: "ask-anything",
+            frontApp: NSRunningApplication.current
+        )
+        delegate.setFrontPasteTargetProviderForTesting { nil }
+        delegate.askAnythingForTesting()
+        delegate.setReadSelectedTextProviderForTesting {
+            "selected fallback text"
+        }
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Summarize this in a short, clear way.")
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "summary-ready"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Summarize this in a short, clear way.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        XCTAssertTrue(delegate.hasCapturedPasteTargetForTesting())
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "summary-ready")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testAskAnythingCancelClearsPendingPromptPasteTarget() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+        let originalAutoPasteLLMAnswers = settings.autoPasteLLMAnswers
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setFrontPasteTargetProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+            settings.autoPasteLLMAnswers = originalAutoPasteLLMAnswers
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+        settings.autoPasteLLMAnswers = false
+
+        delegate.prepareCommandPaletteRunForTesting(
+            actionID: "ask-anything",
+            frontApp: NSRunningApplication.current
+        )
+        delegate.setFrontPasteTargetProviderForTesting { nil }
+        delegate.askAnythingForTesting()
+        delegate.cancelAskPromptWindowForTesting()
+        delegate.setReadSelectedTextProviderForTesting {
+            "selected fallback text"
+        }
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Summarize this in a short, clear way.")
+            XCTAssertEqual(selectedText, "selected fallback text")
+            return "standalone-ready"
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Summarize this in a short, clear way.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        XCTAssertFalse(delegate.hasCapturedPasteTargetForTesting())
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "standalone-ready")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testBestLocalActionRoutesToPromptTemplateUsingQuickLLMFlow() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+
+        delegate.setReadSelectedTextProviderForTesting {
+            "meeting transcript"
+        }
+
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Turn this into short bullet notes.")
+            XCTAssertEqual(selectedText, "meeting transcript")
+            return "notes-routed"
+        }
+
+        delegate.runBestLocalActionForTesting(intent: "meeting minutes")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "notes-routed")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testBestLocalActionRoutesToScriptCommand() async throws {
+        let scriptURL = try makeTempScript(
+            name: "deploy-preview.sh",
+            contents: """
+            #!/bin/sh
+            echo preview-ready
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: scriptURL.deletingLastPathComponent()) }
+
+        let item = ScriptCommandItem(
+            url: scriptURL,
+            title: "Deploy Preview",
+            subtitle: "Ship the latest preview build",
+            keywords: ["deploy", "preview", "build", "release"],
+            systemImage: "terminal",
+            displayPath: scriptURL.path
+        )
+
+        let delegate = AppDelegate()
+        delegate.setScriptCommandItemsForTesting([item])
+        defer { delegate.setScriptCommandItemsForTesting(nil) }
+
+        delegate.runBestLocalActionForTesting(intent: "deploy preview build")
+        await delegate.waitForScriptCommandTaskForTesting()
+
+        let state = delegate.readSelectedStateForTesting()
+        XCTAssertEqual(state.lastText, "preview-ready")
+        XCTAssertTrue(state.answerText.isEmpty)
+        XCTAssertTrue(state.errorText.isEmpty)
+    }
+
+    @MainActor
+    func testQuickLLMCommandUsesClipboardFallbackWhenSelectionIsEmpty() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+        let originalUseCloudVoiceForLLM = settings.useCloudVoiceForLLM
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setAskLLMAnswerProviderForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+            settings.useCloudVoiceForLLM = originalUseCloudVoiceForLLM
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+        settings.useCloudVoiceForLLM = false
+
+        delegate.setReadSelectedTextProviderForTesting {
+            nil
+        }
+        delegate.setClipboardTextProviderForTesting {
+            "clipboard fallback text"
+        }
+        delegate.setAskLLMAnswerProviderForTesting { prompt, selectedText, _ in
+            XCTAssertEqual(prompt, "Draft a short, clear reply. Keep it helpful and ready to send.")
+            XCTAssertEqual(selectedText, "clipboard fallback text")
+            return "reply-ready"
+        }
+
+        delegate.runQuickLLMCommandForTesting(
+            question: "Draft a short, clear reply. Keep it helpful and ready to send."
+        )
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+        await delegate.waitForAskLLMTaskForTesting()
+
+        let state = delegate.askLLMStateForTesting()
+        XCTAssertEqual(state.answerText, "reply-ready")
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertFalse(state.isWorking)
+    }
+
+    @MainActor
+    func testQuickLLMCommandStartsPickWhenSelectionAndClipboardAreEmpty() async {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalLLMEnabled = settings.llmEnabled
+        let originalOpenAIAPIKey = settings.openAIAPIKey
+
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+            delegate.setClipboardTextProviderForTesting(nil)
+            delegate.setStartPickHandlerForTesting(nil)
+            settings.llmEnabled = originalLLMEnabled
+            settings.openAIAPIKey = originalOpenAIAPIKey
+        }
+
+        settings.llmEnabled = true
+        settings.openAIAPIKey = "test-key"
+
+        delegate.setReadSelectedTextProviderForTesting {
+            nil
+        }
+        delegate.setClipboardTextProviderForTesting {
+            nil
+        }
+
+        var capturedMode: SelectionCaptureMode?
+        delegate.setStartPickHandlerForTesting { mode in
+            capturedMode = mode
+        }
+
+        delegate.runQuickLLMCommandForTesting(question: "Summarize this in a short, clear way.")
+        await delegate.waitForQuickLLMPreparationTaskForTesting()
+
+        XCTAssertEqual(capturedMode, .lasso)
+        XCTAssertEqual(
+            delegate.pendingQuickLLMQuestionForTesting(),
+            "Summarize this in a short, clear way."
+        )
+    }
+
+    @MainActor
+    func testReadSelectedTextStaleCompletionDoesNotOverrideLatestSelection() async throws {
+        let delegate = AppDelegate()
+        let stub = ReadSelectedTextProviderStub()
+
+        delegate.setReadSelectedTextProviderForTesting {
+            await stub.next()
+        }
+        defer {
+            delegate.setReadSelectedTextProviderForTesting(nil)
+        }
+
+        delegate.readSelectedTextFromFrontAppForTesting()
+        try await stub.waitUntilStarted(callID: 1)
+
+        delegate.readSelectedTextFromFrontAppForTesting()
+        try await stub.waitUntilStarted(callID: 2)
+
+        await stub.resume(callID: 2, text: "second-selection")
+        await delegate.waitForReadSelectedTaskForTesting()
+
+        var state = delegate.readSelectedStateForTesting()
+        XCTAssertEqual(state.lastText, "second-selection")
+        XCTAssertTrue(state.answerText.isEmpty)
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertEqual(state.petMessage, "Read selected text.")
+
+        await stub.resume(callID: 1, text: "first-selection")
+        try await Task.sleep(nanoseconds: 70_000_000)
+
+        state = delegate.readSelectedStateForTesting()
+        XCTAssertEqual(state.lastText, "second-selection")
+        XCTAssertTrue(state.answerText.isEmpty)
+        XCTAssertTrue(state.errorText.isEmpty)
+        XCTAssertEqual(state.petMessage, "Read selected text.")
+    }
+
+    @MainActor
+    func testSelectionOCRStaleCompletionDoesNotOverrideLatestPick() async throws {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalAutoCopyNewText = settings.autoCopyNewText
+        let originalReadAfterPick = settings.readAfterPick
+        let originalAutoPastePickedText = settings.autoPastePickedText
+        let originalLLMEnabled = settings.llmEnabled
+
+        defer {
+            delegate.setSelectionOCRProviderForTesting(nil)
+            settings.autoCopyNewText = originalAutoCopyNewText
+            settings.readAfterPick = originalReadAfterPick
+            settings.autoPastePickedText = originalAutoPastePickedText
+            settings.llmEnabled = originalLLMEnabled
+        }
+
+        settings.autoCopyNewText = false
+        settings.readAfterPick = false
+        settings.autoPastePickedText = false
+        settings.llmEnabled = false
+
+        let stub = SelectionOCRProviderStub()
+        delegate.setSelectionOCRProviderForTesting {
+            try await stub.nextText()
+        }
+
+        let image = try makeTestSelectionImage(width: 16, height: 12)
+        let selectedImage = SelectedImage(cgImage: image, pngData: nil)
+
+        delegate.processSelectedImageForTesting(selectedImage)
+        try await stub.waitUntilStarted(callID: 1)
+
+        delegate.processSelectedImageForTesting(selectedImage)
+        try await stub.waitUntilStarted(callID: 2)
+
+        await stub.resume(callID: 2, text: "second-pick")
+        await delegate.waitForSelectionProcessingTaskForTesting()
+
+        var state = delegate.readSelectedStateForTesting()
+        XCTAssertEqual(state.lastText, "second-pick")
+        XCTAssertTrue(state.errorText.isEmpty)
+
+        await stub.resume(callID: 1, text: "first-pick")
+        try await Task.sleep(nanoseconds: 70_000_000)
+
+        state = delegate.readSelectedStateForTesting()
+        XCTAssertEqual(state.lastText, "second-pick")
+        XCTAssertTrue(state.errorText.isEmpty)
+    }
+
+    @MainActor
+    func testSelectionReplacementClearsWorkingStateWhenOlderOCRCompletesStale() async throws {
+        let delegate = AppDelegate()
+        let settings = SettingsStore.shared
+
+        let originalAutoCopyNewText = settings.autoCopyNewText
+        let originalReadAfterPick = settings.readAfterPick
+        let originalAutoPastePickedText = settings.autoPastePickedText
+        let originalLLMEnabled = settings.llmEnabled
+
+        defer {
+            delegate.setSelectionOCRProviderForTesting(nil)
+            settings.autoCopyNewText = originalAutoCopyNewText
+            settings.readAfterPick = originalReadAfterPick
+            settings.autoPastePickedText = originalAutoPastePickedText
+            settings.llmEnabled = originalLLMEnabled
+        }
+
+        settings.autoCopyNewText = false
+        settings.readAfterPick = false
+        settings.autoPastePickedText = false
+        settings.llmEnabled = false
+
+        let stub = SelectionOCRProviderStub()
+        delegate.setSelectionOCRProviderForTesting {
+            try await stub.nextText()
+        }
+
+        let image = try makeTestSelectionImage(width: 16, height: 12)
+        let lassoSelection = SelectedImage(cgImage: image, pngData: nil)
+
+        delegate.processSelectedImageForTesting(lassoSelection, mode: .lasso)
+        try await stub.waitUntilStarted(callID: 1)
+        XCTAssertTrue(delegate.askLLMStateForTesting().isWorking)
+
+        let screenshotSelection = SelectedImage(cgImage: image, pngData: nil)
+        delegate.processSelectedImageForTesting(screenshotSelection, mode: .screenshotLine)
+        await delegate.waitForSelectionProcessingTaskForTesting()
+
+        var state = delegate.askLLMStateForTesting()
+        XCTAssertFalse(state.isWorking)
+        XCTAssertEqual(state.errorText, "Could not capture screenshot.")
+
+        await stub.resume(callID: 1, text: "stale-first-pick")
+        try await Task.sleep(nanoseconds: 70_000_000)
+
+        state = delegate.askLLMStateForTesting()
+        XCTAssertFalse(state.isWorking)
+        XCTAssertEqual(state.errorText, "Could not capture screenshot.")
+    }
+
+    private actor SelectionOCRProviderStub {
+        private var nextCallID = 0
+        private var startedCallIDs: Set<Int> = []
+        private var continuations: [Int: CheckedContinuation<String, Error>] = [:]
+
+        func nextText() async throws -> String {
+            nextCallID += 1
+            let callID = nextCallID
+            startedCallIDs.insert(callID)
+            return try await withCheckedThrowingContinuation { continuation in
+                continuations[callID] = continuation
+            }
+        }
+
+        func waitUntilStarted(
+            callID: Int,
+            timeoutNanoseconds: UInt64 = 1_000_000_000
+        ) async throws {
+            let pollNanoseconds: UInt64 = 10_000_000
+            var elapsedNanoseconds: UInt64 = 0
+
+            while !startedCallIDs.contains(callID) {
+                guard elapsedNanoseconds < timeoutNanoseconds else {
+                    throw SelectionOCRProviderStubError.timeout(callID: callID)
+                }
+                try await Task.sleep(nanoseconds: pollNanoseconds)
+                elapsedNanoseconds += pollNanoseconds
+            }
+        }
+
+        func resume(callID: Int, text: String) {
+            continuations.removeValue(forKey: callID)?.resume(returning: text)
+        }
+    }
+
+    private enum SelectionOCRProviderStubError: Error {
+        case timeout(callID: Int)
+    }
+
+    private actor ReadSelectedTextProviderStub {
+        private var nextCallID = 0
+        private var startedCallIDs: Set<Int> = []
+        private var continuations: [Int: CheckedContinuation<String?, Never>] = [:]
+
+        func next() async -> String? {
+            nextCallID += 1
+            let callID = nextCallID
+            startedCallIDs.insert(callID)
+            return await withCheckedContinuation { continuation in
+                continuations[callID] = continuation
+            }
+        }
+
+        func waitUntilStarted(
+            callID: Int,
+            timeoutNanoseconds: UInt64 = 1_000_000_000
+        ) async throws {
+            let pollNanoseconds: UInt64 = 10_000_000
+            var elapsedNanoseconds: UInt64 = 0
+
+            while !startedCallIDs.contains(callID) {
+                guard elapsedNanoseconds < timeoutNanoseconds else {
+                    throw ReadSelectedTextProviderStubError.timeout(callID: callID)
+                }
+                try await Task.sleep(nanoseconds: pollNanoseconds)
+                elapsedNanoseconds += pollNanoseconds
+            }
+        }
+
+        func resume(callID: Int, text: String?) {
+            continuations.removeValue(forKey: callID)?.resume(returning: text)
+        }
+    }
+
+    private enum ReadSelectedTextProviderStubError: Error {
+        case timeout(callID: Int)
+    }
+
+    private actor AskLLMAnswerProviderStub {
+        private var startedPrompts: Set<String> = []
+        private var continuations: [String: CheckedContinuation<String, Error>] = [:]
+
+        func answer(prompt: String) async throws -> String {
+            startedPrompts.insert(prompt)
+            return try await withCheckedThrowingContinuation { continuation in
+                continuations[prompt] = continuation
+            }
+        }
+
+        func waitUntilStarted(
+            prompt: String,
+            timeoutNanoseconds: UInt64 = 1_000_000_000
+        ) async throws {
+            let pollNanoseconds: UInt64 = 10_000_000
+            var elapsedNanoseconds: UInt64 = 0
+
+            while !startedPrompts.contains(prompt) {
+                guard elapsedNanoseconds < timeoutNanoseconds else {
+                    throw AskLLMAnswerProviderStubError.timeout(prompt: prompt)
+                }
+                try await Task.sleep(nanoseconds: pollNanoseconds)
+                elapsedNanoseconds += pollNanoseconds
+            }
+        }
+
+        func resume(prompt: String, answer: String) {
+            continuations.removeValue(forKey: prompt)?.resume(returning: answer)
+        }
+    }
+
+    private enum AskLLMAnswerProviderStubError: Error {
+        case timeout(prompt: String)
+    }
+
     private func restoreDefaultsObject(_ object: Any?, forKey key: String) {
         let defaults = UserDefaults.standard
         if let object {
@@ -16886,6 +18319,29 @@ final class AppDelegateLaunchTests: XCTestCase {
         }
     }
 
+    private func makeTestSelectionImage(width: Int, height: Int) throws -> CGImage {
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            throw SelectionImageError.couldNotMakeImage
+        }
+
+        context.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        guard let image = context.makeImage() else {
+            throw SelectionImageError.couldNotMakeImage
+        }
+        return image
+    }
+
     private static func dayStamp(daysFromNow offset: Int) -> String {
         let calendar = Calendar.current
         let date = calendar.date(byAdding: .day, value: offset, to: Date()) ?? Date()
@@ -16896,4 +18352,17 @@ final class AppDelegateLaunchTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
+
+    private func makeTempScript(name: String, contents: String) throws -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ScriptCommandTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let fileURL = directoryURL.appendingPathComponent(name)
+        try contents.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
+    }
+}
+
+private enum SelectionImageError: Error {
+    case couldNotMakeImage
 }

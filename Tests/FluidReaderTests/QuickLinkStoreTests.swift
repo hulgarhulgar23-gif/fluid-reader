@@ -28,6 +28,11 @@ final class QuickLinkStoreTests: XCTestCase {
         XCTAssertNil(QuickLinkItem.make(urlString: "mailto:"))
     }
 
+    func testQuickLinkItemRejectsEmbeddedCredentials() {
+        XCTAssertNil(QuickLinkItem.make(urlString: "https://trusted.example.com@evil.example/path"))
+        XCTAssertNil(QuickLinkItem.make(urlString: "https://user:pass@example.com/docs"))
+    }
+
     @MainActor
     func testStoreSavesDedupesLimitsAndPersistsLinks() throws {
         let defaults = try makeDefaults()
@@ -99,6 +104,63 @@ final class QuickLinkStoreTests: XCTestCase {
 
         XCTAssertEqual(store.items.map(\.urlString), ["https://example.com/old"])
         XCTAssertTrue(store.items.allSatisfy { !$0.isPinned })
+    }
+
+    @MainActor
+    func testLoadSanitizesInvalidAndCredentialLinks() throws {
+        let defaults = try makeDefaults()
+        let seededItems = [
+            QuickLinkItem(id: UUID(), title: "Docs", urlString: "https://example.com/docs"),
+            QuickLinkItem(id: UUID(), title: "Bad scheme", urlString: "javascript:alert(1)"),
+            QuickLinkItem(
+                id: UUID(),
+                title: "Spoofed",
+                urlString: "https://trusted.example.com@evil.example/path"
+            )
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "links")
+
+        let store = QuickLinkStore(defaults: defaults, storageKey: "links")
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.urlString, "https://example.com/docs")
+        XCTAssertEqual(store.items.first?.title, "Docs")
+    }
+
+    @MainActor
+    func testLoadDedupesByNormalizedURLAndPreservesPinnedIfAnyDuplicateIsPinned() throws {
+        let defaults = try makeDefaults()
+        let duplicateID = UUID()
+        let seededItems = [
+            QuickLinkItem(
+                id: duplicateID,
+                title: "Primary Title",
+                urlString: "https://example.com/docs",
+                isPinned: false
+            ),
+            QuickLinkItem(
+                id: UUID(),
+                title: "Duplicate Pinned",
+                urlString: "example.com/docs",
+                isPinned: true
+            ),
+            QuickLinkItem(
+                id: UUID(),
+                title: "Other",
+                urlString: "https://example.com/other",
+                isPinned: false
+            )
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "links")
+
+        let store = QuickLinkStore(defaults: defaults, storageKey: "links")
+
+        XCTAssertEqual(store.items.count, 2)
+        XCTAssertEqual(store.items.first?.urlString, "https://example.com/docs")
+        XCTAssertEqual(store.items.first?.id, duplicateID)
+        XCTAssertEqual(store.items.first?.title, "Primary Title")
+        XCTAssertTrue(store.items.first?.isPinned == true)
+        XCTAssertEqual(store.items.last?.urlString, "https://example.com/other")
     }
 
     @MainActor

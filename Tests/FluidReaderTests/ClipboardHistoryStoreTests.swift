@@ -58,6 +58,40 @@ final class ClipboardHistoryStoreTests: XCTestCase {
         XCTAssertEqual(item.text.count, ClipboardHistoryStore.maxTextLength)
     }
 
+    func testLoadSanitizesInvalidValuesAndDedupesByText() throws {
+        let defaults = makeDefaults()
+        let longText = String(repeating: "b", count: ClipboardHistoryStore.maxTextLength + 25)
+        let seededItems = [
+            ClipboardHistoryItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 1),
+                text: "  First clip  "
+            ),
+            ClipboardHistoryItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 2),
+                text: " \n "
+            ),
+            ClipboardHistoryItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 3),
+                text: "First clip"
+            ),
+            ClipboardHistoryItem(
+                id: UUID(),
+                createdAt: Date(timeIntervalSince1970: 4),
+                text: longText
+            )
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "history")
+
+        let store = ClipboardHistoryStore(defaults: defaults, storageKey: "history")
+
+        XCTAssertEqual(store.items.count, 2)
+        XCTAssertEqual(store.items[0].text, "First clip")
+        XCTAssertEqual(store.items[1].text.count, ClipboardHistoryStore.maxTextLength)
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "FluidReaderClipboardHistoryStoreTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

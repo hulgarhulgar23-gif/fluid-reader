@@ -12,6 +12,17 @@ enum AppDefaults {
     static let customPromptText = "Pull out the key points and any action items. Keep it short."
     static let saveRecentItems = true
     static let readerAlwaysOnTop = false
+    static let showMenuBarItemKey = "showMenuBarItem"
+    static let showMenuBarItem = true
+    static let launcherCompactModeKey = "launcherCompactMode"
+    static let launcherCompactMode = false
+    static let launcherIndexedRootPathsKey = "launcherIndexedRootPaths"
+    static let frontWindowGapPointsKey = "frontWindowGapPoints"
+    static let frontWindowGapPoints = 0
+    static let frontWindowGapPointOptions = [0, 8, 12, 16, 20, 24, 32]
+    static let frontWindowCycleProfileKey = "frontWindowCycleProfile"
+    static let frontWindowCycleProfile = "full"
+    static let frontWindowCustomCycleCommandIDsKey = "frontWindowCustomCycleCommandIDs"
     static let autoCopyNewText = false
     static let autoPastePickedText = false
     static let autoPasteLLMAnswers = false
@@ -246,6 +257,10 @@ enum AppDefaults {
     static func value(_ value: String, fallback: String) -> String {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return clean.isEmpty ? fallback : clean
+    }
+
+    static func normalizedFrontWindowGapPoints(_ points: Int) -> Int {
+        frontWindowGapPointOptions.contains(points) ? points : frontWindowGapPoints
     }
 
     static func normalizedFameAutoOpsBundleCooldownMinutes(_ minutes: Int) -> Int {

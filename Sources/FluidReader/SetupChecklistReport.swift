@@ -33,6 +33,10 @@ enum SetupChecklistAction: String, Equatable {
     case accessibilitySettings
     case appSettings
     case loginItemsSettings
+    case openCommands
+    case openNotesWorkspace
+    case openExtensionsWorkspace
+    case openWindowSettings
 }
 
 struct SetupChecklistItem: Identifiable, Equatable {
@@ -47,13 +51,25 @@ struct SetupChecklistItem: Identifiable, Equatable {
 struct SetupChecklistReport: Equatable {
     let items: [SetupChecklistItem]
 
+    private static let platformItemIDs: Set<String> = [
+        "launcher-platform",
+        "notes-workspace",
+        "extensions-workspace",
+        "window-commands"
+    ]
+
     var actionNeededCount: Int {
         items.filter { $0.state == .actionNeeded }.count
     }
 
     var focusedItems: [SetupChecklistItem] {
-        let targetState: SetupChecklistItemState = actionNeededCount == 0 ? .ready : .actionNeeded
-        return items.filter { $0.state == targetState }
+        if actionNeededCount == 0 {
+            return items.filter { $0.state == .ready }
+        }
+
+        return items.filter { item in
+            item.state == .actionNeeded || Self.platformItemIDs.contains(item.id)
+        }
     }
 
     var summary: String {
@@ -103,7 +119,11 @@ struct SetupChecklistReport: Equatable {
             autoPasteLLMAnswersItem(isEnabled: autoPasteLLMAnswers, accessibilityTrusted: accessibilityTrusted),
             launchAtLoginItem(state: launchAtLoginState),
             recentItemsItem(isEnabled: saveRecentItems),
-            clipboardHistoryItem(isEnabled: saveClipboardHistory)
+            clipboardHistoryItem(isEnabled: saveClipboardHistory),
+            launcherPlatformItem(),
+            notesWorkspaceItem(),
+            extensionsWorkspaceItem(),
+            windowCommandsItem(accessibilityTrusted: accessibilityTrusted)
         ])
     }
 
@@ -273,6 +293,52 @@ struct SetupChecklistReport: Equatable {
             state: isEnabled ? .ready : .optional,
             actionTitle: isEnabled ? nil : "Open Settings",
             action: isEnabled ? nil : .appSettings
+        )
+    }
+
+    private static func launcherPlatformItem() -> SetupChecklistItem {
+        SetupChecklistItem(
+            id: "launcher-platform",
+            title: "Root Search",
+            detail: "Commands can search apps, files from your indexed folders, notes, links, clipboard history, scripts, and built-in actions from one bar.",
+            state: .ready,
+            actionTitle: "Open Commands",
+            action: .openCommands
+        )
+    }
+
+    private static func notesWorkspaceItem() -> SetupChecklistItem {
+        SetupChecklistItem(
+            id: "notes-workspace",
+            title: "Notes Workspace",
+            detail: "Saved snippets, quick links, clipboard history, and recent reader items now share one calmer local workspace you can search and manage from one window.",
+            state: .ready,
+            actionTitle: "Open Notes Workspace",
+            action: .openNotesWorkspace
+        )
+    }
+
+    private static func extensionsWorkspaceItem() -> SetupChecklistItem {
+        SetupChecklistItem(
+            id: "extensions-workspace",
+            title: "Extensions Workspace",
+            detail: "AI Commands and Script Commands share one local extension hub for run, reveal, and refresh workflows.",
+            state: .ready,
+            actionTitle: "Open Extensions Workspace",
+            action: .openExtensionsWorkspace
+        )
+    }
+
+    private static func windowCommandsItem(accessibilityTrusted: Bool) -> SetupChecklistItem {
+        SetupChecklistItem(
+            id: "window-commands",
+            title: "Window Commands",
+            detail: accessibilityTrusted
+                ? "Window Settings lets you tune gaps, saved layout cycles, and launcher hotkeys for window actions."
+                : "Window Settings is ready, and Accessibility will unlock moving other apps once permissions are granted.",
+            state: .ready,
+            actionTitle: "Open Window Settings",
+            action: .openWindowSettings
         )
     }
 }

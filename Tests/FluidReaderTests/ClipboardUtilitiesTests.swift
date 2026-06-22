@@ -132,6 +132,22 @@ final class ClipboardUtilitiesTests: XCTestCase {
         XCTAssertNil(ClipboardUtility.cleanURL("mailto:hello@example.com"))
     }
 
+    func testCleanURLPreservesEncodedPlusInRemainingParameters() {
+        // Stripping tracking params must not decode "%2B" to "+": for a
+        // form-encoded server "a+b" means "a b", so the URL's meaning changes.
+        XCTAssertEqual(
+            ClipboardUtility.cleanURL("https://example.com/search?q=a%2Bb&utm_source=news"),
+            "https://example.com/search?q=a%2Bb"
+        )
+    }
+
+    func testCleanURLRejectsEmbeddedCredentials() {
+        // "apple.com@evil.com" visually looks trusted while actually opening
+        // evil.com. Cleaning should reject this pattern entirely.
+        XCTAssertNil(ClipboardUtility.cleanURL("https://apple.com@evil.com/login?utm_source=news"))
+        XCTAssertNil(ClipboardUtility.cleanURL("https://user:pass@example.com/path"))
+    }
+
     func testExtractURLsFromText() {
         let text = """
         Read https://example.com/a?utm_source=news&keep=1.

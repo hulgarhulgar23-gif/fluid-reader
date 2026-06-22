@@ -12,6 +12,7 @@ enum InlineColorConverter {
             title: "Color: \(color.hex)",
             subtitle: "\(color.rgb) | \(color.hsl)",
             systemImage: "paintpalette",
+            sourceKind: .color,
             keywords: [query, color.hex, color.rgb, color.hsl],
             canFavorite: false
         ) {

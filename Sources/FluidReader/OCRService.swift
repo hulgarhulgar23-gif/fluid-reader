@@ -1,7 +1,7 @@
 import Foundation
 import Vision
 
-final class OCRService {
+final class OCRService: Sendable {
     func recognizeText(in image: CGImage, languageCode: String) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -41,7 +41,12 @@ final class OCRService {
         request.minimumTextHeight = 0.01
 
         let trimmedLanguage = languageCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedLanguage.isEmpty {
+        if trimmedLanguage.isEmpty {
+            // Empty code means the user picked the "Auto" preset. Vision does
+            // not auto-detect by default (it falls back to English-only), so
+            // ask it to detect the language instead of silently doing en-US.
+            request.automaticallyDetectsLanguage = true
+        } else {
             request.recognitionLanguages = [trimmedLanguage]
         }
 

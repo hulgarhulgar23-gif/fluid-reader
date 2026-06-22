@@ -1,6 +1,6 @@
 # Commands
 
-Open Commands with `Option + Shift + Space`.
+Open Commands with `Option + Shift + Space` by default.
 
 Commands is the fast place for reading, asking, copying, saving, opening, and fixing common problems.
 
@@ -10,6 +10,21 @@ For a fast path through the most useful commands, see [POWER_USER_GUIDE.md](POWE
 
 - Press `Return` to run the selected command.
 - Press `Command + 1` through `Command + 9` to run one of the first nine shown commands.
+- Press `Command + K` on the selected result to open the Action Panel for contextual actions like reveal, copy path, copy link, or favorite.
+- Turn on `Compact launcher mode` in `Settings -> Launcher` for a tighter launcher window without hiding any commands or root-search sources.
+- Rebind the dedicated `Commands`, `Pick and Read`, and `Screenshot` launcher shortcuts in `Settings -> Launcher`.
+- `Settings -> Launcher` now also shows a compact customization summary plus quick filters for `Customized`, `Platform`, `AI`, `Windows`, `Scripts`, and `All`, so aliases and hotkeys stay easy to tune without surfacing the whole command catalog at once.
+- Hide the menu-bar item in `Settings -> App` if you want the launcher to stay quieter in the background; global shortcuts still work.
+- Root search mixes commands with installed apps, indexed files from your configured folders (Desktop/Documents/Downloads by default), common folders, quick links, saved snippets, clipboard history, and recent reader items.
+- When search is empty, the launcher shows a compact launcher home with quick tiles for `Pick and Read`, `Screenshot`, `Ask`, `Route Request`, `Notes`, `Extensions`, `Windows`, and `Setup`, plus compact platform chips for `Reader`, `Refresh Search`, `Hide/Show Menu Bar`, and `Settings`.
+- The same idle launcher home still shows the compact root-search summary with live source counts plus one-tap scope chips like `app:`, `file:`, `note:`, `clip:`, `link:`, `script:`, `route:`, and `tile:` so the one-bar model stays obvious without cluttering the idle view.
+- User script commands from `~/Library/Application Support/FluidReader/ScriptCommands` also appear in the same launcher and use the same Action Panel, aliases, and custom global hotkeys as built-in commands.
+- `Open Notes Workspace` now opens a broader saved workspace where notes, quick links, clipboard history, and recent reader items share one calmer local management surface.
+- `Open Extensions Workspace` gives AI Commands, starter extensions, and Script Commands one local extension hub with search, install, run, reveal, and settings shortcuts in the same window.
+- Both workspaces now also show quick summary counts plus focused filters, so notes and extensions read like platform surfaces instead of long flat lists.
+- `Run Best Local Action` routes a natural-language request to the best matching local AI Command or Script Command, and `route:` / `do:` gives the same path from root search.
+- `Settings -> LLM` now also doubles as a compact AI command center with quick summary cards, launch buttons for `Ask Anything`, `Run Best Local Action`, and `Open Extensions Workspace`, and focused filters for `Ready`, `Built-In`, `Custom`, `Scripts`, and `All`.
+- When Commands is idle, the list stays focused on launcher hubs and core reader actions; current-text and answer actions only appear when they are actually ready, and typing or scoping still reaches the broader command catalog.
 - When Launch Recovery is active, press `Option + Shift + L` globally, or `Option + Command + R` inside Commands for the dedicated recovery quick run.
 - If Launch Recovery is not active yet, `Option + Shift + L` auto-reroutes to the best available onboarding recovery command and shows a `Recovery Rerouted` cue.
 - When search is empty in `All`, `Top Picks` shows context-aware next actions, can favor your pinned commands, can surface share actions like recap or card, and shows streak and milestone badges (`x3`, `x5`, ...).
@@ -44,9 +59,10 @@ For a fast path through the most useful commands, see [POWER_USER_GUIDE.md](POWE
 - During that sticky carry-over, `Top Picks` now shows a compact `Legend Hold N` badge so you can see remaining forced-promotion opens at a glance.
 - In `Settings -> Fame Ops`, Auto Trust Surge now includes a configurable `Legend risk sticky Top Picks window` (how many opens the promoted defense action stays pinned after `Legend Risk Alert`), optional `Legend risk hold until recovered` (auto-extends that hold while the decay forecast remains active), and a persistent weekly `Auto League history` timeline with per-week score/tier snapshots, a latest tier-shift callout, and a rolling league momentum line.
 - Use the category chips (`Core`, `Ask`, `Text`, `Saved`, `Open`, `Window`, `Settings`, `Support`) to narrow the list fast.
+- In `Settings -> Launcher`, rebind the dedicated launcher shortcuts, then search any command and add comma-separated aliases or a custom global hotkey (for example `⌥⌘P` or `cmd+shift+p`) to make your own launcher words work, then add or remove indexed file roots without losing the rest of the launcher setup.
 - Press `Control + 0` for `All`, or `Control + 1` through `Control + 8` to switch categories from the keyboard.
-- Type `ask:`, `text:`, `saved:`, `open:`, `window:`, `settings:`, `support:`, or `core:` to scope search from the keyboard. Short aliases also work, such as `q:` for ask, `copy:`, `paste:`, or `calc:` for text tools, `perm:`, `grant:`, `checklist:`, or `onboarding:` for settings, `fix:`, `repair:`, `error:`, `blocked:`, `share:`, `social:`, or `post:` for support, `snip:`, `fav:`, `note:`, or `clip:` for saved items, `tile:` for window layouts, and `app:`, `file:`, `docs:`, or `site:` for app/file/web open actions.
-- If a search misses, Commands now suggests trying shorter text or scope aliases (`q:`, `snip:`, `perm:`, `onboarding:`, `share:`, `fix:`, `copy:`, `calc:`, `file:`, `tile:`).
+- Type `ask:`, `text:`, `saved:`, `open:`, `window:`, `settings:`, `support:`, or `core:` to scope search from the keyboard. Short aliases also work, such as `q:` for ask, `copy:`, `paste:`, or `calc:` for text tools, `perm:`, `grant:`, `checklist:`, or `onboarding:` for settings, `fix:`, `repair:`, `error:`, `blocked:`, `share:`, `social:`, or `post:` for support, `snip:` or `note:` for notes/snippets, `clip:` for clipboard history, `link:` for saved quick links, `script:` for local script commands, `tile:` for window layouts, and `app:`, `file:`, `docs:`, or `site:` for focused open-source search.
+- If a search misses, Commands now suggests trying shorter text or scope aliases (`q:`, `snip:`, `clip:`, `link:`, `script:`, `perm:`, `onboarding:`, `share:`, `fix:`, `copy:`, `calc:`, `file:`, `tile:`).
 - Type a URL to open it.
 - Type a URL with tracking params to copy a clean URL.
 - Type a URL to copy it as a Markdown link.
@@ -68,10 +84,15 @@ For a fast path through the most useful commands, see [POWER_USER_GUIDE.md](POWE
 - `Pick and Read`
 - `Mark Screenshot`
 - `Ask Anything`
+- `Run Best Local Action`
 - `Read Last Text`
 - `Stop Speech`
 
 Quick LLM actions use the current reader text or image first. If the reader is empty, they try selected text, then clipboard text. If neither has text, the app asks you to pick text from the screen.
+
+For action routing, open `Run Best Local Action` or type `route: meeting minutes` / `do deploy preview` in Commands to let the launcher choose the best local AI Command or Script Command.
+
+Use `Settings -> LLM` when you want the same AI layer in one place: freeform ask, reusable prompts, saved custom prompts, and local script targets all show up there with quick filters and launch buttons.
 
 Common quick actions:
 
@@ -149,9 +170,18 @@ Paste commands need Accessibility permission. They restore your old clipboard af
 - `Open Clipboard Path`
 - `Reveal Clipboard Path`
 - `Save Selected as Link`
-- `Refresh Apps`
+- `Refresh Apps & Files`
+- `Open Extensions Workspace`
+- `Import Extension Pack`
+- `Open Script Commands Folder`
+- `Refresh Script Commands`
 
 Search an app name to open installed apps from `/Applications`, `/System/Applications`, or `~/Applications`.
+Use `Refresh Apps & Files` after installing something new or when you want a fresh file index for your configured launcher folders.
+Use `Open Extensions Workspace` to browse AI Commands, install starter extensions into your local script folder, run Script Commands without searching, refresh scripts, or jump straight into launcher settings. It now also shows quick counts and focused filters for `All`, `AI`, `Scripts`, and `Starter`.
+Use `Import Extension Pack` to install a portable local script-extension pack, and use `Export` on any installed Script Command inside Extensions Workspace to create one.
+Use `Open Script Commands Folder` to jump straight to the user automation folder. Supported script types include shell (`.sh`, `.zsh`, `.bash`, `.command`), Python (`.py`), Node (`.js`, `.mjs`, `.cjs`), Ruby (`.rb`), PHP (`.php`), Swift (`.swift`), and PowerShell (`.ps1`). Optional leading comment metadata also works: `@title`, `@subtitle`, `@keywords`, and `@icon`.
+Use `Refresh Apps & Files` after changing indexed roots if you want an immediate reload, although the launcher also refreshes file results automatically when indexed roots change in Settings.
 
 Search `folder` to open Downloads, Documents, Desktop, Home, Applications, or Utilities in Finder.
 
@@ -161,6 +191,7 @@ Search `folder` to open Downloads, Documents, Desktop, Home, Applications, or Ut
 - `Save Clipboard as Snippet`
 - `Save Text as Snippet`
 - `Save Answer as Snippet`
+- `Open Notes Workspace`
 - `Copy Snippets`
 - `Save Snippets`
 - `Clear Snippets`
@@ -188,12 +219,15 @@ Search `folder` to open Downloads, Documents, Desktop, Home, Applications, or Ut
 - `Clear Clipboard History`
 
 Recent items, snippets, quick links, and clipboard history stay on this Mac. Pinned snippets and pinned links stay above normal items. Snippets and links can be renamed, and snippet text or saved link URLs can be edited later. Clipboard history is off by default.
+`Open Notes Workspace` still shows saved snippets as local notes, but now also brings quick links, clipboard history, and recent reader items into that same saved workspace. You can search across the full local surface, edit/pin/delete notes and links, copy clipboard items, restore recent reader items, import links from the clipboard, and use focused filters for `All`, `Notes`, `Links`, `Clipboard`, `Recent`, and `Pinned`.
 
 Quick links export as Markdown links with the saved title as link text.
 `Import Clipboard Links` saves every valid URL found in copied text as quick links.
+Quick links and clipboard history entries also appear in root search, and typing a URL now offers `Save Link` so you can add it without leaving Commands.
 
 ## Window Commands
 
+- `Window Settings`
 - `Window Left Half`
 - `Window Right Half`
 - `Window Top Left Quarter`
@@ -213,6 +247,10 @@ Quick links export as Markdown links with the saved title as link text.
 - `Window Previous Layout`
 - `Cycle Profile: Full`
 - `Cycle Profile: Focus`
+- `Cycle Profile: Halves`
+- `Cycle Profile: Thirds`
+- `Cycle Profile: Quarters`
+- `Cycle Profile: Custom`
 - `Window Undo Last Move`
 - `Window Next Display`
 - `Window Previous Display`
@@ -220,7 +258,7 @@ Quick links export as Markdown links with the saved title as link text.
 Window commands move the app you were using before Commands opened. They need Accessibility permission.
 `Window Cycle Layout` rotates through common presets, so repeated runs quickly try multiple layouts.
 `Window Previous Layout` runs the same cycle in reverse.
-Cycle profiles change which presets the cycle commands use.
+Cycle profiles change which saved preset set the cycle commands use, and `Window Settings` now lets you preview the active cycle, choose the active profile, adjust the shared layout gap, edit the saved custom cycle set, and assign direct hotkeys to window actions in one place.
 
 ## Utilities
 

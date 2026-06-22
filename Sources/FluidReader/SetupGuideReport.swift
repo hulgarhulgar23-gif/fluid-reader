@@ -38,18 +38,19 @@ struct SetupGuideReport: Equatable {
         """
         # Fluid Reader Setup Guide
 
-        ## Shortcuts
+        ## Shortcut Defaults
         - ⌥⇧Space: Commands
         - ⌥⇧R: Read/pick
         - ⌥⇧S: Screenshot
         - ⌥⌘O: Auto Bundle status
         - ⌥⌘L: Launch Rescue Auto status
         - \(AppDelegate.readerStatusShortcutMenuHintLine())
+        - Rebind launcher shortcuts in Settings -> Launcher.
 
         ## First Use
         1. Open Commands.
-        2. Run Read Selected Text.
-        3. Draw area if needed.
+        2. Search for an app, file, note, link, or command. Change indexed folders in Settings -> Launcher.
+        3. Try Run Best Local Action, then open Extensions Workspace for AI Commands, starter extensions, importable packs, and scripts, or open Notes Workspace for your saved notes, links, clipboard history, and recent items.
 
         ## Status
         - Screen Recording: \(yesNo(screenRecordingAllowed))
@@ -64,7 +65,7 @@ struct SetupGuideReport: Equatable {
         - No API keys or private content.
 
         ## Useful Commands
-        Try: Read Selected Text, Ask Anything, Search Web.
+        Try: Run Best Local Action, Refresh Apps & Files, Import Extension Pack, Open Extensions Workspace, Open Notes Workspace, Window Settings, Read Selected Text, Ask Anything, Search Web.
 
         ## Share
         Paste this:
@@ -114,7 +115,7 @@ struct SetupGuideReport: Equatable {
 
         ## Positioning
         Local-first macOS OCR + ask.
-        Shortcut: ⌥⇧Space.
+        Default shortcut: ⌥⇧Space. Rebind in Settings -> Launcher.
         \(proof)
 
         ## Hooks

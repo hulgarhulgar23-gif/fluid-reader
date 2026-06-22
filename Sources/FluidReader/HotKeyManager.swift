@@ -4,8 +4,30 @@ import Foundation
 final class HotKeyManager {
     nonisolated static let launchRecoveryHotKeyDisplayName = "Option + Shift + L"
     nonisolated static let fameExceptionalLoopHotKeyDisplayName = "Option + Shift + E"
+    private typealias ResolvedHotKey = (
+        id: UInt32,
+        keyCode: Int,
+        modifiers: UInt32,
+        name: String,
+        isRequired: Bool
+    )
 
-    struct SystemAPI {
+    struct RegisteredHotKey {
+        let keyCode: Int
+        let modifiers: UInt32
+        let name: String
+    }
+
+    struct AdditionalHotKey {
+        let id: UInt32
+        let keyCode: Int
+        let modifiers: UInt32
+        let name: String
+        let isRequired: Bool
+        let action: () -> Void
+    }
+
+    struct SystemAPI: @unchecked Sendable {
         let installEventHandler: (_ manager: HotKeyManager, _ eventHandler: inout EventHandlerRef?) -> OSStatus
         let removeEventHandler: (_ eventHandler: EventHandlerRef) -> Void
         let registerEventHotKey: (
@@ -75,6 +97,7 @@ final class HotKeyManager {
     enum RegistrationError: LocalizedError, Equatable {
         case eventHandler(OSStatus)
         case hotKey(String, OSStatus)
+        case duplicateHotKey(String, String)
 
         var errorDescription: String? {
             switch self {
@@ -82,6 +105,8 @@ final class HotKeyManager {
                 return "The keyboard shortcut could not start. Error \(status)."
             case .hotKey(let name, let status):
                 return "\(name) is already in use. Error \(status)."
+            case .duplicateHotKey(let existingName, let conflictingName):
+                return "\(conflictingName) conflicts with \(existingName). Use a different keyboard shortcut."
             }
         }
     }
@@ -92,6 +117,32 @@ final class HotKeyManager {
     private(set) var skippedOptionalHotKeyNames: [String] = []
     private let systemAPI: SystemAPI
 
+    private static let defaultReadHotKey = RegisteredHotKey(
+        keyCode: kVK_ANSI_R,
+        modifiers: UInt32(optionKey | shiftKey),
+        name: "Option + Shift + R"
+    )
+    private static let defaultScreenshotHotKey = RegisteredHotKey(
+        keyCode: kVK_ANSI_S,
+        modifiers: UInt32(optionKey | shiftKey),
+        name: "Option + Shift + S"
+    )
+    private static let defaultCommandHotKey = RegisteredHotKey(
+        keyCode: kVK_Space,
+        modifiers: UInt32(optionKey | shiftKey),
+        name: "Option + Shift + Space"
+    )
+    private static let defaultLaunchRecoveryHotKey = RegisteredHotKey(
+        keyCode: kVK_ANSI_L,
+        modifiers: UInt32(optionKey | shiftKey),
+        name: HotKeyManager.launchRecoveryHotKeyDisplayName
+    )
+    private static let defaultFameExceptionalLoopHotKey = RegisteredHotKey(
+        keyCode: kVK_ANSI_E,
+        modifiers: UInt32(optionKey | shiftKey),
+        name: HotKeyManager.fameExceptionalLoopHotKeyDisplayName
+    )
+
     init(systemAPI: SystemAPI = .live) {
         self.systemAPI = systemAPI
     }
@@ -101,9 +152,52 @@ final class HotKeyManager {
         readAction: @escaping () -> Void,
         screenshotAction: @escaping () -> Void,
         commandAction: @escaping () -> Void,
+        readHotKey: RegisteredHotKey? = nil,
+        screenshotHotKey: RegisteredHotKey? = nil,
+        commandHotKey: RegisteredHotKey? = nil,
         launchRecoveryAction: (() -> Void)? = nil,
-        fameExceptionalLoopAction: (() -> Void)? = nil
+        launchRecoveryHotKey: RegisteredHotKey? = nil,
+        fameExceptionalLoopAction: (() -> Void)? = nil,
+        fameExceptionalLoopHotKey: RegisteredHotKey? = nil,
+        additionalHotKeys: [AdditionalHotKey] = []
     ) -> Result<Void, RegistrationError> {
+        let resolvedReadHotKey = readHotKey ?? Self.defaultReadHotKey
+        let resolvedScreenshotHotKey = screenshotHotKey ?? Self.defaultScreenshotHotKey
+        let resolvedCommandHotKey = commandHotKey ?? Self.defaultCommandHotKey
+
+        var hotKeys: [ResolvedHotKey] = [
+            (1, resolvedReadHotKey.keyCode, resolvedReadHotKey.modifiers, resolvedReadHotKey.name, true),
+            (2, resolvedScreenshotHotKey.keyCode, resolvedScreenshotHotKey.modifiers, resolvedScreenshotHotKey.name, true),
+            (3, resolvedCommandHotKey.keyCode, resolvedCommandHotKey.modifiers, resolvedCommandHotKey.name, true)
+        ]
+        if launchRecoveryAction != nil {
+            let resolvedLaunchRecoveryHotKey = launchRecoveryHotKey ?? Self.defaultLaunchRecoveryHotKey
+            hotKeys.append((
+                4,
+                resolvedLaunchRecoveryHotKey.keyCode,
+                resolvedLaunchRecoveryHotKey.modifiers,
+                resolvedLaunchRecoveryHotKey.name,
+                false
+            ))
+        }
+        if fameExceptionalLoopAction != nil {
+            let resolvedExceptionalLoopHotKey = fameExceptionalLoopHotKey ?? Self.defaultFameExceptionalLoopHotKey
+            hotKeys.append((
+                5,
+                resolvedExceptionalLoopHotKey.keyCode,
+                resolvedExceptionalLoopHotKey.modifiers,
+                resolvedExceptionalLoopHotKey.name,
+                false
+            ))
+        }
+        hotKeys.append(contentsOf: additionalHotKeys.map {
+            ($0.id, $0.keyCode, $0.modifiers, $0.name, $0.isRequired)
+        })
+
+        if let duplicateError = Self.duplicateRegistrationError(in: hotKeys) {
+            return .failure(duplicateError)
+        }
+
         unregister()
         skippedOptionalHotKeyNames = []
         actions = [
@@ -117,6 +211,9 @@ final class HotKeyManager {
         if let fameExceptionalLoopAction {
             actions[5] = fameExceptionalLoopAction
         }
+        for registration in additionalHotKeys {
+            actions[registration.id] = registration.action
+        }
 
         let handlerStatus = systemAPI.installEventHandler(self, &eventHandler)
         guard handlerStatus == noErr else {
@@ -124,24 +221,12 @@ final class HotKeyManager {
             return .failure(.eventHandler(handlerStatus))
         }
 
-        var hotKeys: [(id: UInt32, keyCode: Int, name: String, isRequired: Bool)] = [
-            (1, kVK_ANSI_R, "Option + Shift + R", true),
-            (2, kVK_ANSI_S, "Option + Shift + S", true),
-            (3, kVK_Space, "Option + Shift + Space", true)
-        ]
-        if launchRecoveryAction != nil {
-            hotKeys.append((4, kVK_ANSI_L, Self.launchRecoveryHotKeyDisplayName, false))
-        }
-        if fameExceptionalLoopAction != nil {
-            hotKeys.append((5, kVK_ANSI_E, Self.fameExceptionalLoopHotKeyDisplayName, false))
-        }
-
         for hotKey in hotKeys {
             var ref: EventHotKeyRef?
             let hotKeyStatus = systemAPI.registerEventHotKey(
                 hotKey.id,
                 hotKey.keyCode,
-                UInt32(optionKey | shiftKey),
+                hotKey.modifiers,
                 &ref
             )
             guard hotKeyStatus == noErr, let ref else {
@@ -175,5 +260,21 @@ final class HotKeyManager {
         }
 
         actions.removeAll()
+    }
+
+    private static func duplicateRegistrationError(
+        in hotKeys: [ResolvedHotKey]
+    ) -> RegistrationError? {
+        var seenHotKeyNames: [String: String] = [:]
+
+        for hotKey in hotKeys {
+            let pairKey = "\(hotKey.modifiers):\(hotKey.keyCode)"
+            if let existingName = seenHotKeyNames[pairKey] {
+                return .duplicateHotKey(existingName, hotKey.name)
+            }
+            seenHotKeyNames[pairKey] = hotKey.name
+        }
+
+        return nil
     }
 }

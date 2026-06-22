@@ -27,6 +27,25 @@ final class WebSearchTests: XCTestCase {
         XCTAssertNil(WebSearch.webURL(from: "127.0.0.1"))
     }
 
+    func testSearchURLEscapesPlusSoServersDoNotReadItAsSpace() throws {
+        let url = try XCTUnwrap(WebSearch.searchURL(for: "c++ tutorial"))
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+
+        // The "+" must be percent-escaped; otherwise DuckDuckGo decodes it as a
+        // space and searches for "c   tutorial" instead of "c++ tutorial".
+        XCTAssertEqual(components.percentEncodedQuery, "q=c%2B%2B%20tutorial")
+        // An RFC 3986 parser must recover the literal "+" characters.
+        XCTAssertEqual(components.queryItems, [URLQueryItem(name: "q", value: "c++ tutorial")])
+    }
+
+    func testWebURLRejectsEmbeddedCredentials() {
+        // "apple.com@evil.com" parses as user "apple.com" on host "evil.com";
+        // opening it would send the user to evil.com while looking trusted.
+        XCTAssertNil(WebSearch.webURL(from: "apple.com@evil.com"))
+        XCTAssertNil(WebSearch.webURL(from: "https://apple.com@evil.com/login"))
+        XCTAssertNil(WebSearch.webURL(from: "https://user:pass@example.com"))
+    }
+
     func testMakeActionOpensSearchURL() throws {
         var openedURL: URL?
         let action = try XCTUnwrap(WebSearch.makeAction(query: "swift appkit") { url in
@@ -72,6 +91,34 @@ final class WebSearchTests: XCTestCase {
     func testMakeCleanURLActionSkipsAlreadyCleanURL() {
         XCTAssertNil(WebSearch.makeCleanURLAction(query: "example.com/docs?keep=1", copy: { _ in }))
         XCTAssertNil(WebSearch.makeCleanURLAction(query: "swift appkit", copy: { _ in }))
+    }
+
+    func testMakeSaveQuickLinkActionSavesTypedURL() throws {
+        var savedURL = ""
+        let action = try XCTUnwrap(WebSearch.makeSaveQuickLinkAction(
+            query: "example.com/docs",
+            existingItems: []
+        ) { url in
+            savedURL = url
+        })
+
+        XCTAssertEqual(action.id, "inline-save-quick-link")
+        XCTAssertEqual(action.title, "Save Link: https://example.com/docs")
+        XCTAssertEqual(action.subtitle, "Add to Quick Links")
+        XCTAssertEqual(action.sourceKind, .link)
+
+        action.run()
+        XCTAssertEqual(savedURL, "https://example.com/docs")
+    }
+
+    func testMakeSaveQuickLinkActionSkipsExistingLink() throws {
+        let existingItem = try XCTUnwrap(QuickLinkItem.make(urlString: "example.com/docs"))
+
+        XCTAssertNil(WebSearch.makeSaveQuickLinkAction(
+            query: "example.com/docs",
+            existingItems: [existingItem],
+            save: { _ in }
+        ))
     }
 
     func testMarkdownLinkBuildsMarkdownLinkFromTypedURL() {

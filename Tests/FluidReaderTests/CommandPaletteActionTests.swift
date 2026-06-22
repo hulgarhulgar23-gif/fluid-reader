@@ -954,15 +954,122 @@ final class CommandPaletteActionTests: XCTestCase {
         )
     }
 
+    func testFilterCanLimitResultsToSourceKinds() {
+        let actions = [
+            CommandPaletteAction(
+                id: "ask-anything",
+                title: "Ask Anything",
+                subtitle: "Ask about text",
+                systemImage: "sparkles",
+                sourceKind: .ask,
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "script-command",
+                title: "Run Build Script",
+                subtitle: "Run local script",
+                systemImage: "terminal",
+                sourceKind: .script,
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "quick-link",
+                title: "Open Link",
+                subtitle: "Open saved link",
+                systemImage: "link",
+                sourceKind: .link,
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "open-app",
+                title: "Open App: Safari",
+                subtitle: "Launch installed app",
+                systemImage: "app.badge",
+                sourceKind: .app,
+                run: {}
+            )
+        ]
+
+        XCTAssertEqual(
+            CommandPaletteAction.filter(
+                actions,
+                query: "",
+                requiredSourceKinds: [.script]
+            ).map(\.id),
+            ["script-command"]
+        )
+        XCTAssertEqual(
+            CommandPaletteAction.filter(
+                actions,
+                query: "",
+                requiredSourceKinds: [.link, .app]
+            ).map(\.id),
+            ["quick-link", "open-app"]
+        )
+    }
+
+    func testFilterCanBoostPlatformActionsForSingleTermSearch() {
+        let actions = [
+            CommandPaletteAction(
+                id: "prompt-notes",
+                title: "Notes",
+                subtitle: "Turn text into notes",
+                systemImage: "sparkles",
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "open-notes-workspace",
+                title: "Open Notes Workspace",
+                subtitle: "Browse, edit, and pin saved notes",
+                systemImage: "note.text",
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "import-extension-pack",
+                title: "Import Extension Pack",
+                subtitle: "Install a local script-extension pack",
+                systemImage: "square.and.arrow.down.on.square",
+                run: {}
+            ),
+            CommandPaletteAction(
+                id: "open-extensions-workspace",
+                title: "Open Extensions Workspace",
+                subtitle: "Browse AI commands and script commands",
+                systemImage: "puzzlepiece.extension",
+                run: {}
+            )
+        ]
+
+        XCTAssertEqual(
+            CommandPaletteAction.filter(
+                actions,
+                query: "notes",
+                priorityActionIDs: Set(["open-notes-workspace"])
+            ).first?.id,
+            "open-notes-workspace"
+        )
+
+        XCTAssertEqual(
+            CommandPaletteAction.filter(
+                actions,
+                query: "extension pack",
+                priorityActionIDs: Set(["open-extensions-workspace"])
+            ).first?.id,
+            "import-extension-pack"
+        )
+    }
+
     func testScopedQueryParsingRecognizesGroupPrefixes() {
         let askScope = CommandPaletteGroup.parseScopedQuery("ask: rewrite this")
         let textScope = CommandPaletteGroup.parseScopedQuery("text/base64 encode")
 
         XCTAssertEqual(askScope.group, .ask)
+        XCTAssertNil(askScope.sourceKinds)
         XCTAssertEqual(askScope.searchQuery, "rewrite this")
         XCTAssertEqual(askScope.hasScope, true)
 
         XCTAssertEqual(textScope.group, .text)
+        XCTAssertNil(textScope.sourceKinds)
         XCTAssertEqual(textScope.searchQuery, "base64 encode")
         XCTAssertEqual(textScope.hasScope, true)
     }
@@ -997,122 +1104,163 @@ final class CommandPaletteActionTests: XCTestCase {
         let clipScope = CommandPaletteGroup.parseScopedQuery("clip: history")
         let tileScope = CommandPaletteGroup.parseScopedQuery("tile: left")
         let appScope = CommandPaletteGroup.parseScopedQuery("app: safari")
+        let linkScope = CommandPaletteGroup.parseScopedQuery("link: docs")
+        let scriptScope = CommandPaletteGroup.parseScopedQuery("script: build")
 
         XCTAssertEqual(quickAskScope.group, .ask)
+        XCTAssertNil(quickAskScope.sourceKinds)
         XCTAssertEqual(quickAskScope.searchQuery, "summarize")
         XCTAssertEqual(quickAskScope.hasScope, true)
 
         XCTAssertEqual(questionAskScope.group, .ask)
+        XCTAssertNil(questionAskScope.sourceKinds)
         XCTAssertEqual(questionAskScope.searchQuery, "explain this")
         XCTAssertEqual(questionAskScope.hasScope, true)
 
         XCTAssertEqual(copyScope.group, .text)
+        XCTAssertNil(copyScope.sourceKinds)
         XCTAssertEqual(copyScope.searchQuery, "quote")
         XCTAssertEqual(copyScope.hasScope, true)
 
         XCTAssertEqual(calcScope.group, .text)
+        XCTAssertNil(calcScope.sourceKinds)
         XCTAssertEqual(calcScope.searchQuery, "2 + 2")
         XCTAssertEqual(calcScope.hasScope, true)
 
         XCTAssertEqual(pasteScope.group, .text)
+        XCTAssertNil(pasteScope.sourceKinds)
         XCTAssertEqual(pasteScope.searchQuery, "answer")
         XCTAssertEqual(pasteScope.hasScope, true)
 
         XCTAssertEqual(fileScope.group, .open)
+        XCTAssertEqual(fileScope.sourceKinds, [.file, .path])
         XCTAssertEqual(fileScope.searchQuery, "downloads")
         XCTAssertEqual(fileScope.hasScope, true)
 
         XCTAssertEqual(siteScope.group, .open)
+        XCTAssertEqual(siteScope.sourceKinds, [.web, .link])
         XCTAssertEqual(siteScope.searchQuery, "openai")
         XCTAssertEqual(siteScope.hasScope, true)
 
         XCTAssertEqual(docsScope.group, .open)
+        XCTAssertEqual(docsScope.sourceKinds, [.file, .folder, .path])
         XCTAssertEqual(docsScope.searchQuery, "~/Desktop")
         XCTAssertEqual(docsScope.hasScope, true)
 
         XCTAssertEqual(prefsScope.group, .settings)
+        XCTAssertNil(prefsScope.sourceKinds)
         XCTAssertEqual(prefsScope.searchQuery, "permission")
         XCTAssertEqual(prefsScope.hasScope, true)
 
         XCTAssertEqual(checklistScope.group, .settings)
+        XCTAssertNil(checklistScope.sourceKinds)
         XCTAssertEqual(checklistScope.searchQuery, "screen")
         XCTAssertEqual(checklistScope.hasScope, true)
 
         XCTAssertEqual(onboardingScope.group, .settings)
+        XCTAssertNil(onboardingScope.sourceKinds)
         XCTAssertEqual(onboardingScope.searchQuery, "setup")
         XCTAssertEqual(onboardingScope.hasScope, true)
 
         XCTAssertEqual(bugScope.group, .support)
+        XCTAssertNil(bugScope.sourceKinds)
         XCTAssertEqual(bugScope.searchQuery, "screenshot")
         XCTAssertEqual(bugScope.hasScope, true)
 
         XCTAssertEqual(shareScope.group, .support)
+        XCTAssertNil(shareScope.sourceKinds)
         XCTAssertEqual(shareScope.searchQuery, "recap")
         XCTAssertEqual(shareScope.hasScope, true)
 
         XCTAssertEqual(socialScope.group, .support)
+        XCTAssertNil(socialScope.sourceKinds)
         XCTAssertEqual(socialScope.searchQuery, "post")
         XCTAssertEqual(socialScope.hasScope, true)
 
         XCTAssertEqual(postScope.group, .support)
+        XCTAssertNil(postScope.sourceKinds)
         XCTAssertEqual(postScope.searchQuery, "x")
         XCTAssertEqual(postScope.hasScope, true)
 
         XCTAssertEqual(fameScope.group, .support)
+        XCTAssertNil(fameScope.sourceKinds)
         XCTAssertEqual(fameScope.searchQuery, "board")
         XCTAssertEqual(fameScope.hasScope, true)
 
         XCTAssertEqual(viralScope.group, .support)
+        XCTAssertNil(viralScope.sourceKinds)
         XCTAssertEqual(viralScope.searchQuery, "hooks")
         XCTAssertEqual(viralScope.hasScope, true)
 
         XCTAssertEqual(blockedScope.group, .support)
+        XCTAssertNil(blockedScope.sourceKinds)
         XCTAssertEqual(blockedScope.searchQuery, "permission")
         XCTAssertEqual(blockedScope.hasScope, true)
 
         XCTAssertEqual(errorScope.group, .support)
+        XCTAssertNil(errorScope.sourceKinds)
         XCTAssertEqual(errorScope.searchQuery, "stuck")
         XCTAssertEqual(errorScope.hasScope, true)
 
         XCTAssertEqual(permScope.group, .settings)
+        XCTAssertNil(permScope.sourceKinds)
         XCTAssertEqual(permScope.searchQuery, "accessibility")
         XCTAssertEqual(permScope.hasScope, true)
 
         XCTAssertEqual(grantScope.group, .settings)
+        XCTAssertNil(grantScope.sourceKinds)
         XCTAssertEqual(grantScope.searchQuery, "screen")
         XCTAssertEqual(grantScope.hasScope, true)
 
         XCTAssertEqual(fixScope.group, .support)
+        XCTAssertNil(fixScope.sourceKinds)
         XCTAssertEqual(fixScope.searchQuery, "paste")
         XCTAssertEqual(fixScope.hasScope, true)
 
         XCTAssertEqual(repairScope.group, .support)
+        XCTAssertNil(repairScope.sourceKinds)
         XCTAssertEqual(repairScope.searchQuery, "pick")
         XCTAssertEqual(repairScope.hasScope, true)
 
         XCTAssertEqual(snipScope.group, .saved)
+        XCTAssertEqual(snipScope.sourceKinds, [.snippet])
         XCTAssertEqual(snipScope.searchQuery, "pinned")
         XCTAssertEqual(snipScope.hasScope, true)
 
         XCTAssertEqual(favScope.group, .saved)
+        XCTAssertNil(favScope.sourceKinds)
         XCTAssertEqual(favScope.searchQuery, "pinned")
         XCTAssertEqual(favScope.hasScope, true)
 
         XCTAssertEqual(noteScope.group, .saved)
+        XCTAssertEqual(noteScope.sourceKinds, [.snippet])
         XCTAssertEqual(noteScope.searchQuery, "meeting")
         XCTAssertEqual(noteScope.hasScope, true)
 
         XCTAssertEqual(clipScope.group, .saved)
+        XCTAssertEqual(clipScope.sourceKinds, [.clipboard])
         XCTAssertEqual(clipScope.searchQuery, "history")
         XCTAssertEqual(clipScope.hasScope, true)
 
         XCTAssertEqual(tileScope.group, .window)
+        XCTAssertNil(tileScope.sourceKinds)
         XCTAssertEqual(tileScope.searchQuery, "left")
         XCTAssertEqual(tileScope.hasScope, true)
 
         XCTAssertEqual(appScope.group, .open)
+        XCTAssertEqual(appScope.sourceKinds, [.app])
         XCTAssertEqual(appScope.searchQuery, "safari")
         XCTAssertEqual(appScope.hasScope, true)
+
+        XCTAssertEqual(linkScope.group, .saved)
+        XCTAssertEqual(linkScope.sourceKinds, [.link])
+        XCTAssertEqual(linkScope.searchQuery, "docs")
+        XCTAssertEqual(linkScope.hasScope, true)
+
+        XCTAssertNil(scriptScope.group)
+        XCTAssertEqual(scriptScope.sourceKinds, [.script])
+        XCTAssertEqual(scriptScope.searchQuery, "build")
+        XCTAssertEqual(scriptScope.hasScope, true)
     }
 
     func testScopedQueryParsingSkipsRegularTimeAndURLInputs() {
@@ -9252,6 +9400,85 @@ final class CommandPaletteActionTests: XCTestCase {
         )
     }
 
+    func testRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistorySanitizesMalformedEntries() throws {
+        let defaults = try makeDefaults()
+        let history = [
+            CommandPaletteTopPicks.RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+                weekStamp: " 3000 ",
+                runsToday: -2,
+                runsThisWeek: 6,
+                bestWeekRuns: 1,
+                currentStreak: 4,
+                bestStreak: 2,
+                leagueScore: -100,
+                tier: .starter
+            ),
+            CommandPaletteTopPicks.RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+                weekStamp: "oops",
+                runsToday: 1,
+                runsThisWeek: 1,
+                bestWeekRuns: 1,
+                currentStreak: 1,
+                bestStreak: 1,
+                leagueScore: 9,
+                tier: .legend
+            ),
+            CommandPaletteTopPicks.RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+                weekStamp: "2000",
+                runsToday: 1,
+                runsThisWeek: 0,
+                bestWeekRuns: 0,
+                currentStreak: 1,
+                bestStreak: 1,
+                leagueScore: 999,
+                tier: .legend
+            ),
+            CommandPaletteTopPicks.RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+                weekStamp: "2000 ",
+                runsToday: 2,
+                runsThisWeek: 3,
+                bestWeekRuns: 4,
+                currentStreak: 2,
+                bestStreak: 3,
+                leagueScore: 0,
+                tier: .starter
+            )
+        ]
+        let historyData = try JSONEncoder().encode(history)
+        defaults.set(
+            historyData,
+            forKey: AppDefaults.fameRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryKey
+        )
+
+        let loadedHistory = CommandPaletteTopPicks
+            .recommendationMomentumRescueHallOfFameAutoDefenseLeagueHistory(
+                defaults: defaults,
+                historyKey: AppDefaults
+                    .fameRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryKey,
+                limit: 10
+            )
+
+        XCTAssertEqual(loadedHistory.map(\.weekStamp), ["3000", "2000"])
+
+        let latestWeek = try XCTUnwrap(loadedHistory.first)
+        XCTAssertEqual(latestWeek.runsToday, 0)
+        XCTAssertEqual(latestWeek.runsThisWeek, 6)
+        XCTAssertEqual(latestWeek.bestWeekRuns, 6)
+        XCTAssertEqual(latestWeek.currentStreak, 4)
+        XCTAssertEqual(latestWeek.bestStreak, 4)
+        XCTAssertEqual(latestWeek.leagueScore, 16)
+        XCTAssertEqual(latestWeek.tier, .elite)
+
+        let previousWeek = try XCTUnwrap(loadedHistory.last)
+        XCTAssertEqual(previousWeek.runsToday, 2)
+        XCTAssertEqual(previousWeek.runsThisWeek, 3)
+        XCTAssertEqual(previousWeek.bestWeekRuns, 4)
+        XCTAssertEqual(previousWeek.currentStreak, 2)
+        XCTAssertEqual(previousWeek.bestStreak, 3)
+        XCTAssertEqual(previousWeek.leagueScore, 10)
+        XCTAssertEqual(previousWeek.tier, .rising)
+    }
+
     func testTopPicksLaunchRecoveryHotKeyAutoRescueRecencyBadgeUsesCompactRelativeTime() {
         let now = Date(timeIntervalSince1970: 2_400)
 
@@ -10484,6 +10711,93 @@ final class CommandPaletteActionTests: XCTestCase {
         )
     }
 
+    func testTopPicksLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistorySanitizesMalformedEntries() throws {
+        let defaults = try makeDefaults()
+        let history = [
+            CommandPaletteTopPicks.LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+                weekStamp: "1000",
+                runsToday: -1,
+                runsThisWeek: 2,
+                bestWeekRuns: 1,
+                currentStreak: 0,
+                bestStreak: -2,
+                leagueScore: -10,
+                tier: .legend
+            ),
+            CommandPaletteTopPicks.LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+                weekStamp: "bad",
+                runsToday: 1,
+                runsThisWeek: 1,
+                bestWeekRuns: 1,
+                currentStreak: 1,
+                bestStreak: 1,
+                leagueScore: 9,
+                tier: .legend
+            ),
+            CommandPaletteTopPicks.LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+                weekStamp: " 0 ",
+                runsToday: 1,
+                runsThisWeek: 1,
+                bestWeekRuns: 1,
+                currentStreak: 1,
+                bestStreak: 1,
+                leagueScore: 9,
+                tier: .legend
+            ),
+            CommandPaletteTopPicks.LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+                weekStamp: "2000 ",
+                runsToday: 5,
+                runsThisWeek: 10,
+                bestWeekRuns: 3,
+                currentStreak: 8,
+                bestStreak: 1,
+                leagueScore: 1,
+                tier: .starter
+            ),
+            CommandPaletteTopPicks.LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+                weekStamp: "2000",
+                runsToday: 1,
+                runsThisWeek: 4,
+                bestWeekRuns: 4,
+                currentStreak: 2,
+                bestStreak: 2,
+                leagueScore: 99,
+                tier: .legend
+            )
+        ]
+        let historyData = try JSONEncoder().encode(history)
+        defaults.set(
+            historyData,
+            forKey: AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryKey
+        )
+
+        let loadedHistory = CommandPaletteTopPicks.launchRecoveryHotKeyAutoTrustSurgeLeagueHistory(
+            defaults: defaults,
+            historyKey: AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryKey,
+            limit: 10
+        )
+
+        XCTAssertEqual(loadedHistory.map(\.weekStamp), ["2000", "1000"])
+
+        let latestWeek = try XCTUnwrap(loadedHistory.first)
+        XCTAssertEqual(latestWeek.runsToday, 1)
+        XCTAssertEqual(latestWeek.runsThisWeek, 4)
+        XCTAssertEqual(latestWeek.bestWeekRuns, 4)
+        XCTAssertEqual(latestWeek.currentStreak, 2)
+        XCTAssertEqual(latestWeek.bestStreak, 2)
+        XCTAssertEqual(latestWeek.leagueScore, 13)
+        XCTAssertEqual(latestWeek.tier, .elite)
+
+        let previousWeek = try XCTUnwrap(loadedHistory.last)
+        XCTAssertEqual(previousWeek.runsToday, 0)
+        XCTAssertEqual(previousWeek.runsThisWeek, 2)
+        XCTAssertEqual(previousWeek.bestWeekRuns, 2)
+        XCTAssertEqual(previousWeek.currentStreak, 0)
+        XCTAssertEqual(previousWeek.bestStreak, 0)
+        XCTAssertEqual(previousWeek.leagueScore, 4)
+        XCTAssertEqual(previousWeek.tier, .starter)
+    }
+
     func testTopPicksLaunchRecoveryHotKeyAutoTrustSurgeDailyRunHelpersResetAcrossDayBoundary() {
         let calendar = Calendar(identifier: .gregorian)
         let now = Date(timeIntervalSince1970: 9_000_000)
@@ -10624,6 +10938,39 @@ final class CommandPaletteActionTests: XCTestCase {
         )
         XCTAssertEqual(resetStreak.streak, 1)
         XCTAssertEqual(resetStreak.bestStreak, 9)
+    }
+
+    func testTopPicksLaunchRecoveryHotKeyAutoTrustSurgeRunHelpersSaturateAtIntMax() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 9_000_000)
+        let todayStamp = CommandPaletteTopPicks.launchRecoveryHotKeyAutoTrustSurgeDayStamp(
+            now: now,
+            calendar: calendar
+        )
+        let weekStamp = CommandPaletteTopPicks.launchRecoveryHotKeyAutoTrustSurgeWeekStamp(
+            now: now,
+            calendar: calendar
+        )
+
+        let sameDayRecorded = CommandPaletteTopPicks.launchRecoveryHotKeyAutoTrustSurgeRecordedRun(
+            dayStamp: todayStamp,
+            storedCount: Int.max,
+            now: now,
+            calendar: calendar
+        )
+        XCTAssertEqual(sameDayRecorded.dayStamp, todayStamp)
+        XCTAssertEqual(sameDayRecorded.runsToday, Int.max)
+
+        let sameWeekRecorded = CommandPaletteTopPicks.launchRecoveryHotKeyAutoTrustSurgeRecordedWeeklyRun(
+            weekStamp: weekStamp,
+            storedCount: Int.max,
+            bestWeekCount: Int.max,
+            now: now,
+            calendar: calendar
+        )
+        XCTAssertEqual(sameWeekRecorded.weekStamp, weekStamp)
+        XCTAssertEqual(sameWeekRecorded.runsThisWeek, Int.max)
+        XCTAssertEqual(sameWeekRecorded.bestWeekCount, Int.max)
     }
 
     func testTopPicksIdleStatePrioritizesOnboardingRecoveryFollowupAction() {
@@ -10801,6 +11148,56 @@ final class CommandPaletteActionTests: XCTestCase {
                 favoritesKey: "commandFavorites"
             ).favoriteActionIDs.isEmpty
         )
+    }
+
+    func testUsageStoreLoadSanitizesPersistedRecordsAndFavorites() throws {
+        let defaults = try makeDefaults()
+        let records = [
+            "read": CommandUsageRecord(useCount: 2, lastUsedAt: Date(timeIntervalSince1970: 100)),
+            " bad id ": CommandUsageRecord(useCount: 8, lastUsedAt: Date(timeIntervalSince1970: 120)),
+            "open": CommandUsageRecord(useCount: 0, lastUsedAt: Date(timeIntervalSince1970: 140))
+        ]
+        defaults.set(try JSONEncoder().encode(records), forKey: "commandUsage")
+        defaults.set(["read", " read selected ", "", "   "], forKey: "commandFavorites")
+
+        let store = CommandUsageStore(
+            defaults: defaults,
+            key: "commandUsage",
+            favoritesKey: "commandFavorites"
+        )
+
+        XCTAssertEqual(Set(store.records.keys), ["read"])
+        XCTAssertEqual(store.records["read"]?.useCount, 2)
+        XCTAssertEqual(store.favoriteActionIDs, ["read"])
+    }
+
+    func testUsageStoreRejectsInvalidActionIDWhenRecordingOrFavoriting() throws {
+        let defaults = try makeDefaults()
+        let store = CommandUsageStore(
+            defaults: defaults,
+            key: "commandUsage",
+            favoritesKey: "commandFavorites"
+        )
+
+        store.recordRun(actionID: "invalid id")
+        store.toggleFavorite(actionID: "invalid id")
+
+        XCTAssertTrue(store.records.isEmpty)
+        XCTAssertTrue(store.favoriteActionIDs.isEmpty)
+    }
+
+    func testUsageStoreRecordRunSaturatesAtIntMax() throws {
+        let defaults = try makeDefaults()
+        let records = [
+            "read": CommandUsageRecord(useCount: Int.max, lastUsedAt: Date(timeIntervalSince1970: 100))
+        ]
+        defaults.set(try JSONEncoder().encode(records), forKey: "commandUsage")
+
+        let store = CommandUsageStore(defaults: defaults, key: "commandUsage")
+        store.recordRun(actionID: "read", at: Date(timeIntervalSince1970: 200))
+
+        XCTAssertEqual(store.records["read"]?.useCount, Int.max)
+        XCTAssertEqual(store.records["read"]?.lastUsedAt, Date(timeIntervalSince1970: 200))
     }
 
     func testCommandPaletteSessionTracksOpens() {
@@ -11126,6 +11523,126 @@ final class CommandPaletteActionTests: XCTestCase {
         )
     }
 
+    func testCommandPaletteSessionLoadSanitizesMalformedRecommendationPairMetrics() throws {
+        let defaults = try makeDefaults()
+        let opportunities: [String: Int] = [
+            "run-fame-exceptional-loop->run-fame-next-move-copy-drafts": 4,
+            " run-fame-exceptional-loop -> run-fame-cadence-autopilot-loop ": 3,
+            "run fame->run-fame-next-move-copy-drafts": 8,
+            "run-fame-next-move-copy-drafts->run-fame-next-move-copy-drafts": 5,
+            "run-fame-exceptional-loop->run-fame-cadence-autopilot-loop->extra": 9
+        ]
+        let conversions: [String: Int] = [
+            "run-fame-exceptional-loop->run-fame-next-move-copy-drafts": 9,
+            "run-fame-exceptional-loop->run-fame-cadence-autopilot-loop": 1,
+            "run fame->run-fame-cadence-autopilot-loop": 2
+        ]
+        let lastConversionOpenCounts: [String: Int] = [
+            "run-fame-exceptional-loop->run-fame-next-move-copy-drafts": 7,
+            "run-fame-exceptional-loop->run-fame-cadence-autopilot-loop": -2,
+            "run-fame-exceptional-loop->run-fame-cadence-autopilot-loop->extra": 4
+        ]
+        defaults.set(
+            try JSONEncoder().encode(opportunities),
+            forKey: AppDefaults.fameRecommendationConversionPairOpportunitiesKey
+        )
+        defaults.set(
+            try JSONEncoder().encode(conversions),
+            forKey: AppDefaults.fameRecommendationConversionPairConversionsKey
+        )
+        defaults.set(
+            try JSONEncoder().encode(lastConversionOpenCounts),
+            forKey: AppDefaults.fameRecommendationConversionPairLastConversionOpenCountKey
+        )
+
+        let session = CommandPaletteSession(defaults: defaults)
+
+        XCTAssertEqual(
+            session.recommendationPairPerformance(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            ),
+            CommandPaletteSession.RecommendationPairPerformance(
+                opportunities: 4,
+                conversions: 4
+            )
+        )
+        XCTAssertEqual(
+            session.recommendationPairPerformance(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            ),
+            CommandPaletteSession.RecommendationPairPerformance(
+                opportunities: 3,
+                conversions: 1
+            )
+        )
+        XCTAssertEqual(
+            session.recommendationPairLastConversionOpenCount(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            ),
+            7
+        )
+        XCTAssertNil(
+            session.recommendationPairLastConversionOpenCount(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertNil(
+            session.recommendationPairPerformance(
+                sourceActionID: "run fame",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            )
+        )
+    }
+
+    func testCommandPaletteSessionRecommendationPairCountersSaturateAtIntMax() throws {
+        let defaults = try makeDefaults()
+        let token = "run-fame-exceptional-loop->run-fame-next-move-copy-drafts"
+        defaults.set(Int.max, forKey: AppDefaults.fameRecommendationConversionOpportunitiesKey)
+        defaults.set(Int.max, forKey: AppDefaults.fameRecommendationConversionCountKey)
+        defaults.set(
+            try JSONEncoder().encode([token: Int.max]),
+            forKey: AppDefaults.fameRecommendationConversionPairOpportunitiesKey
+        )
+        defaults.set(
+            try JSONEncoder().encode([token: Int.max]),
+            forKey: AppDefaults.fameRecommendationConversionPairConversionsKey
+        )
+
+        let session = CommandPaletteSession(defaults: defaults)
+        session.beginOpen()
+
+        XCTAssertTrue(session.recordRecommendationOpportunity())
+        XCTAssertTrue(
+            session.recordRecommendationOpportunity(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            )
+        )
+        XCTAssertTrue(
+            session.recordRecommendationConversion(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            )
+        )
+
+        XCTAssertEqual(session.recommendationConversionOpportunities, Int.max)
+        XCTAssertEqual(session.recommendationConversionCount, Int.max)
+        XCTAssertEqual(
+            session.recommendationPairPerformance(
+                sourceActionID: "run-fame-exceptional-loop",
+                recommendedActionID: "run-fame-next-move-copy-drafts"
+            ),
+            CommandPaletteSession.RecommendationPairPerformance(
+                opportunities: Int.max,
+                conversions: Int.max
+            )
+        )
+    }
+
     func testCommandPaletteSessionPersistsRecommendationPairLastConversionOpenCount() throws {
         let defaults = try makeDefaults()
         let session = CommandPaletteSession(defaults: defaults)
@@ -11210,6 +11727,57 @@ final class CommandPaletteActionTests: XCTestCase {
         )
         XCTAssertEqual(session.recommendationConversionCount, 0)
         XCTAssertEqual(session.recommendationConversionOpenStreak, 0)
+    }
+
+    func testCommandPaletteSessionRecommendationPairAPIsRejectWhitespaceAndSeparatorIDs() throws {
+        let defaults = try makeDefaults()
+        let session = CommandPaletteSession(defaults: defaults)
+        session.beginOpen()
+
+        XCTAssertFalse(
+            session.recordRecommendationOpportunity(
+                sourceActionID: "run fame",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertFalse(
+            session.recordRecommendationOpportunity(
+                sourceActionID: "run-fame-next-move-copy-drafts->bad",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertFalse(
+            session.recordRecommendationConversion(
+                sourceActionID: "run fame",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertFalse(
+            session.recordRecommendationConversion(
+                sourceActionID: "run-fame-next-move-copy-drafts",
+                recommendedActionID: "run-fame-cadence-autopilot-loop->bad"
+            )
+        )
+        XCTAssertNil(
+            session.recommendationPairPerformance(
+                sourceActionID: "run fame",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertNil(
+            session.recommendationPairLastConversionOpenCount(
+                sourceActionID: "run-fame-next-move-copy-drafts",
+                recommendedActionID: "run-fame-cadence-autopilot-loop->bad"
+            )
+        )
+        XCTAssertNil(
+            session.recommendationPairOpensSinceLastConversion(
+                sourceActionID: "run-fame-next-move-copy-drafts->bad",
+                recommendedActionID: "run-fame-cadence-autopilot-loop"
+            )
+        )
+        XCTAssertEqual(session.recommendationConversionOpportunities, 0)
+        XCTAssertEqual(session.recommendationConversionCount, 0)
     }
 
     func testRecommendationConversionSignalLineFormatsLiveTelemetry() {

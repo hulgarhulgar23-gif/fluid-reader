@@ -12,6 +12,7 @@ enum InlineCalculator {
             title: "Calculate: \(calculation.result)",
             subtitle: "\(calculation.expression) = \(calculation.result)",
             systemImage: "function",
+            sourceKind: .math,
             keywords: [calculation.expression, calculation.result],
             canFavorite: false
         ) {

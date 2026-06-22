@@ -148,6 +148,17 @@ final class ReaderState: ObservableObject {
     @Published private(set) var snippets: [ReaderSnippetItem] = []
     @Published private(set) var pulseID = UUID()
 
+    /// Mirrors the "Save recent items" setting. When false, `remember(...)`
+    /// keeps no history and turning it off purges anything already stored, so
+    /// opting out actually stops reader content from being written to disk.
+    var savesRecentItems = true {
+        didSet {
+            guard !savesRecentItems else { return }
+            recentItems = []
+            defaults.removeObject(forKey: Self.historyKey)
+        }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         recentItems = Self.loadHistory(from: defaults)
@@ -164,6 +175,7 @@ final class ReaderState: ObservableObject {
     }
 
     func remember(text: String, answer: String = "") {
+        guard savesRecentItems else { return }
         guard let item = ReaderHistoryItem.make(text: text, answer: answer) else { return }
 
         let deduped = recentItems.filter {
@@ -204,6 +216,26 @@ final class ReaderState: ObservableObject {
             petSay("History cleared.", mood: .ready)
             pulse()
         }
+    }
+
+    @discardableResult
+    func deleteHistoryItem(_ item: ReaderHistoryItem, announce: Bool = true) -> Bool {
+        let originalCount = recentItems.count
+        recentItems.removeAll { $0.id == item.id }
+        guard recentItems.count != originalCount else { return false }
+
+        if recentItems.isEmpty {
+            defaults.removeObject(forKey: Self.historyKey)
+        } else {
+            saveHistory()
+        }
+
+        if announce {
+            petSay("Deleted recent item.", mood: .ready)
+            pulse()
+        }
+
+        return true
     }
 
     @discardableResult
@@ -353,20 +385,68 @@ final class ReaderState: ObservableObject {
 
     private static func loadHistory(from defaults: UserDefaults) -> [ReaderHistoryItem] {
         guard let data = defaults.data(forKey: historyKey),
-              let items = try? JSONDecoder().decode([ReaderHistoryItem].self, from: data) else {
+              let decodedItems = try? JSONDecoder().decode([ReaderHistoryItem].self, from: data) else {
             return []
         }
 
-        return Array(items.prefix(historyLimit))
+        var sanitizedItems: [ReaderHistoryItem] = []
+        var seenKeys = Set<String>()
+
+        for item in decodedItems {
+            guard let sanitizedItem = ReaderHistoryItem.make(
+                text: item.text,
+                answer: item.answer,
+                createdAt: item.createdAt,
+                id: item.id
+            ) else {
+                continue
+            }
+
+            let dedupeKey = "\(sanitizedItem.text)\u{241F}\(sanitizedItem.answer)"
+            guard seenKeys.insert(dedupeKey).inserted else {
+                continue
+            }
+
+            sanitizedItems.append(sanitizedItem)
+            if sanitizedItems.count >= historyLimit {
+                break
+            }
+        }
+
+        return sanitizedItems
     }
 
     private static func loadSnippets(from defaults: UserDefaults) -> [ReaderSnippetItem] {
         guard let data = defaults.data(forKey: snippetsKey),
-              let items = try? JSONDecoder().decode([ReaderSnippetItem].self, from: data) else {
+              let decodedItems = try? JSONDecoder().decode([ReaderSnippetItem].self, from: data) else {
             return []
         }
 
-        return orderedSnippets(items)
+        var sanitizedItems: [ReaderSnippetItem] = []
+        var indexByText: [String: Int] = [:]
+
+        for item in decodedItems {
+            guard let sanitizedItem = ReaderSnippetItem.make(
+                text: item.text,
+                title: item.customTitle ?? "",
+                id: item.id,
+                isPinned: item.isPinned
+            ) else {
+                continue
+            }
+
+            if let existingIndex = indexByText[sanitizedItem.text] {
+                if sanitizedItem.isPinned, !sanitizedItems[existingIndex].isPinned {
+                    sanitizedItems[existingIndex] = sanitizedItems[existingIndex].withPinned(true)
+                }
+                continue
+            }
+
+            indexByText[sanitizedItem.text] = sanitizedItems.count
+            sanitizedItems.append(sanitizedItem)
+        }
+
+        return orderedSnippets(sanitizedItems)
     }
 
     private static func orderedSnippets(_ items: [ReaderSnippetItem]) -> [ReaderSnippetItem] {

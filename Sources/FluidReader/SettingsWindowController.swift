@@ -11,6 +11,9 @@ final class SettingsWindowController {
 
     init(
         settings: SettingsStore,
+        commandAliasStore: CommandAliasStore,
+        commandHotKeyStore: CommandHotKeyStore,
+        launcherActions: @escaping () -> [CommandPaletteAction],
         testVoice: @escaping () -> Void,
         testEffect: @escaping () -> Void,
         resetCadenceExecutionKitStreak: @escaping () -> Void,
@@ -18,10 +21,18 @@ final class SettingsWindowController {
         resetFameExceptionalLoopOutcomeTuning: @escaping () -> Void,
         runFameExceptionalLoopRecoveryLaneNow: @escaping () -> Void,
         runFameExceptionalLoopHealthRecommendedAction: @escaping () -> Void,
-        openLatestFameExceptionalLoopRecap: @escaping () -> Void
+        openLatestFameExceptionalLoopRecap: @escaping () -> Void,
+        openExtensionsWorkspace: @escaping () -> Void,
+        openScriptCommandsFolder: @escaping () -> Void,
+        refreshLauncherCatalogs: @escaping () -> Void,
+        pickIndexedRoot: @escaping () -> Void,
+        refreshScriptCommands: @escaping () -> Void
     ) {
         let view = SettingsView(
             settings: settings,
+            commandAliasStore: commandAliasStore,
+            commandHotKeyStore: commandHotKeyStore,
+            launcherActions: launcherActions,
             testVoice: testVoice,
             testEffect: testEffect,
             resetCadenceExecutionKitStreak: resetCadenceExecutionKitStreak,
@@ -34,7 +45,12 @@ final class SettingsWindowController {
             runFameExceptionalLoopHealthRecommendedAction:
                 runFameExceptionalLoopHealthRecommendedAction,
             openLatestFameExceptionalLoopRecap:
-                openLatestFameExceptionalLoopRecap
+                openLatestFameExceptionalLoopRecap,
+            openExtensionsWorkspace: openExtensionsWorkspace,
+            openScriptCommandsFolder: openScriptCommandsFolder,
+            refreshLauncherCatalogs: refreshLauncherCatalogs,
+            pickIndexedRoot: pickIndexedRoot,
+            refreshScriptCommands: refreshScriptCommands
         )
         window = NSWindow(
             contentRect: NSRect(origin: .zero, size: Self.preferredContentSize),
@@ -68,6 +84,9 @@ final class SettingsWindowController {
 
 private struct SettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var commandAliasStore: CommandAliasStore
+    @ObservedObject var commandHotKeyStore: CommandHotKeyStore
+    let launcherActions: () -> [CommandPaletteAction]
     let testVoice: () -> Void
     let testEffect: () -> Void
     let resetCadenceExecutionKitStreak: () -> Void
@@ -76,16 +95,208 @@ private struct SettingsView: View {
     let runFameExceptionalLoopRecoveryLaneNow: () -> Void
     let runFameExceptionalLoopHealthRecommendedAction: () -> Void
     let openLatestFameExceptionalLoopRecap: () -> Void
+    let openExtensionsWorkspace: () -> Void
+    let openScriptCommandsFolder: () -> Void
+    let refreshLauncherCatalogs: () -> Void
+    let pickIndexedRoot: () -> Void
+    let refreshScriptCommands: () -> Void
     @State private var cadenceExecutionKitStreak = 0
     @State private var cadenceExecutionKitBestStreak = 0
+    @State private var launcherFilter = LauncherCustomizationFilter.customized
+    @State private var launcherQuery = ""
+    @State private var aiFilter = AIWorkspaceFilter.all
+    @State private var aiQuery = ""
+    @State private var windowFilter = WindowCustomizationFilter.cycle
+    @State private var windowQuery = ""
+
+    // The huge "Fame Ops" growth section is internal tooling, not reader
+    // settings, so it is hidden to keep this window short and focused. Flip to
+    // `true` to bring those controls back.
+    private var showFameOpsSettings: Bool { false }
 
     var body: some View {
         Form {
             Section("App") {
                 LaunchAtLoginRow()
+                Toggle("Show in menu bar", isOn: $settings.showMenuBarItem)
+                Text("Hide the status item if you want Fluid Reader to stay quieter in the background. Commands and launcher hotkeys still work.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Toggle("Keep reader on top", isOn: $settings.readerAlwaysOnTop)
             }
 
+            Section("Launcher") {
+                Text("Customize the unified launcher without changing what it can do. Dedicated shortcuts stay separate, while any command below can get aliases or its own global hotkey.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("Global hotkeys accept symbols like ⌥⌘P or text like cmd+shift+p.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                launcherCustomizationSummaryGrid
+                Text("Dedicated launcher shortcuts")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                ForEach(LauncherHotKeyCatalog.all) { definition in
+                    launcherDedicatedHotKeyRow(definition)
+                }
+                Text("Any command below can also get its own aliases and global hotkey.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Toggle("Compact launcher mode", isOn: $settings.launcherCompactMode)
+                Text("Shrinks the launcher window, rows, footer, and Action Panel without hiding any commands.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                HStack {
+                    Button("Open Extensions Workspace") {
+                        openExtensionsWorkspace()
+                    }
+                    Button("Refresh Apps & Files") {
+                        refreshLauncherCatalogs()
+                    }
+                    Button("Open Script Commands Folder") {
+                        openScriptCommandsFolder()
+                    }
+                    Button("Refresh Script Commands") {
+                        refreshScriptCommands()
+                    }
+                }
+                Text("Drop shell, Python, Node, Ruby, Swift, PHP, or PowerShell scripts into the Script Commands folder. Optional leading comment metadata: @title, @subtitle, @keywords, @icon.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                launcherIndexedRootsEditor
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Command customization")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(launcherCommandListTitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    launcherFilterBar
+
+                    TextField("Find command", text: $launcherQuery)
+
+                    Text("Use filters to focus Platform, AI, Windows, Scripts, or just the commands you already customized.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    if shouldShowLauncherBrowseLimitHint {
+                        Text("Showing the first \(launcherBrowseRowLimit) \(launcherFilter.title.lowercased()) commands. Start typing to narrow further.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if launcherRows.isEmpty {
+                        Text(launcherEmptyStateText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(launcherRows, id: \.id) { action in
+                            launcherAliasRow(action)
+                        }
+                    }
+                }
+            }
+
+            Section("Window") {
+                Text("Tile, cycle, and display commands stay in the same launcher. Tune the active profile, preview the saved cycle, and assign direct hotkeys here without changing the broader command catalog.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                windowCustomizationSummaryGrid
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Active cycle preview")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(activeWindowCycleCommands.count) layouts")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    activeWindowCyclePreview
+
+                    Text("`Window Cycle Layout` rotates through these saved layouts, and profile switches in Commands update this same list.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Picker("Cycle profile", selection: $settings.frontWindowCycleProfile) {
+                    ForEach(FrontWindowCycleProfile.allCases, id: \.rawValue) { profile in
+                        Text(profile.commandTitle).tag(profile.rawValue)
+                    }
+                }
+
+                Picker("Window gap", selection: $settings.frontWindowGapPoints) {
+                    ForEach(AppDefaults.frontWindowGapPointOptions, id: \.self) { points in
+                        Text(points == 0 ? "Off" : "\(points) pt").tag(points)
+                    }
+                }
+
+                if settings.frontWindowCycleProfileValue == .custom {
+                    Text("Custom profile keeps the checked layouts in the built-in cycle order. The same saved set appears in the active cycle preview above.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(FrontWindowLayoutCommand.cycleEligibleCommands, id: \.rawValue) { command in
+                        Toggle(command.shortTitle, isOn: customWindowCommandBinding(command))
+                            .disabled(isOnlyCustomWindowCommand(command))
+                    }
+
+                    Text("\(settings.frontWindowCustomCycleCommands.count) layouts in the saved custom cycle.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(windowCycleProfileSummary)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Window command hotkeys")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(windowCommandListTitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    windowFilterBar
+
+                    TextField("Find window command", text: $windowQuery)
+
+                    Text("Assign direct hotkeys to layouts, cycle helpers, display moves, or profile switches. Use `Settings -> Launcher` if you also want aliases.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    if shouldShowWindowBrowseLimitHint {
+                        Text("Showing the first \(windowBrowseRowLimit) \(windowFilter.title.lowercased()) window commands. Start typing to narrow further.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if windowRows.isEmpty {
+                        Text(windowEmptyStateText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(windowRows, id: \.id) { action in
+                            windowHotKeyRow(action)
+                        }
+                    }
+                }
+            }
+
+            if showFameOpsSettings {
             Section("Fame Ops") {
                 Toggle("Auto-pulse after snapshot", isOn: $settings.fameAutoPulseAfterSnapshot)
                 Toggle("Quiet auto-pulse mode", isOn: $settings.fameAutoPulseQuietMode)
@@ -500,6 +711,7 @@ private struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            }
 
             Section("Reading") {
                 Picker("Voice", selection: $settings.voiceIdentifier) {
@@ -656,6 +868,51 @@ private struct SettingsView: View {
             }
 
             Section("LLM") {
+                Text("Ask Anything handles one-off questions, reusable AI commands stay in the same launcher, and Run Best Local Action can route between those commands and your local scripts from one local-first surface.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                aiWorkspaceSummaryGrid
+                aiHubActionStrip
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("AI command center")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(aiCommandListTitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    aiFilterBar
+
+                    TextField("Find AI command or script", text: $aiQuery)
+
+                    Text("Built-in prompts, saved prompts, and local scripts all stay searchable here so AI feels like one platform instead of separate features.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+
+                    if shouldShowAIBrowseLimitHint {
+                        Text("Showing the first \(aiBrowseRowLimit) \(aiFilter.title.lowercased()) AI items. Start typing to narrow further.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if aiRows.isEmpty {
+                        Text(aiEmptyStateText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(aiRows, id: \.id) { action in
+                            aiCommandRow(action)
+                        }
+                    }
+                }
+
+                Divider()
+
                 Toggle("Use LLM", isOn: $settings.llmEnabled)
 
                 if settings.llmEnabled {
@@ -690,24 +947,29 @@ private struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                     }
 
-                    Divider()
-
-                    savedPromptFields(
-                        "Saved prompt 1",
-                        title: $settings.customPromptTitle,
-                        prompt: $settings.customPromptText
-                    )
-                    savedPromptFields(
-                        "Saved prompt 2",
-                        title: $settings.customPromptTitle2,
-                        prompt: $settings.customPromptText2
-                    )
-                    savedPromptFields(
-                        "Saved prompt 3",
-                        title: $settings.customPromptTitle3,
-                        prompt: $settings.customPromptText3
-                    )
+                } else {
+                    Text("Turn on LLM and add an API key to run AI commands. Local scripts can still appear in routing and the extension workspace.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
+
+                Divider()
+
+                savedPromptFields(
+                    "Saved prompt 1",
+                    title: $settings.customPromptTitle,
+                    prompt: $settings.customPromptText
+                )
+                savedPromptFields(
+                    "Saved prompt 2",
+                    title: $settings.customPromptTitle2,
+                    prompt: $settings.customPromptText2
+                )
+                savedPromptFields(
+                    "Saved prompt 3",
+                    title: $settings.customPromptTitle3,
+                    prompt: $settings.customPromptText3
+                )
             }
         }
         .formStyle(.grouped)
@@ -716,6 +978,872 @@ private struct SettingsView: View {
         .onAppear {
             refreshCadenceExecutionKitStreak()
         }
+    }
+
+    private var launcherIndexedRootsEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Indexed roots")
+                .font(.callout.weight(.semibold))
+            Text("File search starts with Desktop, Documents, and Downloads, but you can add Home, Applications, or any folder you want the launcher to index.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Button("Add Folder") {
+                    pickIndexedRoot()
+                }
+                Button("Add Home") {
+                    addIndexedRoot(FileManager.default.homeDirectoryForCurrentUser.path)
+                }
+                Button("Add Applications") {
+                    addIndexedRoot("/Applications")
+                }
+                Button("Reset Defaults") {
+                    settings.launcherIndexedRootPaths = LocalFileSearchCatalog.defaultRootPaths()
+                }
+            }
+
+            if settings.launcherIndexedRootPaths.isEmpty {
+                Text("No indexed roots yet. Add a folder or reset defaults.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(settings.launcherIndexedRootPaths, id: \.self) { path in
+                    HStack(spacing: 8) {
+                        Text(LocalFileSearchCatalog.displayRootPath(path))
+                            .font(.caption)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .help(path)
+                        Button("Remove") {
+                            removeIndexedRoot(path)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+            }
+        }
+    }
+
+    private func addIndexedRoot(_ path: String) {
+        settings.launcherIndexedRootPaths = LocalFileSearchCatalog.normalizedRootPaths(
+            settings.launcherIndexedRootPaths + [path]
+        )
+    }
+
+    private func removeIndexedRoot(_ path: String) {
+        settings.launcherIndexedRootPaths = settings.launcherIndexedRootPaths.filter { $0 != path }
+    }
+
+    private var launcherBrowseRowLimit: Int {
+        18
+    }
+
+    private var aiBrowseRowLimit: Int {
+        16
+    }
+
+    private var windowBrowseRowLimit: Int {
+        14
+    }
+
+    private var launcherCustomizationCatalog: LauncherCustomizationCatalog {
+        LauncherCustomizationCatalog(
+            actions: dedupedLauncherActions(),
+            aliasActionIDs: Set(commandAliasStore.aliasedActionIDs),
+            hotKeyActionIDs: Set(commandHotKeyStore.assignedActionIDs),
+            indexedRootCount: settings.launcherIndexedRootPaths.count
+        )
+    }
+
+    private var launcherSummary: LauncherCustomizationSummary {
+        launcherCustomizationCatalog.summary
+    }
+
+    private var launcherRows: [CommandPaletteAction] {
+        launcherCustomizationCatalog.rows(
+            for: launcherFilter,
+            query: launcherQuery,
+            emptyQueryLimit: launcherBrowseRowLimit
+        )
+    }
+
+    private var launcherFilteredCommandCount: Int {
+        launcherCustomizationCatalog.count(for: launcherFilter)
+    }
+
+    private var shouldShowLauncherBrowseLimitHint: Bool {
+        launcherCustomizationCatalog.shouldShowBrowseLimitHint(
+            for: launcherFilter,
+            query: launcherQuery,
+            emptyQueryLimit: launcherBrowseRowLimit
+        )
+    }
+
+    private var launcherCommandListTitle: String {
+        let cleanQuery = launcherQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let noun = launcherFilteredCommandCount == 1 ? "command" : "commands"
+        if cleanQuery.isEmpty {
+            return "\(launcherFilteredCommandCount) \(noun)"
+        }
+        let shownCount = launcherRows.count
+        let shownNoun = shownCount == 1 ? "match" : "matches"
+        return "\(shownCount) \(shownNoun)"
+    }
+
+    private var launcherEmptyStateText: String {
+        let cleanQuery = launcherQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanQuery.isEmpty else {
+            return "No \(launcherFilter.title.lowercased()) commands matched. Try a shorter search or switch filters."
+        }
+        if launcherFilter == .customized, !launcherSummary.hasCustomizedCommands {
+            return "No customized commands yet. Pick Platform, AI, Windows, Scripts, or All to add aliases or hotkeys."
+        }
+        return "No \(launcherFilter.title.lowercased()) commands are available in this view yet."
+    }
+
+    private var activeWindowCycleCommands: [FrontWindowLayoutCommand] {
+        switch settings.frontWindowCycleProfileValue {
+        case .custom:
+            return FrontWindowLayoutCommand.normalizedCycleCommands(
+                settings.frontWindowCustomCycleCommands
+            )
+        default:
+            return FrontWindowLayoutCommand.normalizedCycleCommands(
+                settings.frontWindowCycleProfileValue.defaultCommands
+            )
+        }
+    }
+
+    private var windowActions: [CommandPaletteAction] {
+        dedupedLauncherActions().filter { $0.resolvedGroup == .window }
+    }
+
+    private var windowCustomizationCatalog: WindowCustomizationCatalog {
+        WindowCustomizationCatalog(
+            actions: windowActions,
+            hotKeyActionIDs: Set(commandHotKeyStore.assignedActionIDs),
+            activeProfile: settings.frontWindowCycleProfileValue,
+            activeCycleCommands: activeWindowCycleCommands,
+            gapPoints: settings.frontWindowGapPoints
+        )
+    }
+
+    private var windowSummary: WindowCustomizationSummary {
+        windowCustomizationCatalog.summary
+    }
+
+    private var llmReady: Bool {
+        settings.llmEnabled && !settings.openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var aiHubActions: [CommandPaletteAction] {
+        dedupedLauncherActions().filter { AIWorkspaceCatalog.hubActionIDs.contains($0.id) }
+    }
+
+    private var aiWorkspaceCatalog: AIWorkspaceCatalog {
+        AIWorkspaceCatalog(
+            actions: dedupedLauncherActions(),
+            llmReady: llmReady
+        )
+    }
+
+    private var aiSummary: AIWorkspaceSummary {
+        aiWorkspaceCatalog.summary
+    }
+
+    private var aiRows: [CommandPaletteAction] {
+        aiWorkspaceCatalog.rows(
+            for: aiFilter,
+            query: aiQuery,
+            emptyQueryLimit: aiBrowseRowLimit
+        )
+    }
+
+    private var aiFilteredCommandCount: Int {
+        aiWorkspaceCatalog.count(for: aiFilter)
+    }
+
+    private var shouldShowAIBrowseLimitHint: Bool {
+        aiWorkspaceCatalog.shouldShowBrowseLimitHint(
+            for: aiFilter,
+            query: aiQuery,
+            emptyQueryLimit: aiBrowseRowLimit
+        )
+    }
+
+    private var aiCommandListTitle: String {
+        let cleanQuery = aiQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let noun = aiFilteredCommandCount == 1 ? "item" : "items"
+        if cleanQuery.isEmpty {
+            return "\(aiFilteredCommandCount) \(noun)"
+        }
+        let shownCount = aiRows.count
+        let shownNoun = shownCount == 1 ? "match" : "matches"
+        return "\(shownCount) \(shownNoun)"
+    }
+
+    private var aiEmptyStateText: String {
+        let cleanQuery = aiQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanQuery.isEmpty else {
+            return "No \(aiFilter.title.lowercased()) AI items matched. Try a shorter search or switch filters."
+        }
+        switch aiFilter {
+        case .ready:
+            return llmReady
+                ? "No ready AI items yet. Add a local script or save a custom prompt below."
+                : "No ready AI items yet. Turn on LLM or add a local script to light this view up."
+        case .builtIn:
+            return "No built-in AI commands are available in this view yet."
+        case .custom:
+            return "No custom prompts yet. Save one below so Ask and local routing can reuse it."
+        case .scripts:
+            return "No local scripts yet. Drop one into the Script Commands folder or install a starter extension."
+        case .all:
+            return "No AI commands or scripts are available in this view yet."
+        }
+    }
+
+    private var windowRows: [CommandPaletteAction] {
+        windowCustomizationCatalog.rows(
+            for: windowFilter,
+            query: windowQuery,
+            emptyQueryLimit: windowBrowseRowLimit
+        )
+    }
+
+    private var windowFilteredCommandCount: Int {
+        windowCustomizationCatalog.count(for: windowFilter)
+    }
+
+    private var shouldShowWindowBrowseLimitHint: Bool {
+        windowCustomizationCatalog.shouldShowBrowseLimitHint(
+            for: windowFilter,
+            query: windowQuery,
+            emptyQueryLimit: windowBrowseRowLimit
+        )
+    }
+
+    private var windowCommandListTitle: String {
+        let cleanQuery = windowQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let noun = windowFilteredCommandCount == 1 ? "command" : "commands"
+        if cleanQuery.isEmpty {
+            return "\(windowFilteredCommandCount) \(noun)"
+        }
+        let shownCount = windowRows.count
+        let shownNoun = shownCount == 1 ? "match" : "matches"
+        return "\(shownCount) \(shownNoun)"
+    }
+
+    private var windowEmptyStateText: String {
+        let cleanQuery = windowQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanQuery.isEmpty else {
+            return "No \(windowFilter.title.lowercased()) window commands matched. Try a shorter search or switch filters."
+        }
+        if windowFilter == .customized, windowSummary.customizedHotKeyCount == 0 {
+            return "No window hotkeys yet. Pick Cycle, Layouts, Profiles, or All to assign one."
+        }
+        return "No \(windowFilter.title.lowercased()) window commands are available in this view yet."
+    }
+
+    private func dedupedLauncherActions() -> [CommandPaletteAction] {
+        var seen = Set<String>()
+        return launcherActions().filter { action in
+            seen.insert(action.id).inserted
+        }
+    }
+
+    private var windowCycleProfileSummary: String {
+        let customCommands = settings.frontWindowCustomCycleCommands
+        return settings.frontWindowCycleProfileValue.subtitle(customCommands: customCommands)
+    }
+
+    private func customWindowCommandBinding(
+        _ command: FrontWindowLayoutCommand
+    ) -> Binding<Bool> {
+        Binding(
+            get: {
+                settings.frontWindowCustomCycleCommands.contains(command)
+            },
+            set: { isEnabled in
+                var commands = settings.frontWindowCustomCycleCommands
+                if isEnabled {
+                    commands.append(command)
+                } else {
+                    commands.removeAll { $0 == command }
+                }
+                settings.frontWindowCustomCycleCommands = commands
+            }
+        )
+    }
+
+    private func isOnlyCustomWindowCommand(_ command: FrontWindowLayoutCommand) -> Bool {
+        let commands = settings.frontWindowCustomCycleCommands
+        return commands.count == 1 && commands.contains(command)
+    }
+
+    @ViewBuilder
+    private func launcherDedicatedHotKeyRow(_ definition: LauncherHotKeyDefinition) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(definition.title)
+                .font(.callout.weight(.semibold))
+            Text(definition.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            TextField(
+                "global hotkey like cmd+shift+p",
+                text: Binding(
+                    get: {
+                        commandHotKeyStore.shortcutText(for: definition.id)
+                    },
+                    set: { nextValue in
+                        _ = commandHotKeyStore.setShortcutText(actionID: definition.id, shortcutText: nextValue)
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+
+            Text(definition.validationMessage(using: commandHotKeyStore))
+                .font(.caption2)
+                .foregroundStyle(
+                    commandHotKeyStore.shortcutText(for: definition.id).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || (
+                            commandHotKeyStore.parsedShortcut(for: definition.id) != nil
+                                && !commandHotKeyStore.hasConflict(for: definition.id)
+                        )
+                        ? Color.secondary
+                        : .orange
+                )
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var launcherCustomizationSummaryGrid: some View {
+        let summary = launcherSummary
+        return VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(minimum: 120), spacing: 8),
+                    GridItem(.flexible(minimum: 120), spacing: 8)
+                ],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                launcherSummaryCard(
+                    title: "Dedicated shortcuts",
+                    value: summary.customizedShortcutCount,
+                    detail: summary.customizedShortcutCount == 0 ? "Using defaults" : "Customized"
+                )
+                launcherSummaryCard(
+                    title: "Command aliases",
+                    value: summary.aliasedCommandCount,
+                    detail: "Custom search words"
+                )
+                launcherSummaryCard(
+                    title: "Command hotkeys",
+                    value: summary.hotKeyCommandCount,
+                    detail: "Per-command globals"
+                )
+                launcherSummaryCard(
+                    title: "Indexed roots",
+                    value: summary.indexedRootCount,
+                    detail: "Apps and files"
+                )
+            }
+
+            Text("Dedicated launcher shortcuts stay separate above. Commands below still use the same alias and hotkey system across built-in actions, AI, scripts, and windows.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func launcherSummaryCard(
+        title: String,
+        value: String,
+        detail: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(value)
+                .font(.title3.weight(.semibold))
+            Text(title)
+                .font(.caption.weight(.medium))
+            Text(detail)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.42))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func launcherSummaryCard(
+        title: String,
+        value: Int,
+        detail: String
+    ) -> some View {
+        launcherSummaryCard(title: title, value: "\(value)", detail: detail)
+    }
+
+    private var launcherFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(LauncherCustomizationFilter.allCases) { filter in
+                    Button {
+                        launcherFilter = filter
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(filter.title)
+                            Text("\(launcherCustomizationCatalog.count(for: filter))")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(launcherFilter == filter ? Color.accentColor : Color.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            launcherFilter == filter
+                                ? Color.accentColor.opacity(0.14)
+                                : Color(nsColor: .textBackgroundColor).opacity(0.34)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(
+                                    launcherFilter == filter
+                                        ? Color.accentColor.opacity(0.28)
+                                        : Color.secondary.opacity(0.16),
+                                    lineWidth: 1
+                                )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private var aiWorkspaceSummaryGrid: some View {
+        let summary = aiSummary
+        return VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(minimum: 120), spacing: 8),
+                    GridItem(.flexible(minimum: 120), spacing: 8)
+                ],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                launcherSummaryCard(
+                    title: "AI hubs",
+                    value: summary.hubActionCount,
+                    detail: "Ask + route entry points"
+                )
+                launcherSummaryCard(
+                    title: "Built-in prompts",
+                    value: summary.builtInPromptCount,
+                    detail: "Reusable AI commands"
+                )
+                launcherSummaryCard(
+                    title: "Custom prompts",
+                    value: summary.customPromptCount,
+                    detail: "Saved by you"
+                )
+                launcherSummaryCard(
+                    title: "Local scripts",
+                    value: summary.scriptCommandCount,
+                    detail: "Routeable automation"
+                )
+                launcherSummaryCard(
+                    title: "LLM status",
+                    value: summary.llmStatusTitle,
+                    detail: summary.readyActionCount == 0
+                        ? "No ready AI items yet"
+                        : "\(summary.readyActionCount) ready items"
+                )
+            }
+
+            Text("Ask Anything is the freeform surface, reusable prompts are your AI commands, and local scripts are the automation lane that Run Best Local Action can route into.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var aiHubActionStrip: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Quick launch")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            HStack {
+                ForEach(aiHubActions, id: \.id) { action in
+                    Button(action.title) {
+                        action.run()
+                    }
+                }
+                Button("Open Extensions Workspace") {
+                    openExtensionsWorkspace()
+                }
+                Button("Refresh Script Commands") {
+                    refreshScriptCommands()
+                }
+            }
+
+            Text("Use the buttons above for freeform ask, local routing, or extension/script browsing without leaving Settings.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var aiFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(AIWorkspaceFilter.allCases) { filter in
+                    Button {
+                        aiFilter = filter
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(filter.title)
+                            Text("\(aiWorkspaceCatalog.count(for: filter))")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(aiFilter == filter ? Color.accentColor : Color.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            aiFilter == filter
+                                ? Color.accentColor.opacity(0.14)
+                                : Color(nsColor: .textBackgroundColor).opacity(0.34)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(
+                                    aiFilter == filter
+                                        ? Color.accentColor.opacity(0.28)
+                                        : Color.secondary.opacity(0.16),
+                                    lineWidth: 1
+                                )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private var windowCustomizationSummaryGrid: some View {
+        let summary = windowSummary
+        return VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(minimum: 120), spacing: 8),
+                    GridItem(.flexible(minimum: 120), spacing: 8)
+                ],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                launcherSummaryCard(
+                    title: "Active profile",
+                    value: summary.activeProfileTitle,
+                    detail: "Cycle preset"
+                )
+                launcherSummaryCard(
+                    title: "Window gap",
+                    value: summary.gapTitle,
+                    detail: "Shared layout inset"
+                )
+                launcherSummaryCard(
+                    title: "Cycle layouts",
+                    value: summary.activeCycleCommandCount,
+                    detail: "Active rotation"
+                )
+                launcherSummaryCard(
+                    title: "Window hotkeys",
+                    value: summary.customizedHotKeyCount,
+                    detail: "Direct globals"
+                )
+            }
+
+            Text("Window actions below reuse the same global hotkey system as the launcher, but stay grouped here so the layout product feels self-contained.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var activeWindowCyclePreview: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 120), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(activeWindowCycleCommands, id: \.rawValue) { command in
+                HStack(spacing: 6) {
+                    Image(systemName: command.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(command.shortTitle)
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color(nsColor: .textBackgroundColor).opacity(0.42))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
+    private var windowFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(WindowCustomizationFilter.allCases) { filter in
+                    Button {
+                        windowFilter = filter
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(filter.title)
+                            Text("\(windowCustomizationCatalog.count(for: filter))")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(windowFilter == filter ? Color.accentColor : Color.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            windowFilter == filter
+                                ? Color.accentColor.opacity(0.14)
+                                : Color(nsColor: .textBackgroundColor).opacity(0.34)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(
+                                    windowFilter == filter
+                                        ? Color.accentColor.opacity(0.28)
+                                        : Color.secondary.opacity(0.16),
+                                    lineWidth: 1
+                                )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    @ViewBuilder
+    private func aiCommandRow(_ action: CommandPaletteAction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(action.title)
+                    .font(.callout.weight(.semibold))
+
+                Spacer()
+
+                Button(action.sourceKind == .script ? "Run" : "Use") {
+                    action.run()
+                }
+                .controlSize(.small)
+                .disabled(!action.isEnabled)
+            }
+
+            if !aiMetadataTitles(for: action).isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(aiMetadataTitles(for: action), id: \.self) { title in
+                        Text(title)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color(nsColor: .textBackgroundColor).opacity(0.52))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+
+            Text(action.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            if !action.isEnabled {
+                Text(action.disabledReason)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+
+            if !action.secondaryActions.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(Array(action.secondaryActions.prefix(2)), id: \.id) { secondaryAction in
+                        Button(secondaryAction.title) {
+                            secondaryAction.run()
+                        }
+                        .controlSize(.small)
+                        .disabled(!secondaryAction.isEnabled)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func launcherAliasRow(_ action: CommandPaletteAction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(action.title)
+                .font(.callout.weight(.semibold))
+            if !launcherMetadataTitles(for: action).isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(launcherMetadataTitles(for: action), id: \.self) { title in
+                        Text(title)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color(nsColor: .textBackgroundColor).opacity(0.52))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            Text(action.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            TextField(
+                "aliases, comma separated",
+                text: Binding(
+                    get: {
+                        commandAliasStore.aliasText(for: action.id)
+                    },
+                    set: { nextValue in
+                        _ = commandAliasStore.setAliases(actionID: action.id, aliasText: nextValue)
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+
+            TextField(
+                "global hotkey like cmd+shift+p",
+                text: Binding(
+                    get: {
+                        commandHotKeyStore.shortcutText(for: action.id)
+                    },
+                    set: { nextValue in
+                        _ = commandHotKeyStore.setShortcutText(actionID: action.id, shortcutText: nextValue)
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+
+            if let validationMessage = commandHotKeyStore.validationMessage(for: action.id) {
+                Text(validationMessage)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        commandHotKeyStore.parsedShortcut(for: action.id) == nil
+                            || commandHotKeyStore.hasConflict(for: action.id)
+                            ? Color.orange
+                            : .secondary
+                    )
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func windowHotKeyRow(_ action: CommandPaletteAction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(action.title)
+                .font(.callout.weight(.semibold))
+            if !windowMetadataTitles(for: action).isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(windowMetadataTitles(for: action), id: \.self) { title in
+                        Text(title)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color(nsColor: .textBackgroundColor).opacity(0.52))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            Text(action.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            TextField(
+                "global hotkey like cmd+shift+p",
+                text: Binding(
+                    get: {
+                        commandHotKeyStore.shortcutText(for: action.id)
+                    },
+                    set: { nextValue in
+                        _ = commandHotKeyStore.setShortcutText(actionID: action.id, shortcutText: nextValue)
+                    }
+                )
+            )
+            .textFieldStyle(.roundedBorder)
+
+            if let validationMessage = commandHotKeyStore.validationMessage(for: action.id) {
+                Text(validationMessage)
+                    .font(.caption2)
+                    .foregroundStyle(
+                        commandHotKeyStore.parsedShortcut(for: action.id) == nil
+                            || commandHotKeyStore.hasConflict(for: action.id)
+                            ? Color.orange
+                            : .secondary
+                    )
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func launcherMetadataTitles(for action: CommandPaletteAction) -> [String] {
+        var titles: [String] = []
+        if !commandAliasStore.aliases(for: action.id).isEmpty {
+            titles.append("Alias")
+        }
+        if !commandHotKeyStore.shortcutText(for: action.id).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            titles.append("Hotkey")
+        }
+        if action.sourceKind == .script {
+            titles.append("Script")
+        } else if action.resolvedGroup == .ask {
+            titles.append("AI")
+        } else if action.resolvedGroup == .window {
+            titles.append("Window")
+        }
+        return titles
+    }
+
+    private func aiMetadataTitles(for action: CommandPaletteAction) -> [String] {
+        aiWorkspaceCatalog.metadataTitles(for: action)
+    }
+
+    private func windowMetadataTitles(for action: CommandPaletteAction) -> [String] {
+        var titles: [String] = []
+        if !commandHotKeyStore.shortcutText(for: action.id).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            titles.append("Hotkey")
+        }
+        if windowCustomizationCatalog.isActiveProfileAction(action.id) {
+            titles.append("Active Profile")
+        } else if windowCustomizationCatalog.isProfileAction(action.id) {
+            titles.append("Profile")
+        }
+        if windowCustomizationCatalog.isActiveCycleAction(action.id) {
+            titles.append("In Cycle")
+        } else if windowCustomizationCatalog.isLayoutAction(action.id) {
+            titles.append("Layout")
+        } else if action.id == FrontWindowLayoutCommand.moveToNextDisplay.actionID
+            || action.id == FrontWindowLayoutCommand.moveToPreviousDisplay.actionID {
+            titles.append("Display")
+        } else if windowCustomizationCatalog.isCycleUtilityAction(action.id) {
+            titles.append("Cycle")
+        }
+        return titles
     }
 
     private func savedPromptFields(
@@ -1558,7 +2686,9 @@ private struct LaunchAtLoginRow: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Open at login", isOn: Binding(
                 get: { state.isEnabled },
-                set: setOpenAtLogin
+                set: { isEnabled in
+                    setOpenAtLogin(isEnabled)
+                }
             ))
             .disabled(!state.canToggle)
 

@@ -93,9 +93,32 @@ final class ClipboardHistoryStore: ObservableObject {
 
     private static func loadItems(from defaults: UserDefaults, storageKey: String) -> [ClipboardHistoryItem] {
         guard let data = defaults.data(forKey: storageKey),
-              let items = try? JSONDecoder().decode([ClipboardHistoryItem].self, from: data) else {
+              let decodedItems = try? JSONDecoder().decode([ClipboardHistoryItem].self, from: data) else {
             return []
         }
-        return Array(items.prefix(itemLimit))
+
+        var sanitizedItems: [ClipboardHistoryItem] = []
+        var seenTexts = Set<String>()
+
+        for item in decodedItems {
+            guard let sanitizedItem = ClipboardHistoryItem.make(
+                text: item.text,
+                createdAt: item.createdAt,
+                id: item.id
+            ) else {
+                continue
+            }
+
+            guard seenTexts.insert(sanitizedItem.text).inserted else {
+                continue
+            }
+
+            sanitizedItems.append(sanitizedItem)
+            if sanitizedItems.count >= itemLimit {
+                break
+            }
+        }
+
+        return sanitizedItems
     }
 }

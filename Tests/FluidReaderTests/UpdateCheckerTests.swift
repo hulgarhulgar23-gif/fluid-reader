@@ -60,6 +60,42 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
             from: Data(#"{"tag_name": "v0.2.0", "html_url": "http://insecure.example.com"}"#.utf8)
         ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://example.com/hulgarhulgar23-gif/fluid-reader/releases/tag/v0.2.0"}"#
+                    .utf8
+            )
+        ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://github.com/hulgarhulgar23-gif/fluid-reader/releases-malicious"}"#
+                    .utf8
+            )
+        ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://user:pass@github.com/hulgarhulgar23-gif/fluid-reader/releases/tag/v0.2.0"}"#
+                    .utf8
+            )
+        ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://github.com/hulgarhulgar23-gif/fluid-reader/releases/../issues"}"#
+                    .utf8
+            )
+        ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://github.com/hulgarhulgar23-gif/fluid-reader/releases/%2E%2E/issues"}"#
+                    .utf8
+            )
+        ))
+        XCTAssertThrowsError(try UpdateChecker.parseLatestRelease(
+            from: Data(
+                #"{"tag_name": "v0.2.0", "html_url": "https://github.com/hulgarhulgar23-gif/fluid-reader/releases/%2e%2e%5cissues"}"#
+                    .utf8
+            )
+        ))
     }
 
     func testReleaseURLsPointAtSubmissionRepository() {

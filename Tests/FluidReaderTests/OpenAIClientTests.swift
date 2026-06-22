@@ -27,6 +27,86 @@ final class OpenAIClientTests: XCTestCase {
         XCTAssertEqual(url.absoluteString, AppDefaults.openAICompatibleChatEndpoint)
     }
 
+    func testRequestURLRejectsRelativeOrUnsupportedEndpoints() {
+        XCTAssertThrowsError(
+            try OpenAIClient.requestURL(
+                provider: "openAICompatibleChat",
+                endpoint: "v1/chat/completions"
+            )
+        ) { error in
+            guard case OpenAIError.badURL = error else {
+                XCTFail("Expected bad URL error for relative endpoint.")
+                return
+            }
+        }
+
+        XCTAssertThrowsError(
+            try OpenAIClient.requestURL(
+                provider: "openAICompatibleChat",
+                endpoint: "file:///tmp/mock-server"
+            )
+        ) { error in
+            guard case OpenAIError.badURL = error else {
+                XCTFail("Expected bad URL error for unsupported scheme.")
+                return
+            }
+        }
+    }
+
+    func testRequestURLRejectsCredentialEndpoints() {
+        XCTAssertThrowsError(
+            try OpenAIClient.requestURL(
+                provider: "openAICompatibleChat",
+                endpoint: "https://user:pass@example.com/v1/chat/completions"
+            )
+        ) { error in
+            guard case OpenAIError.badURL = error else {
+                XCTFail("Expected bad URL error for credential endpoint.")
+                return
+            }
+        }
+
+        XCTAssertThrowsError(
+            try OpenAIClient.requestURL(
+                provider: "openAICompatibleChat",
+                endpoint: "https://trusted.example.com@evil.example/v1/chat/completions"
+            )
+        ) { error in
+            guard case OpenAIError.badURL = error else {
+                XCTFail("Expected bad URL error for spoofed credential endpoint.")
+                return
+            }
+        }
+    }
+
+    func testRequestURLAllowsLoopbackHTTPForCompatibleChat() throws {
+        let localhostURL = try OpenAIClient.requestURL(
+            provider: "openAICompatibleChat",
+            endpoint: "http://localhost:11434/v1/chat/completions"
+        )
+        XCTAssertEqual(localhostURL.absoluteString, "http://localhost:11434/v1/chat/completions")
+
+        let loopbackURL = try OpenAIClient.requestURL(
+            provider: "openAICompatibleChat",
+            endpoint: "http://127.0.0.1:8080/v1/chat/completions"
+        )
+        XCTAssertEqual(loopbackURL.absoluteString, "http://127.0.0.1:8080/v1/chat/completions")
+    }
+
+    func testRequestURLRejectsNonLoopbackHTTPForCompatibleChat() {
+        XCTAssertThrowsError(
+            try OpenAIClient.requestURL(
+                provider: "openAICompatibleChat",
+                endpoint: "http://example.com/v1/chat/completions"
+            )
+        ) { error in
+            guard case OpenAIError.badURL = error else {
+                XCTFail("Expected bad URL error for non-loopback HTTP endpoint.")
+                return
+            }
+        }
+    }
+
     func testAskBodyUsesDefaultModelAndAddsImage() throws {
         let data = try OpenAIClient.makeAskBody(
             question: "What is this?",

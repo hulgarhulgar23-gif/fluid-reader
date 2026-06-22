@@ -18,6 +18,7 @@ enum LocalFilePath {
                 title: "Open Path: \(preview)",
                 subtitle: url.path,
                 systemImage: "folder",
+                sourceKind: .path,
                 keywords: ["open", "file", "folder", "path", "finder", query],
                 canFavorite: false
             ) {
@@ -28,6 +29,7 @@ enum LocalFilePath {
                 title: "Reveal Path: \(preview)",
                 subtitle: url.path,
                 systemImage: "folder.badge.questionmark",
+                sourceKind: .path,
                 keywords: ["reveal", "show", "file", "folder", "path", "finder", query],
                 canFavorite: false
             ) {

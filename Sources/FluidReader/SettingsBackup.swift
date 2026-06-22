@@ -15,6 +15,12 @@ struct SettingsBackup: Codable, Equatable {
     let saveRecentItems: Bool
     let saveClipboardHistory: Bool
     let readerAlwaysOnTop: Bool
+    let showMenuBarItem: Bool
+    let launcherCompactMode: Bool
+    let launcherIndexedRootPaths: [String]
+    let frontWindowGapPoints: Int
+    let frontWindowCycleProfile: String
+    let frontWindowCustomCycleCommandIDs: [String]
     let fameAutoPulseAfterSnapshot: Bool
     let fameAutoPulseQuietMode: Bool
     let fameMorningBriefOnLaunch: Bool
@@ -33,6 +39,11 @@ struct SettingsBackup: Codable, Equatable {
     let fameLaunchRecoveryHotKeyAutoCoachCooldownMinutes: Int
     let fameLaunchRecoveryHotKeyAutoRescueEnabled: Bool
     let fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes: Int
+    let fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled: Bool
+    let fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes: Int
+    let fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap: Int
+    let fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens: Int
+    let fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled: Bool
     let fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled: Bool
     let fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes: Int
     let fameRecommendationMomentumRescueHallOfFameLegendRiskStickyPromotionOpens: Int
@@ -64,9 +75,15 @@ struct SettingsBackup: Codable, Equatable {
     let customPromptText2: String
     let customPromptTitle3: String
     let customPromptText3: String
+    let commandAliasEntries: [String: [String]]
+    let commandHotKeyEntries: [String: String]
 
     @MainActor
-    static func make(settings: SettingsStore) -> SettingsBackup {
+    static func make(
+        settings: SettingsStore,
+        commandAliasStore: CommandAliasStore? = nil,
+        commandHotKeyStore: CommandHotKeyStore? = nil
+    ) -> SettingsBackup {
         SettingsBackup(
             version: currentVersion,
             voiceIdentifier: settings.voiceIdentifier,
@@ -80,6 +97,12 @@ struct SettingsBackup: Codable, Equatable {
             saveRecentItems: settings.saveRecentItems,
             saveClipboardHistory: settings.saveClipboardHistory,
             readerAlwaysOnTop: settings.readerAlwaysOnTop,
+            showMenuBarItem: settings.showMenuBarItem,
+            launcherCompactMode: settings.launcherCompactMode,
+            launcherIndexedRootPaths: settings.launcherIndexedRootPaths,
+            frontWindowGapPoints: settings.frontWindowGapPoints,
+            frontWindowCycleProfile: settings.frontWindowCycleProfile,
+            frontWindowCustomCycleCommandIDs: settings.frontWindowCustomCycleCommandIDs,
             fameAutoPulseAfterSnapshot: settings.fameAutoPulseAfterSnapshot,
             fameAutoPulseQuietMode: settings.fameAutoPulseQuietMode,
             fameMorningBriefOnLaunch: settings.fameMorningBriefOnLaunch,
@@ -103,6 +126,15 @@ struct SettingsBackup: Codable, Equatable {
             fameLaunchRecoveryHotKeyAutoRescueEnabled: settings.fameLaunchRecoveryHotKeyAutoRescueEnabled,
             fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes:
                 settings.fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled: settings.fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes:
+                settings.fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap:
+                settings.fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap,
+            fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens:
+                settings.fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens,
+            fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled:
+                settings.fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled,
             fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled:
                 settings.fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled,
             fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes:
@@ -138,7 +170,9 @@ struct SettingsBackup: Codable, Equatable {
             customPromptTitle2: settings.customPromptTitle2,
             customPromptText2: settings.customPromptText2,
             customPromptTitle3: settings.customPromptTitle3,
-            customPromptText3: settings.customPromptText3
+            customPromptText3: settings.customPromptText3,
+            commandAliasEntries: commandAliasStore?.backupEntries() ?? [:],
+            commandHotKeyEntries: commandHotKeyStore?.backupEntries() ?? [:]
         )
     }
 
@@ -167,7 +201,11 @@ struct SettingsBackup: Codable, Equatable {
     }
 
     @MainActor
-    func apply(to settings: SettingsStore) {
+    func apply(
+        to settings: SettingsStore,
+        commandAliasStore: CommandAliasStore? = nil,
+        commandHotKeyStore: CommandHotKeyStore? = nil
+    ) {
         settings.voiceIdentifier = clean(voiceIdentifier, fallback: settings.voiceIdentifier)
         settings.speechRate = clamp(speechRate, to: 0.30...0.65)
         settings.speechPitch = clamp(speechPitch, to: 0.80...1.25)
@@ -179,6 +217,16 @@ struct SettingsBackup: Codable, Equatable {
         settings.saveRecentItems = saveRecentItems
         settings.saveClipboardHistory = saveClipboardHistory
         settings.readerAlwaysOnTop = readerAlwaysOnTop
+        settings.showMenuBarItem = showMenuBarItem
+        settings.launcherCompactMode = launcherCompactMode
+        settings.launcherIndexedRootPaths = LocalFileSearchCatalog.normalizedRootPaths(
+            launcherIndexedRootPaths
+        )
+        settings.frontWindowGapPoints = AppDefaults.normalizedFrontWindowGapPoints(frontWindowGapPoints)
+        settings.frontWindowCycleProfile =
+            FrontWindowManager.normalizedCycleProfileRawValue(frontWindowCycleProfile)
+        settings.frontWindowCustomCycleCommandIDs =
+            FrontWindowManager.normalizedCustomCycleCommandRawValues(frontWindowCustomCycleCommandIDs)
         settings.fameAutoPulseAfterSnapshot = fameAutoPulseAfterSnapshot
         settings.fameAutoPulseQuietMode = fameAutoPulseQuietMode
         settings.fameMorningBriefOnLaunch = fameMorningBriefOnLaunch
@@ -223,6 +271,21 @@ struct SettingsBackup: Codable, Equatable {
             AppDefaults.normalizedFameLaunchRecoveryHotKeyAutoRescueCooldownMinutes(
                 fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes
             )
+        settings.fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled = fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled
+        settings.fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes(
+                fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes
+            )
+        settings.fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap(
+                fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap
+            )
+        settings.fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens(
+                fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens
+            )
+        settings.fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled =
+            fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled
         settings.fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled =
             fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled
         settings.fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes =
@@ -273,6 +336,8 @@ struct SettingsBackup: Codable, Equatable {
         settings.customPromptText2 = customPromptText2.trimmingCharacters(in: .whitespacesAndNewlines)
         settings.customPromptTitle3 = customPromptTitle3.trimmingCharacters(in: .whitespacesAndNewlines)
         settings.customPromptText3 = customPromptText3.trimmingCharacters(in: .whitespacesAndNewlines)
+        commandAliasStore?.restoreEntries(commandAliasEntries)
+        commandHotKeyStore?.restoreEntries(commandHotKeyEntries)
     }
 
     private func clean(_ value: String, fallback: String) -> String {
@@ -299,6 +364,12 @@ extension SettingsBackup {
         case saveRecentItems
         case saveClipboardHistory
         case readerAlwaysOnTop
+        case showMenuBarItem
+        case launcherCompactMode
+        case launcherIndexedRootPaths
+        case frontWindowGapPoints
+        case frontWindowCycleProfile
+        case frontWindowCustomCycleCommandIDs
         case fameAutoPulseAfterSnapshot
         case fameAutoPulseQuietMode
         case fameMorningBriefOnLaunch
@@ -317,6 +388,11 @@ extension SettingsBackup {
         case fameLaunchRecoveryHotKeyAutoCoachCooldownMinutes
         case fameLaunchRecoveryHotKeyAutoRescueEnabled
         case fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes
+        case fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled
+        case fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes
+        case fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap
+        case fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens
+        case fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled
         case fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled
         case fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes
         case fameRecommendationMomentumRescueHallOfFameLegendRiskStickyPromotionOpens
@@ -348,6 +424,8 @@ extension SettingsBackup {
         case customPromptText2
         case customPromptTitle3
         case customPromptText3
+        case commandAliasEntries
+        case commandHotKeyEntries
     }
 
     init(from decoder: Decoder) throws {
@@ -368,6 +446,26 @@ extension SettingsBackup {
         saveClipboardHistory = try container.decodeIfPresent(Bool.self, forKey: .saveClipboardHistory)
             ?? AppDefaults.saveClipboardHistory
         readerAlwaysOnTop = try container.decode(Bool.self, forKey: .readerAlwaysOnTop)
+        showMenuBarItem = try container.decodeIfPresent(Bool.self, forKey: .showMenuBarItem)
+            ?? AppDefaults.showMenuBarItem
+        launcherCompactMode = try container.decodeIfPresent(Bool.self, forKey: .launcherCompactMode)
+            ?? AppDefaults.launcherCompactMode
+        launcherIndexedRootPaths = LocalFileSearchCatalog.normalizedRootPaths(
+            try container.decodeIfPresent([String].self, forKey: .launcherIndexedRootPaths)
+                ?? LocalFileSearchCatalog.defaultRootPaths()
+        )
+        frontWindowGapPoints = AppDefaults.normalizedFrontWindowGapPoints(
+            try container.decodeIfPresent(Int.self, forKey: .frontWindowGapPoints)
+                ?? AppDefaults.frontWindowGapPoints
+        )
+        frontWindowCycleProfile = FrontWindowManager.normalizedCycleProfileRawValue(
+            try container.decodeIfPresent(String.self, forKey: .frontWindowCycleProfile)
+                ?? AppDefaults.frontWindowCycleProfile
+        )
+        frontWindowCustomCycleCommandIDs = FrontWindowManager.normalizedCustomCycleCommandRawValues(
+            try container.decodeIfPresent([String].self, forKey: .frontWindowCustomCycleCommandIDs)
+                ?? []
+        )
         fameAutoPulseAfterSnapshot = try container.decodeIfPresent(
             Bool.self,
             forKey: .fameAutoPulseAfterSnapshot
@@ -458,6 +556,35 @@ extension SettingsBackup {
                     forKey: .fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes
                 ) ?? AppDefaults.fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes
             )
+        fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled
+        ) ?? AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled
+        fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes(
+                try container.decodeIfPresent(
+                    Int.self,
+                    forKey: .fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes
+                ) ?? AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes
+            )
+        fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap(
+                try container.decodeIfPresent(
+                    Int.self,
+                    forKey: .fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap
+                ) ?? AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap
+            )
+        fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens =
+            AppDefaults.normalizedFameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens(
+                try container.decodeIfPresent(
+                    Int.self,
+                    forKey: .fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens
+                ) ?? AppDefaults.fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens
+            )
+        fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled
+        ) ?? AppDefaults.fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled
         fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled
@@ -532,5 +659,13 @@ extension SettingsBackup {
         customPromptText2 = try container.decode(String.self, forKey: .customPromptText2)
         customPromptTitle3 = try container.decode(String.self, forKey: .customPromptTitle3)
         customPromptText3 = try container.decode(String.self, forKey: .customPromptText3)
+        commandAliasEntries = try container.decodeIfPresent(
+            [String: [String]].self,
+            forKey: .commandAliasEntries
+        ) ?? [:]
+        commandHotKeyEntries = try container.decodeIfPresent(
+            [String: String].self,
+            forKey: .commandHotKeyEntries
+        ) ?? [:]
     }
 }

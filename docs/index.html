@@ -3,181 +3,449 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fluid Reader — local-first screen reader for macOS</title>
-  <meta name="description" content="Fluid Reader is a small macOS menu-bar app. Draw around any screen content to OCR and read it aloud. Local-first: on-device OCR, macOS voices, no account, no background network.">
+  <title>Fluid Reader — a local-first launcher for reading, notes, scripts, and window control</title>
+  <meta name="description" content="Fluid Reader is a local-first macOS launcher. Search apps, files, notes, AI commands, scripts, and window actions from one bar, then use OCR and read-aloud when screen content is hard to copy.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://hulgarhulgar23-gif.github.io/fluid-reader/">
   <meta property="og:title" content="Fluid Reader">
-  <meta property="og:description" content="Draw around any screen content to read it. Local-first macOS menu-bar app.">
+  <meta property="og:description" content="A local-first macOS launcher for apps, files, notes, scripts, window actions, and OCR-powered reading.">
   <meta property="og:image" content="https://hulgarhulgar23-gif.github.io/fluid-reader/assets/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fluid Reader">
+  <meta name="twitter:description" content="A local-first macOS launcher for apps, files, notes, scripts, window actions, and OCR-powered reading.">
+  <meta name="twitter:image" content="https://hulgarhulgar23-gif.github.io/fluid-reader/assets/icon-512.png">
   <link rel="icon" type="image/png" href="assets/icon-256.png">
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #141b33;
-      --panel-2: #182142;
-      --text: #e8ecf8;
-      --muted: #9aa6c8;
-      --accent: #38b2cc;
-      --accent-2: #ffc457;
-      --radius: 14px;
+      --paper: #fbfaf7;
+      --paper-2: #f3f1ea;
+      --ink: #182230;
+      --ink-soft: #51606f;
+      --line: #e4e0d5;
+      --blue: #2a6f9e;
+      --blue-deep: #1c4f74;
+      --teal: #1d8fa8;
+      --amber: #f0a32e;
+      --amber-soft: #fdeed2;
+      --radius: 16px;
+      --display: ui-serif, "New York", Georgia, "Times New Roman", serif;
+      --body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-      line-height: 1.6;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--body);
+      line-height: 1.65;
       -webkit-font-smoothing: antialiased;
+      font-size: 16.5px;
     }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
-    header { padding: 88px 0 56px; text-align: center; }
-    header img { width: 128px; height: 128px; }
-    h1 { font-size: 44px; font-weight: 700; letter-spacing: -0.02em; margin-top: 20px; }
-    .tagline { font-size: 20px; color: var(--muted); max-width: 620px; margin: 12px auto 0; }
-    .kbd {
-      font-family: ui-monospace, "SF Mono", Menlo, monospace;
-      background: var(--panel-2);
-      border: 1px solid #2a355e;
-      border-bottom-width: 2px;
-      border-radius: 6px;
-      padding: 1px 7px;
-      font-size: 0.9em;
+    .wrap { max-width: 1020px; margin: 0 auto; padding: 0 28px; }
+
+    /* ---- top bar ---- */
+    .top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 22px 0;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; text-decoration: none; color: var(--ink); }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; }
+    .top nav { display: flex; gap: 26px; font-size: 15px; }
+    .top nav a { color: var(--ink-soft); text-decoration: none; }
+    .top nav a:hover { color: var(--ink); }
+
+    /* ---- hero ---- */
+    header.hero { padding: 72px 0 36px; text-align: center; }
+    h1 {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: clamp(40px, 6.5vw, 64px);
+      line-height: 1.12;
+      letter-spacing: -0.015em;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    /* the amber lasso, echoing the app icon */
+    .lasso {
+      position: relative;
       white-space: nowrap;
+      padding: 0 0.12em 0 0.14em;
     }
-    .cta { margin-top: 32px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .lasso::before {
+      content: "";
+      position: absolute;
+      inset: 0.02em -0.06em -0.06em -0.1em;
+      border: 3px solid var(--amber);
+      border-radius: 0.45em;
+      pointer-events: none;
+    }
+    .tagline {
+      font-size: 20px;
+      color: var(--ink-soft);
+      max-width: 600px;
+      margin: 22px auto 0;
+    }
+    .cta { margin-top: 34px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     .btn {
       display: inline-block;
-      padding: 13px 26px;
-      border-radius: 10px;
+      padding: 14px 28px;
+      border-radius: 12px;
       font-weight: 600;
       font-size: 16px;
       text-decoration: none;
-      transition: transform 0.1s ease, opacity 0.15s ease;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
     }
-    .btn:hover { transform: translateY(-1px); opacity: 0.92; }
-    .btn-primary { background: linear-gradient(180deg, #3ec3de, #2596c4); color: #07101f; }
-    .btn-secondary { background: var(--panel); color: var(--text); border: 1px solid #2a355e; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: linear-gradient(180deg, var(--blue), var(--blue-deep));
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(28, 79, 116, 0.28);
+    }
+    .btn-primary:hover { box-shadow: 0 5px 18px rgba(28, 79, 116, 0.34); }
+    .btn-secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(24,34,48,0.06); }
     .brew {
-      margin-top: 18px;
-      font-family: ui-monospace, "SF Mono", Menlo, monospace;
-      font-size: 14px;
-      color: var(--muted);
-      background: var(--panel);
-      border: 1px solid #232c52;
-      border-radius: 10px;
-      display: inline-block;
-      padding: 10px 18px;
-      user-select: all;
+      margin-top: 20px;
+      display: inline-flex; align-items: center; gap: 12px;
+      font-family: var(--mono); font-size: 13.5px;
+      color: var(--ink-soft);
+      background: #fff; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px 10px 16px;
+      max-width: 100%;
     }
-    .note { margin-top: 14px; font-size: 13px; color: var(--muted); }
-    section { padding: 48px 0; }
-    h2 { font-size: 26px; margin-bottom: 24px; letter-spacing: -0.01em; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .brew code { user-select: all; overflow-x: auto; white-space: nowrap; min-width: 0; }
+    .brew button {
+      font: 600 12px var(--body);
+      color: var(--blue-deep);
+      background: var(--paper-2);
+      border: 1px solid var(--line); border-radius: 7px;
+      padding: 4px 10px; cursor: pointer; flex-shrink: 0;
+    }
+    .brew button:hover { background: var(--amber-soft); border-color: var(--amber); }
+    .note { margin-top: 14px; font-size: 13.5px; color: var(--ink-soft); }
+
+    /* ---- hero screenshot ---- */
+    .shot-hero { padding: 30px 0 10px; }
+    figure.shot { margin: 0; text-align: center; }
+    figure.shot img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 60px -18px rgba(24, 34, 48, 0.25), 0 4px 14px rgba(24, 34, 48, 0.08);
+    }
+    figure.shot figcaption { margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+
+    /* ---- sections ---- */
+    section { padding: 64px 0; }
+    .eyebrow {
+      font-size: 13px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+      color: var(--teal); margin-bottom: 10px;
+    }
+    h2 {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: clamp(28px, 4vw, 38px);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      margin-bottom: 28px;
+    }
+
+    /* how it works */
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; counter-reset: step; }
+    .step {
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 26px 24px;
+      counter-increment: step;
+    }
+    .step::before {
+      content: counter(step);
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      border: 2px solid var(--amber); border-radius: 10px;
+      font-weight: 700; font-size: 15px; color: var(--ink);
+      margin-bottom: 14px;
+    }
+    .step h3 { font-size: 17px; margin-bottom: 6px; }
+    .step p { color: var(--ink-soft); font-size: 15px; }
+
+    .kbd {
+      font-family: var(--mono);
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 1px 7px;
+      font-size: 0.88em;
+      white-space: nowrap;
+    }
+
+    /* palette split */
+    .split { display: grid; grid-template-columns: 1fr 1.15fr; gap: 44px; align-items: center; }
+    @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+    .split p { color: var(--ink-soft); margin-bottom: 14px; }
+    .split h2 { margin-bottom: 16px; }
+
+    /* features */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; }
     .card {
-      background: var(--panel);
-      border: 1px solid #1f2950;
-      border-radius: var(--radius);
-      padding: 22px;
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 26px 24px;
     }
     .card h3 { font-size: 17px; margin-bottom: 8px; }
-    .card h3 .dot { color: var(--accent-2); margin-right: 6px; }
-    .card p { color: var(--muted); font-size: 15px; }
-    .privacy { background: var(--panel); border: 1px solid #1f2950; border-radius: var(--radius); padding: 28px; }
-    .privacy ul { list-style: none; }
-    .privacy li { padding: 6px 0 6px 28px; position: relative; color: var(--muted); }
-    .privacy li::before { content: "✓"; position: absolute; left: 4px; color: var(--accent); font-weight: 700; }
+    .card p { color: var(--ink-soft); font-size: 15px; }
+
+    /* privacy */
+    .privacy {
+      background: linear-gradient(135deg, #18374e, #145a6b);
+      color: #eef4f6;
+      border-radius: 22px;
+      padding: 48px;
+    }
+    .privacy .eyebrow { color: var(--amber); }
+    .privacy h2 { color: #fff; }
+    .privacy ul { list-style: none; columns: 2; column-gap: 40px; }
+    @media (max-width: 700px) { .privacy ul { columns: 1; } .privacy { padding: 34px 26px; } }
+    .privacy li {
+      break-inside: avoid;
+      padding: 7px 0 7px 30px; position: relative;
+      color: #c8d8de; font-size: 15.5px;
+    }
+    .privacy li::before { content: "✓"; position: absolute; left: 2px; color: var(--amber); font-weight: 700; }
+
+    /* shortcuts + install */
+    .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: start; }
+    @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
     table { width: 100%; border-collapse: collapse; }
-    td { padding: 10px 8px; border-bottom: 1px solid #1f2950; color: var(--muted); }
+    td { padding: 11px 8px; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-size: 15px; }
     td:first-child { white-space: nowrap; width: 1%; padding-right: 24px; }
-    footer { padding: 48px 0 64px; text-align: center; color: var(--muted); font-size: 14px; }
-    footer a { color: var(--accent); text-decoration: none; }
+    ol.install { padding-left: 22px; color: var(--ink-soft); font-size: 15.5px; }
+    ol.install li { padding: 5px 0; }
+    ol.install strong { color: var(--ink); }
+    .install-note {
+      margin-top: 16px; font-size: 14px; color: var(--ink-soft);
+      background: var(--amber-soft); border: 1px solid #f3d9a8; border-radius: 10px;
+      padding: 12px 16px;
+    }
+    a.inline { color: var(--blue); }
+
+    /* footer */
+    footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 44px 0 60px; text-align: center; color: var(--ink-soft); font-size: 14.5px; }
+    footer a { color: var(--blue); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
-    .links { display: flex; gap: 22px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+    .links { display: flex; gap: 24px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <header class="wrap">
-    <img src="assets/icon-256.png" alt="Fluid Reader icon" width="128" height="128">
-    <h1>Fluid Reader</h1>
+  <div class="wrap top">
+    <a class="brand" href="#">
+      <img src="assets/icon-256.png" alt="" width="30" height="30">
+      Fluid Reader
+    </a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader">GitHub</a>
+    </nav>
+  </div>
+
+  <header class="hero wrap">
+    <h1>One local launcher for your <span class="lasso">Mac</span>.<br>Read, ask, note, script, tile.</h1>
     <p class="tagline">
-      Draw around anything on your screen and hear it read aloud.
-      A small, local-first menu-bar app for macOS.
+      Fluid Reader is a local-first menu-bar launcher for macOS. Press
+      <span class="kbd">⌥⇧Space</span> by default to search apps, files, notes, AI commands,
+      scripts, and window actions from one bar — then use <span class="kbd">⌥⇧R</span>
+      by default when screen content needs OCR and read-aloud. Nothing leaves your Mac by default.
     </p>
     <div class="cta">
       <a class="btn btn-primary" href="https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest/download/FluidReader.zip">Download for macOS</a>
       <a class="btn btn-secondary" href="https://github.com/hulgarhulgar23-gif/fluid-reader">View on GitHub</a>
     </div>
-    <div><code class="brew">brew install --cask hulgarhulgar23-gif/fluidreader/fluid-reader</code></div>
+    <div class="brew">
+      <code id="brew-cmd">brew install --cask hulgarhulgar23-gif/fluidreader/fluid-reader</code>
+      <button type="button" onclick="copyBrew(this)">Copy</button>
+    </div>
     <p class="note">macOS 14+ · Apple Silicon · MIT licensed · ~1.4 MB download</p>
   </header>
 
-  <section class="wrap">
-    <h2>What it does</h2>
-    <div class="grid">
-      <div class="card">
-        <h3><span class="dot">●</span>Read anything on screen</h3>
-        <p>Press <span class="kbd">⌥⇧R</span>, draw around any content — a PDF, an image, a video frame — and Fluid Reader OCRs it with Apple Vision and reads it with macOS voices.</p>
+  <div class="wrap shot-hero">
+    <figure class="shot">
+      <img src="assets/shot-reader.png" alt="Fluid Reader's reader window showing OCR'd text from a screen selection, ready to be read aloud" loading="lazy" onerror="shotFailed(this)">
+      <figcaption>Pick &amp; Read stays built in: lasso any region, get the text, hear it spoken.</figcaption>
+    </figure>
+  </div>
+
+  <section id="how" class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>One bar for launch, one hotkey for OCR</h2>
+    <div class="steps">
+      <div class="step">
+        <h3>Press <span class="kbd">⌥⇧Space</span> by default</h3>
+        <p>From anywhere. Search apps, files, notes, quick links, clipboard history, AI commands, scripts, and window actions from one launcher.</p>
       </div>
-      <div class="card">
-        <h3><span class="dot">●</span>Keyboard-first commands</h3>
-        <p>Press <span class="kbd">⌥⇧Space</span> for a command palette: read selection, snippets, clipboard tools, quick conversions, an inline calculator, and more.</p>
+      <div class="step">
+        <h3>Run or refine</h3>
+        <p>Use custom aliases, global hotkeys, Compact Mode, and the Action Panel to turn the same launcher into your personal command surface.</p>
       </div>
-      <div class="card">
-        <h3><span class="dot">●</span>Optional LLM, off by default</h3>
-        <p>Ask questions about selected content with your own API key. The app is fully useful without one — LLM support stays off until you turn it on.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot">●</span>Tiny and native</h3>
-        <p>A single ~3 MB app bundle. No Electron, no account, no telemetry, no background network requests. Updates are checked only when you ask.</p>
+      <div class="step">
+        <h3>Pick when copy fails</h3>
+        <p>Need text from a screenshot, PDF, paused video, or inaccessible app? Press <span class="kbd">⌥⇧R</span> by default and Fluid Reader falls back to on-device OCR and read-aloud.</p>
       </div>
     </div>
   </section>
 
   <section class="wrap">
-    <h2>Private by default</h2>
+    <div class="split">
+      <div>
+        <p class="eyebrow">Command palette</p>
+        <h2>Keyboard-first, for everything else</h2>
+        <p>
+          Press <span class="kbd">⌥⇧Space</span> by default for one root search: launch apps, open
+          indexed files from your configured folders (Desktop, Documents, and Downloads by default), open common folders, restore recent reader items, reuse saved snippets, open saved quick links, and revisit clipboard history while reading the
+          current selection, and run quick unit/date conversions or the inline calculator.
+        </p>
+        <p>
+          Want more? Bring your own API key and ask questions about whatever you've
+          selected. LLM support is <strong>off by default</strong> — the app is fully
+          useful without it.
+        </p>
+        <p>
+          Need the launcher to choose for you? <strong>Run Best Local Action</strong> routes a plain-English request to the best local AI Command or Script Command, and the same flow is available from root search with <strong>route:</strong> or <strong>do:</strong>.
+        </p>
+        <p>
+          The default list stays focused on launcher hubs and the core reader flow, with current-text and answer actions only appearing when they are actually ready, but typing, scoping a category,
+          or adding your own aliases, global hotkeys, and indexed roots in Settings lets you reach the broader command catalog fast.
+        </p>
+        <p>
+          When the launcher is idle, it now also acts like a small launcher home with quick tiles for <strong>Pick and Read</strong>, <strong>Screenshot</strong>, <strong>Ask</strong>, <strong>Route Request</strong>, <strong>Notes</strong>, <strong>Extensions</strong>, <strong>Windows</strong>, and <strong>Setup</strong>, plus compact platform chips for <strong>Reader</strong>, <strong>Refresh Search</strong>, <strong>Hide/Show Menu Bar</strong>, and <strong>Settings</strong>.
+        </p>
+        <p>
+          Press <span class="kbd">⌘K</span> on the selected result to open the Action Panel for contextual launcher actions like reveal, copy path, copy link, or favorite.
+        </p>
+        <p>
+          Prefer a tighter launcher? Turn on <strong>Compact launcher mode</strong> in Settings to shrink the window, rows, footer, and Action Panel without losing any commands.
+        </p>
+        <p>
+          When the launcher is idle, it now also shows a compact root-search summary with live source counts and one-tap scope chips like <strong>app:</strong>, <strong>file:</strong>, <strong>note:</strong>, <strong>clip:</strong>, <strong>route:</strong>, and <strong>tile:</strong> so the one-bar search model stays obvious without extra clutter.
+        </p>
+        <p>
+          Need automation too? Drop shell, Python, Node, Ruby, Swift, PHP, or PowerShell scripts into <strong>~/Library/Application Support/FluidReader/ScriptCommands</strong>. They show up in the same launcher and support the same aliases, global hotkeys, and Action Panel flow as built-in commands.
+        </p>
+        <p>
+          Launcher tuning stays cleaner too: <strong>Settings → Launcher</strong> now shows quick customization counts plus focused filters for customized commands, platform actions, AI, windows, scripts, or the full catalog, so aliases and hotkeys do not feel buried in one giant list.
+        </p>
+        <p>
+          Personal workspace is built in too: saved snippets now double as local notes, and <strong>Open Notes Workspace</strong> gives you one place to search, edit, pin, copy, and reopen them.
+        </p>
+        <p>
+          Notes and extensions stay tidy too: each workspace now shows quick counts and focused filters, so saved notes, AI commands, local scripts, and starter installs feel like a real platform surface rather than one long utility list.
+        </p>
+        <p>
+          Want a local extension surface? <strong>Open Extensions Workspace</strong> groups AI Commands, installable starter extensions, importable local extension packs, and Script Commands into one hub, while <strong>Window Settings</strong> now previews the active cycle, keeps saved layouts and gaps together, and exposes direct window-action hotkeys in the same platform story.
+        </p>
+      </div>
+      <figure class="shot">
+        <img src="assets/shot-palette.png" alt="Fluid Reader's command palette with searchable actions" loading="lazy" onerror="shotFailed(this)">
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <p class="eyebrow">Why it's different</p>
+    <h2>Small, native, honest</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>One launcher, many surfaces</h3>
+        <p>Root search, aliases, hotkeys, Action Panel, notes, scripts, AI commands, quick links, clipboard history, files, and apps all stay in one keyboard-first flow.</p>
+      </div>
+      <div class="card">
+        <h3>OCR when other launchers stop</h3>
+        <p>Scanned PDFs, screenshots, paused videos, and apps with no accessibility support still work because OCR and read-aloud are part of the launcher, not bolted on later.</p>
+      </div>
+      <div class="card">
+        <h3>Tiny and native</h3>
+        <p>A single app bundle of a few megabytes. No Electron, no account, no telemetry. Updates are checked only when you ask.</p>
+      </div>
+      <div class="card">
+        <h3>Local-first by default</h3>
+        <p>Uses the macOS voices and on-device OCR you already have. AI is opt-in with your own key, and support bundles skip private reader content by default.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" class="wrap">
     <div class="privacy">
+      <p class="eyebrow">Private by default</p>
+      <h2>Local-first is the whole point</h2>
       <ul>
         <li>Screen captures never leave your Mac.</li>
         <li>OCR runs on-device with Apple Vision.</li>
         <li>Speech uses the built-in macOS voices.</li>
         <li>No analytics, no account, no auto-networking.</li>
+        <li>LLM features are opt-in and use your own key.</li>
         <li>Support bundles exclude private reader content by default.</li>
-        <li>Open source under the MIT license — audit everything.</li>
       </ul>
     </div>
   </section>
 
-  <section class="wrap">
-    <h2>Shortcuts</h2>
-    <table>
-      <tr><td><span class="kbd">⌥⇧Space</span></td><td>Open Commands palette</td></tr>
-      <tr><td><span class="kbd">⌥⇧R</span></td><td>Pick and Read — draw around screen content</td></tr>
-      <tr><td><span class="kbd">⌥⇧L</span></td><td>Launch Recovery Next (during onboarding recovery)</td></tr>
-      <tr><td><span class="kbd">⌘ ,</span></td><td>Settings (from the menu-bar menu)</td></tr>
-    </table>
-  </section>
-
-  <section class="wrap">
-    <h2>Install</h2>
-    <div class="card">
-      <p>
-        Download <a style="color: var(--accent)" href="https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest">the latest release</a>,
-        unzip, and move <strong>FluidReader.app</strong> to Applications.
-        Current builds are not notarized yet: the first time, right-click the app,
-        choose <strong>Open</strong>, then click <strong>Open</strong> again.
-        Grant Screen Recording and Accessibility permissions when macOS asks.
-      </p>
+  <section id="install" class="wrap">
+    <div class="duo">
+      <div>
+        <p class="eyebrow">Shortcuts</p>
+        <h2>Two keys to remember</h2>
+        <table>
+          <tr><td><span class="kbd">⌥⇧R</span></td><td>Pick and Read by default — draw around screen content</td></tr>
+          <tr><td><span class="kbd">⌥⇧Space</span></td><td>Open the command palette by default</td></tr>
+          <tr><td><span class="kbd">⌘ ,</span></td><td>Settings (from the menu-bar menu)</td></tr>
+        </table>
+      </div>
+      <div>
+        <p class="eyebrow">Install</p>
+        <h2>Up and running in a minute</h2>
+        <ol class="install">
+          <li>Download <a class="inline" href="https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest">the latest release</a> and unzip it.</li>
+          <li>Move <strong>FluidReader.app</strong> to Applications.</li>
+          <li>Grant Screen Recording and Accessibility permissions when macOS asks.</li>
+        </ol>
+        <p class="install-note">
+          Builds aren't notarized yet: the first time, right-click the app and choose
+          <strong>Open</strong>, then click <strong>Open</strong> again.
+        </p>
+      </div>
     </div>
   </section>
 
-  <footer class="wrap">
-    <div class="links">
-      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader">GitHub</a>
-      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/releases">Releases</a>
-      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/docs/POWER_USER_GUIDE.md">Power User Guide</a>
-      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a>
-      <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/issues">Report an Issue</a>
+  <footer>
+    <div class="wrap">
+      <div class="links">
+        <a href="https://github.com/hulgarhulgar23-gif/fluid-reader">GitHub</a>
+        <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/releases">Releases</a>
+        <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/docs/POWER_USER_GUIDE.md">Power User Guide</a>
+        <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/docs/TROUBLESHOOTING.md">Troubleshooting</a>
+        <a href="https://github.com/hulgarhulgar23-gif/fluid-reader/issues">Report an Issue</a>
+      </div>
+      <p>MIT licensed. Built as a small, native, local-first tool.</p>
     </div>
-    <p>MIT licensed. Built as a small, native, local-first tool.</p>
   </footer>
+
+  <script>
+    // Degrade gracefully when a screenshot hasn't been captured yet.
+    function shotFailed(img) {
+      var fig = img.closest('figure');
+      if (!fig) return;
+      var split = fig.closest('.split');
+      var heroWrap = fig.closest('.shot-hero');
+      fig.remove();
+      if (split) split.style.gridTemplateColumns = '1fr';
+      if (heroWrap) heroWrap.style.display = 'none';
+    }
+    function copyBrew(btn) {
+      navigator.clipboard.writeText(document.getElementById('brew-cmd').textContent).then(function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+      });
+    }
+  </script>
 </body>
 </html>

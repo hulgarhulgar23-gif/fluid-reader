@@ -89,7 +89,10 @@ struct QuickLinkItem: Identifiable, Codable, Equatable {
         }
 
         if scheme == "http" || scheme == "https" {
-            guard let host = url.host, !host.isEmpty else { return nil }
+            guard url.user == nil,
+                  url.password == nil,
+                  let host = url.host,
+                  !host.isEmpty else { return nil }
         }
 
         if scheme == "mailto" {
@@ -236,10 +239,35 @@ final class QuickLinkStore: ObservableObject {
 
     private static func loadItems(from defaults: UserDefaults, storageKey: String) -> [QuickLinkItem] {
         guard let data = defaults.data(forKey: storageKey),
-              let items = try? JSONDecoder().decode([QuickLinkItem].self, from: data) else {
+              let decodedItems = try? JSONDecoder().decode([QuickLinkItem].self, from: data) else {
             return []
         }
-        return orderedItems(items)
+
+        var sanitizedItems: [QuickLinkItem] = []
+        var indexByURLString: [String: Int] = [:]
+
+        for item in decodedItems {
+            guard let sanitizedItem = QuickLinkItem.make(
+                urlString: item.urlString,
+                title: item.title,
+                id: item.id,
+                isPinned: item.isPinned
+            ) else {
+                continue
+            }
+
+            if let existingIndex = indexByURLString[sanitizedItem.urlString] {
+                if sanitizedItem.isPinned, !sanitizedItems[existingIndex].isPinned {
+                    sanitizedItems[existingIndex] = sanitizedItems[existingIndex].withPinned(true)
+                }
+                continue
+            }
+
+            indexByURLString[sanitizedItem.urlString] = sanitizedItems.count
+            sanitizedItems.append(sanitizedItem)
+        }
+
+        return orderedItems(sanitizedItems)
     }
 
     private static func orderedItems(_ items: [QuickLinkItem]) -> [QuickLinkItem] {

@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-enum FrontWindowLayoutCommand: String, CaseIterable {
+enum FrontWindowLayoutCommand: String, CaseIterable, Identifiable {
     case leftHalf
     case rightHalf
     case topLeftQuarter
@@ -22,6 +22,26 @@ enum FrontWindowLayoutCommand: String, CaseIterable {
     case undoLastMove
     case moveToNextDisplay
     case moveToPreviousDisplay
+
+    var id: String { rawValue }
+
+    static let cycleEligibleCommands: [FrontWindowLayoutCommand] = [
+        .leftHalf,
+        .rightHalf,
+        .topHalf,
+        .bottomHalf,
+        .topLeftQuarter,
+        .topRightQuarter,
+        .bottomLeftQuarter,
+        .bottomRightQuarter,
+        .leftThird,
+        .centerThird,
+        .rightThird,
+        .leftTwoThirds,
+        .rightTwoThirds,
+        .maximize,
+        .center
+    ]
 
     var activityDetail: String {
         switch self {
@@ -67,6 +87,285 @@ enum FrontWindowLayoutCommand: String, CaseIterable {
             return "previous-display"
         }
     }
+
+    var actionID: String {
+        switch self {
+        case .cycleLayoutBackward:
+            return "window-previous-layout"
+        default:
+            return "window-\(activityDetail)"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .leftHalf:
+            return "Window Left Half"
+        case .rightHalf:
+            return "Window Right Half"
+        case .topLeftQuarter:
+            return "Window Top Left Quarter"
+        case .topRightQuarter:
+            return "Window Top Right Quarter"
+        case .bottomLeftQuarter:
+            return "Window Bottom Left Quarter"
+        case .bottomRightQuarter:
+            return "Window Bottom Right Quarter"
+        case .leftThird:
+            return "Window Left Third"
+        case .centerThird:
+            return "Window Center Third"
+        case .rightThird:
+            return "Window Right Third"
+        case .leftTwoThirds:
+            return "Window Left Two Thirds"
+        case .rightTwoThirds:
+            return "Window Right Two Thirds"
+        case .topHalf:
+            return "Window Top Half"
+        case .bottomHalf:
+            return "Window Bottom Half"
+        case .maximize:
+            return "Window Maximize"
+        case .center:
+            return "Window Center"
+        case .cycleLayout:
+            return "Window Cycle Layout"
+        case .cycleLayoutBackward:
+            return "Window Previous Layout"
+        case .undoLastMove:
+            return "Window Undo Last Move"
+        case .moveToNextDisplay:
+            return "Window Next Display"
+        case .moveToPreviousDisplay:
+            return "Window Previous Display"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .leftHalf:
+            return "Left Half"
+        case .rightHalf:
+            return "Right Half"
+        case .topLeftQuarter:
+            return "Top Left Quarter"
+        case .topRightQuarter:
+            return "Top Right Quarter"
+        case .bottomLeftQuarter:
+            return "Bottom Left Quarter"
+        case .bottomRightQuarter:
+            return "Bottom Right Quarter"
+        case .leftThird:
+            return "Left Third"
+        case .centerThird:
+            return "Center Third"
+        case .rightThird:
+            return "Right Third"
+        case .leftTwoThirds:
+            return "Left Two Thirds"
+        case .rightTwoThirds:
+            return "Right Two Thirds"
+        case .topHalf:
+            return "Top Half"
+        case .bottomHalf:
+            return "Bottom Half"
+        case .maximize:
+            return "Maximize"
+        case .center:
+            return "Center"
+        case .cycleLayout:
+            return "Cycle Layout"
+        case .cycleLayoutBackward:
+            return "Previous Layout"
+        case .undoLastMove:
+            return "Undo Last Move"
+        case .moveToNextDisplay:
+            return "Next Display"
+        case .moveToPreviousDisplay:
+            return "Previous Display"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .leftHalf:
+            return "Move front window to the left half"
+        case .rightHalf:
+            return "Move front window to the right half"
+        case .topLeftQuarter:
+            return "Move front window to the top-left quarter"
+        case .topRightQuarter:
+            return "Move front window to the top-right quarter"
+        case .bottomLeftQuarter:
+            return "Move front window to the bottom-left quarter"
+        case .bottomRightQuarter:
+            return "Move front window to the bottom-right quarter"
+        case .leftThird:
+            return "Move front window to the left third"
+        case .centerThird:
+            return "Move front window to the center third"
+        case .rightThird:
+            return "Move front window to the right third"
+        case .leftTwoThirds:
+            return "Move front window to the left two thirds"
+        case .rightTwoThirds:
+            return "Move front window to the right two thirds"
+        case .topHalf:
+            return "Move front window to the top half"
+        case .bottomHalf:
+            return "Move front window to the bottom half"
+        case .maximize:
+            return "Maximize the front window"
+        case .center:
+            return "Center the front window without changing the app"
+        case .cycleLayout:
+            return "Move front window to the next layout preset"
+        case .cycleLayoutBackward:
+            return "Move front window to the previous layout preset"
+        case .undoLastMove:
+            return "Restore the front window to its previous frame"
+        case .moveToNextDisplay:
+            return "Move front window to the next display"
+        case .moveToPreviousDisplay:
+            return "Move front window to the previous display"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .leftHalf:
+            return "rectangle.lefthalf.filled"
+        case .rightHalf:
+            return "rectangle.righthalf.filled"
+        case .topLeftQuarter, .topRightQuarter, .bottomLeftQuarter, .bottomRightQuarter:
+            return "rectangle.split.2x2"
+        case .leftThird, .centerThird, .rightThird, .leftTwoThirds, .rightTwoThirds:
+            return "rectangle.split.3x1"
+        case .topHalf, .bottomHalf:
+            return "rectangle.split.1x2"
+        case .maximize:
+            return "macwindow.on.rectangle"
+        case .center:
+            return "rectangle.center.inset.filled"
+        case .cycleLayout, .cycleLayoutBackward:
+            return "arrow.triangle.2.circlepath.rectangle"
+        case .undoLastMove:
+            return "arrow.uturn.backward"
+        case .moveToNextDisplay, .moveToPreviousDisplay:
+            return "display.2"
+        }
+    }
+
+    var keywords: [String] {
+        switch self {
+        case .leftHalf:
+            return ["split", "tile", "snap", "left", "half"]
+        case .rightHalf:
+            return ["split", "tile", "snap", "right", "half"]
+        case .topLeftQuarter:
+            return ["quarter", "corner", "top-left", "tile"]
+        case .topRightQuarter:
+            return ["quarter", "corner", "top-right", "tile"]
+        case .bottomLeftQuarter:
+            return ["quarter", "corner", "bottom-left", "tile"]
+        case .bottomRightQuarter:
+            return ["quarter", "corner", "bottom-right", "tile"]
+        case .leftThird:
+            return ["third", "left", "tile"]
+        case .centerThird:
+            return ["middle", "center", "third", "tile"]
+        case .rightThird:
+            return ["third", "right", "tile"]
+        case .leftTwoThirds:
+            return ["two-thirds", "2/3", "wide", "left", "tile"]
+        case .rightTwoThirds:
+            return ["two-thirds", "2/3", "wide", "right", "tile"]
+        case .topHalf:
+            return ["top", "half", "tile"]
+        case .bottomHalf:
+            return ["bottom", "half", "tile"]
+        case .maximize:
+            return ["fullscreen", "fill", "maximize", "zoom"]
+        case .center:
+            return ["center", "middle", "focus"]
+        case .cycleLayout:
+            return ["cycle", "rotate", "next-layout", "layout-loop"]
+        case .cycleLayoutBackward:
+            return ["reverse", "back", "previous-layout"]
+        case .undoLastMove:
+            return ["undo", "restore", "revert", "last-position"]
+        case .moveToNextDisplay:
+            return ["monitor", "screen", "display", "next"]
+        case .moveToPreviousDisplay:
+            return ["monitor", "screen", "display", "previous"]
+        }
+    }
+
+    var successMessage: String {
+        switch self {
+        case .leftHalf:
+            return "Moved window left."
+        case .rightHalf:
+            return "Moved window right."
+        case .topLeftQuarter:
+            return "Moved window to the top-left quarter."
+        case .topRightQuarter:
+            return "Moved window to the top-right quarter."
+        case .bottomLeftQuarter:
+            return "Moved window to the bottom-left quarter."
+        case .bottomRightQuarter:
+            return "Moved window to the bottom-right quarter."
+        case .leftThird:
+            return "Moved window to the left third."
+        case .centerThird:
+            return "Moved window to the center third."
+        case .rightThird:
+            return "Moved window to the right third."
+        case .leftTwoThirds:
+            return "Moved window to the left two thirds."
+        case .rightTwoThirds:
+            return "Moved window to the right two thirds."
+        case .topHalf:
+            return "Moved window to the top half."
+        case .bottomHalf:
+            return "Moved window to the bottom half."
+        case .maximize:
+            return "Maximized window."
+        case .center:
+            return "Centered window."
+        case .cycleLayout:
+            return "Switched to the next window layout."
+        case .cycleLayoutBackward:
+            return "Switched to the previous window layout."
+        case .undoLastMove:
+            return "Restored the last window move."
+        case .moveToNextDisplay:
+            return "Moved window to the next display."
+        case .moveToPreviousDisplay:
+            return "Moved window to the previous display."
+        }
+    }
+
+    static func normalizedCycleCommands(_ commands: [FrontWindowLayoutCommand]) -> [FrontWindowLayoutCommand] {
+        var uniqueCommands: [FrontWindowLayoutCommand] = []
+        for command in commands where cycleEligibleCommands.contains(command) {
+            if !uniqueCommands.contains(command) {
+                uniqueCommands.append(command)
+            }
+        }
+        return uniqueCommands
+    }
+
+    static func cycleCommands(fromRawValues rawValues: [String], fallback: [FrontWindowLayoutCommand]) -> [FrontWindowLayoutCommand] {
+        let resolvedCommands = rawValues.compactMap(Self.init(rawValue:))
+        let normalizedCommands = normalizedCycleCommands(resolvedCommands)
+        return normalizedCommands.isEmpty ? fallback : normalizedCommands
+    }
+
+    static func cycleCommandRawValues(_ commands: [FrontWindowLayoutCommand]) -> [String] {
+        normalizedCycleCommands(commands).map(\.rawValue)
+    }
 }
 
 enum FrontWindowMoveResult: Equatable {
@@ -80,9 +379,15 @@ enum FrontWindowMoveResult: Equatable {
     case failed
 }
 
-enum FrontWindowCycleProfile: String, CaseIterable {
+enum FrontWindowCycleProfile: String, CaseIterable, Identifiable {
     case full
     case focus
+    case halves
+    case thirds
+    case quarters
+    case custom
+
+    var id: String { rawValue }
 
     var activityDetail: String {
         switch self {
@@ -90,6 +395,14 @@ enum FrontWindowCycleProfile: String, CaseIterable {
             return "cycle-profile-full"
         case .focus:
             return "cycle-profile-focus"
+        case .halves:
+            return "cycle-profile-halves"
+        case .thirds:
+            return "cycle-profile-thirds"
+        case .quarters:
+            return "cycle-profile-quarters"
+        case .custom:
+            return "cycle-profile-custom"
         }
     }
 
@@ -99,16 +412,118 @@ enum FrontWindowCycleProfile: String, CaseIterable {
             return "Full"
         case .focus:
             return "Focus"
+        case .halves:
+            return "Halves"
+        case .thirds:
+            return "Thirds"
+        case .quarters:
+            return "Quarters"
+        case .custom:
+            return "Custom"
         }
     }
 
-    var commands: [FrontWindowLayoutCommand] {
+    var actionID: String {
+        "window-cycle-profile-\(rawValue)"
+    }
+
+    var commandTitle: String {
+        "Cycle Profile: \(title)"
+    }
+
+    var systemImage: String {
         switch self {
         case .full:
-            return WindowLayout.defaultCycleCommands
+            return "square.grid.3x3"
+        case .focus:
+            return "viewfinder"
+        case .halves:
+            return "rectangle.split.2x1"
+        case .thirds:
+            return "rectangle.split.3x1"
+        case .quarters:
+            return "rectangle.split.2x2"
+        case .custom:
+            return "slider.horizontal.3"
+        }
+    }
+
+    var keywords: [String] {
+        switch self {
+        case .full:
+            return ["profile", "full", "cycle", "window", "layout"]
+        case .focus:
+            return ["profile", "focus", "cycle", "window", "layout"]
+        case .halves:
+            return ["profile", "halves", "split", "cycle", "window"]
+        case .thirds:
+            return ["profile", "thirds", "cycle", "window"]
+        case .quarters:
+            return ["profile", "quarters", "corners", "cycle", "window"]
+        case .custom:
+            return ["profile", "custom", "saved", "preset", "cycle", "window"]
+        }
+    }
+
+    var defaultCommands: [FrontWindowLayoutCommand] {
+        switch self {
+        case .full:
+            return FrontWindowLayoutCommand.cycleEligibleCommands
         case .focus:
             return [.leftHalf, .center, .rightHalf, .maximize]
+        case .halves:
+            return [.leftHalf, .rightHalf, .topHalf, .bottomHalf, .maximize]
+        case .thirds:
+            return [.leftThird, .centerThird, .rightThird, .leftTwoThirds, .rightTwoThirds, .maximize]
+        case .quarters:
+            return [.topLeftQuarter, .topRightQuarter, .bottomLeftQuarter, .bottomRightQuarter, .maximize]
+        case .custom:
+            return []
         }
+    }
+
+    func subtitle(customCommands: [FrontWindowLayoutCommand]) -> String {
+        switch self {
+        case .full:
+            return "Cycle every built-in window layout"
+        case .focus:
+            return "Cycle left, center, right, maximize"
+        case .halves:
+            return "Cycle halves, stacks, and maximize"
+        case .thirds:
+            return "Cycle thirds, wide thirds, and maximize"
+        case .quarters:
+            return "Cycle quarter corners and maximize"
+        case .custom:
+            let count = customCommands.count
+            let noun = count == 1 ? "layout" : "layouts"
+            return "Cycle your saved custom set (\(count) \(noun))"
+        }
+    }
+}
+
+struct WindowLayoutOptions: Equatable {
+    let gap: CGFloat
+
+    init(gap: CGFloat = 0) {
+        self.gap = max(0, gap)
+    }
+
+    func applyGap(to frame: CGRect, inside screenFrame: CGRect) -> CGRect {
+        guard gap > 0 else { return frame }
+        let inset = gap / 2
+        let clampedInsetX = min(inset, max(0, (frame.width - 1) / 2))
+        let clampedInsetY = min(inset, max(0, (frame.height - 1) / 2))
+        let insetFrame = frame.insetBy(dx: clampedInsetX, dy: clampedInsetY)
+        let maxX = screenFrame.maxX - insetFrame.width
+        let maxY = screenFrame.maxY - insetFrame.height
+
+        return CGRect(
+            x: min(max(insetFrame.minX, screenFrame.minX), maxX),
+            y: min(max(insetFrame.minY, screenFrame.minY), maxY),
+            width: max(1, insetFrame.width),
+            height: max(1, insetFrame.height)
+        )
     }
 }
 
@@ -131,28 +546,13 @@ struct FrontWindowUndoStore {
 }
 
 enum WindowLayout {
-    static let defaultCycleCommands: [FrontWindowLayoutCommand] = [
-        .leftHalf,
-        .rightHalf,
-        .topHalf,
-        .bottomHalf,
-        .topLeftQuarter,
-        .topRightQuarter,
-        .bottomLeftQuarter,
-        .bottomRightQuarter,
-        .leftThird,
-        .centerThird,
-        .rightThird,
-        .leftTwoThirds,
-        .rightTwoThirds,
-        .maximize,
-        .center
-    ]
+    static let defaultCycleCommands = FrontWindowLayoutCommand.cycleEligibleCommands
 
     static func targetFrame(
         command: FrontWindowLayoutCommand,
         screenFrame: CGRect,
-        currentFrame: CGRect?
+        currentFrame: CGRect?,
+        options: WindowLayoutOptions = WindowLayoutOptions()
     ) -> CGRect {
         let halfWidth = floor(screenFrame.width / 2)
         let rightWidth = screenFrame.width - halfWidth
@@ -163,130 +563,156 @@ enum WindowLayout {
         let bottomHeight = screenFrame.height - halfHeight
 
         switch command {
+        case .cycleLayout:
+            return targetFrameForCycle(
+                currentFrame: currentFrame,
+                screenFrame: screenFrame,
+                reverse: false,
+                cycleCommands: nil,
+                options: options
+            )
+        case .cycleLayoutBackward:
+            return targetFrameForCycle(
+                currentFrame: currentFrame,
+                screenFrame: screenFrame,
+                reverse: true,
+                cycleCommands: nil,
+                options: options
+            )
+        case .undoLastMove:
+            return currentFrame ?? screenFrame
+        case .moveToNextDisplay, .moveToPreviousDisplay:
+            return currentFrame ?? screenFrame
+        default:
+            break
+        }
+
+        let baseFrame: CGRect
+        switch command {
         case .leftHalf:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY,
                 width: halfWidth,
                 height: screenFrame.height
             )
         case .rightHalf:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + halfWidth,
                 y: screenFrame.minY,
                 width: rightWidth,
                 height: screenFrame.height
             )
         case .topLeftQuarter:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY,
                 width: halfWidth,
                 height: halfHeight
             )
         case .topRightQuarter:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + halfWidth,
                 y: screenFrame.minY,
                 width: rightWidth,
                 height: halfHeight
             )
         case .bottomLeftQuarter:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY + halfHeight,
                 width: halfWidth,
                 height: bottomHeight
             )
         case .bottomRightQuarter:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + halfWidth,
                 y: screenFrame.minY + halfHeight,
                 width: rightWidth,
                 height: bottomHeight
             )
         case .leftThird:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY,
                 width: thirdWidth,
                 height: screenFrame.height
             )
         case .centerThird:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + thirdWidth,
                 y: screenFrame.minY,
                 width: thirdWidth,
                 height: screenFrame.height
             )
         case .rightThird:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + thirdWidth * 2,
                 y: screenFrame.minY,
                 width: rightThirdWidth,
                 height: screenFrame.height
             )
         case .leftTwoThirds:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY,
                 width: twoThirdsWidth,
                 height: screenFrame.height
             )
         case .rightTwoThirds:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX + thirdWidth,
                 y: screenFrame.minY,
                 width: twoThirdsWidth,
                 height: screenFrame.height
             )
         case .topHalf:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY,
                 width: screenFrame.width,
                 height: halfHeight
             )
         case .bottomHalf:
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.minX,
                 y: screenFrame.minY + halfHeight,
                 width: screenFrame.width,
                 height: bottomHeight
             )
         case .maximize:
-            return screenFrame
+            baseFrame = screenFrame
         case .center:
             let size = centeredSize(currentFrame: currentFrame, screenFrame: screenFrame)
-            return CGRect(
+            baseFrame = CGRect(
                 x: screenFrame.midX - size.width / 2,
                 y: screenFrame.midY - size.height / 2,
                 width: size.width,
                 height: size.height
             )
-        case .cycleLayout:
-            return targetFrameForCycle(currentFrame: currentFrame, screenFrame: screenFrame)
-        case .cycleLayoutBackward:
-            return targetFrameForCycle(currentFrame: currentFrame, screenFrame: screenFrame, reverse: true)
-        case .undoLastMove:
-            return currentFrame ?? screenFrame
-        case .moveToNextDisplay:
-            return currentFrame ?? screenFrame
-        case .moveToPreviousDisplay:
-            return currentFrame ?? screenFrame
+        case .cycleLayout, .cycleLayoutBackward, .undoLastMove, .moveToNextDisplay, .moveToPreviousDisplay:
+            baseFrame = currentFrame ?? screenFrame
         }
+
+        return options.applyGap(to: baseFrame, inside: screenFrame)
     }
 
     static func targetFrameForCycle(
         currentFrame: CGRect?,
         screenFrame: CGRect,
         reverse: Bool = false,
-        cycleCommands: [FrontWindowLayoutCommand]? = nil
+        cycleCommands: [FrontWindowLayoutCommand]? = nil,
+        options: WindowLayoutOptions = WindowLayoutOptions()
     ) -> CGRect {
         let cycleCommands = normalizedCycleCommands(cycleCommands)
         guard let firstCommand = cycleCommands.first else { return screenFrame }
         guard let currentFrame else {
-            return targetFrame(command: firstCommand, screenFrame: screenFrame, currentFrame: nil)
+            return targetFrame(
+                command: firstCommand,
+                screenFrame: screenFrame,
+                currentFrame: nil,
+                options: options
+            )
         }
 
         let normalizedCurrentFrame = currentFrame.integral
@@ -294,7 +720,8 @@ enum WindowLayout {
             let commandFrame = targetFrame(
                 command: command,
                 screenFrame: screenFrame,
-                currentFrame: currentFrame
+                currentFrame: currentFrame,
+                options: options
             ).integral
             return isSameLayoutFrame(commandFrame, normalizedCurrentFrame)
         }) {
@@ -302,21 +729,25 @@ enum WindowLayout {
                 ? (currentIndex - 1 + cycleCommands.count) % cycleCommands.count
                 : (currentIndex + 1) % cycleCommands.count
             let nextCommand = cycleCommands[nextIndex]
-            return targetFrame(command: nextCommand, screenFrame: screenFrame, currentFrame: currentFrame)
+            return targetFrame(
+                command: nextCommand,
+                screenFrame: screenFrame,
+                currentFrame: currentFrame,
+                options: options
+            )
         }
 
-        return targetFrame(command: firstCommand, screenFrame: screenFrame, currentFrame: currentFrame)
+        return targetFrame(
+            command: firstCommand,
+            screenFrame: screenFrame,
+            currentFrame: currentFrame,
+            options: options
+        )
     }
 
-    private static func normalizedCycleCommands(_ cycleCommands: [FrontWindowLayoutCommand]?) -> [FrontWindowLayoutCommand] {
+    static func normalizedCycleCommands(_ cycleCommands: [FrontWindowLayoutCommand]?) -> [FrontWindowLayoutCommand] {
         let sourceCommands = cycleCommands ?? defaultCycleCommands
-        var uniqueCommands: [FrontWindowLayoutCommand] = []
-        for command in sourceCommands where defaultCycleCommands.contains(command) {
-            if !uniqueCommands.contains(command) {
-                uniqueCommands.append(command)
-            }
-        }
-
+        let uniqueCommands = FrontWindowLayoutCommand.normalizedCycleCommands(sourceCommands)
         return uniqueCommands.isEmpty ? defaultCycleCommands : uniqueCommands
     }
 
@@ -412,10 +843,10 @@ extension CGRect {
 enum FrontWindowManager {
     @MainActor
     private static var undoStore = FrontWindowUndoStore()
-    private static let cycleProfileKey = "front-window-cycle-profile"
+    private static let defaultCustomCycleCommands: [FrontWindowLayoutCommand] = [.leftHalf, .rightHalf, .maximize]
 
     static func cycleProfile(defaults: UserDefaults = .standard) -> FrontWindowCycleProfile {
-        guard let rawValue = defaults.string(forKey: cycleProfileKey),
+        guard let rawValue = defaults.string(forKey: AppDefaults.frontWindowCycleProfileKey),
               let profile = FrontWindowCycleProfile(rawValue: rawValue) else {
             return .full
         }
@@ -424,10 +855,77 @@ enum FrontWindowManager {
 
     static func setCycleProfile(_ profile: FrontWindowCycleProfile, defaults: UserDefaults = .standard) {
         if profile == .full {
-            defaults.removeObject(forKey: cycleProfileKey)
+            defaults.removeObject(forKey: AppDefaults.frontWindowCycleProfileKey)
             return
         }
-        defaults.set(profile.rawValue, forKey: cycleProfileKey)
+        defaults.set(profile.rawValue, forKey: AppDefaults.frontWindowCycleProfileKey)
+    }
+
+    static func normalizedCycleProfileRawValue(_ rawValue: String) -> String {
+        FrontWindowCycleProfile(rawValue: rawValue)?.rawValue ?? AppDefaults.frontWindowCycleProfile
+    }
+
+    static func layoutGapPoints(defaults: UserDefaults = .standard) -> Int {
+        let storedValue = defaults.object(forKey: AppDefaults.frontWindowGapPointsKey) as? Int
+            ?? AppDefaults.frontWindowGapPoints
+        return AppDefaults.normalizedFrontWindowGapPoints(storedValue)
+    }
+
+    static func setLayoutGapPoints(_ points: Int, defaults: UserDefaults = .standard) {
+        let normalizedPoints = AppDefaults.normalizedFrontWindowGapPoints(points)
+        defaults.set(normalizedPoints, forKey: AppDefaults.frontWindowGapPointsKey)
+    }
+
+    static func normalizedCustomCycleCommandRawValues(_ rawValues: [String]) -> [String] {
+        FrontWindowLayoutCommand.cycleCommandRawValues(
+            FrontWindowLayoutCommand.cycleCommands(
+                fromRawValues: rawValues,
+                fallback: defaultCustomCycleCommands
+            )
+        )
+    }
+
+    static func customCycleCommands(fromRawValues rawValues: [String]) -> [FrontWindowLayoutCommand] {
+        FrontWindowLayoutCommand.cycleCommands(
+            fromRawValues: rawValues,
+            fallback: defaultCustomCycleCommands
+        )
+    }
+
+    static func customCycleCommands(defaults: UserDefaults = .standard) -> [FrontWindowLayoutCommand] {
+        customCycleCommands(
+            fromRawValues: defaults.stringArray(forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey) ?? []
+        )
+    }
+
+    static func setCustomCycleCommands(
+        _ commands: [FrontWindowLayoutCommand],
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.set(
+            FrontWindowLayoutCommand.cycleCommandRawValues(commands),
+            forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey
+        )
+    }
+
+    static func cycleCommands(defaults: UserDefaults = .standard) -> [FrontWindowLayoutCommand] {
+        cycleCommands(for: cycleProfile(defaults: defaults), defaults: defaults)
+    }
+
+    static func cycleCommands(
+        for profile: FrontWindowCycleProfile,
+        defaults: UserDefaults = .standard
+    ) -> [FrontWindowLayoutCommand] {
+        switch profile {
+        case .custom:
+            return customCycleCommands(defaults: defaults)
+        default:
+            return WindowLayout.normalizedCycleCommands(profile.defaultCommands)
+        }
+    }
+
+    private static func layoutOptions(defaults: UserDefaults = .standard) -> WindowLayoutOptions {
+        WindowLayoutOptions(gap: CGFloat(layoutGapPoints(defaults: defaults)))
     }
 
     @MainActor
@@ -452,6 +950,7 @@ enum FrontWindowManager {
         let normalizedCurrentFrame = currentFrame.integral
 
         let targetFrame: CGRect
+        let layoutOptions = layoutOptions()
         switch command {
         case .undoLastMove:
             guard let previousFrame = undoStore.swapCurrentFrame(currentFrame, for: processID) else {
@@ -466,7 +965,8 @@ enum FrontWindowManager {
                 currentFrame: currentFrame,
                 screenFrame: screenFrame,
                 reverse: command == .cycleLayoutBackward,
-                cycleCommands: cycleProfile().commands
+                cycleCommands: cycleCommands(),
+                options: layoutOptions
             ).integral
         case .moveToNextDisplay, .moveToPreviousDisplay:
             guard screenFrames.count > 1 else { return .noOtherScreen }
@@ -496,7 +996,8 @@ enum FrontWindowManager {
             targetFrame = WindowLayout.targetFrame(
                 command: command,
                 screenFrame: screenFrame,
-                currentFrame: currentFrame
+                currentFrame: currentFrame,
+                options: layoutOptions
             ).integral
         }
 

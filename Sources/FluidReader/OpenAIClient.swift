@@ -39,10 +39,28 @@ struct OpenAIClient {
         case .openAICompatibleChat:
             endpointValue = AppDefaults.value(endpoint, fallback: AppDefaults.openAICompatibleChatEndpoint)
         }
-        guard let url = URL(string: endpointValue) else {
+        guard let url = URL(string: endpointValue),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.user == nil,
+              url.password == nil,
+              let host = url.host,
+              !host.isEmpty else {
+            throw OpenAIError.badURL
+        }
+        if scheme == "http",
+           !isLoopbackHost(host) {
             throw OpenAIError.badURL
         }
         return url
+    }
+
+    private static func isLoopbackHost(_ host: String) -> Bool {
+        let normalizedHost = host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedHost == "localhost"
+            || normalizedHost == "127.0.0.1"
+            || normalizedHost == "::1"
+            || normalizedHost == "0:0:0:0:0:0:0:1"
     }
 
     func askAboutSelection(
@@ -263,6 +281,7 @@ struct OpenAIClient {
     private func sendJSON(_ data: Data, to url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 60
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = data

@@ -53,6 +53,65 @@ final class SettingsStore: ObservableObject {
         didSet { save("readerAlwaysOnTop", readerAlwaysOnTop) }
     }
 
+    @Published var showMenuBarItem: Bool {
+        didSet { save(AppDefaults.showMenuBarItemKey, showMenuBarItem) }
+    }
+
+    @Published var launcherCompactMode: Bool {
+        didSet { save(AppDefaults.launcherCompactModeKey, launcherCompactMode) }
+    }
+
+    @Published var launcherIndexedRootPaths: [String] {
+        didSet {
+            let normalized = LocalFileSearchCatalog.normalizedRootPaths(launcherIndexedRootPaths)
+            if normalized != launcherIndexedRootPaths {
+                launcherIndexedRootPaths = normalized
+                return
+            }
+            save(AppDefaults.launcherIndexedRootPathsKey, normalized)
+        }
+    }
+
+    @Published var frontWindowGapPoints: Int {
+        didSet {
+            let normalized = AppDefaults.normalizedFrontWindowGapPoints(frontWindowGapPoints)
+            if normalized != frontWindowGapPoints {
+                frontWindowGapPoints = normalized
+                return
+            }
+            save(AppDefaults.frontWindowGapPointsKey, normalized)
+        }
+    }
+
+    @Published var frontWindowCycleProfile: String {
+        didSet {
+            let normalized = FrontWindowManager.normalizedCycleProfileRawValue(frontWindowCycleProfile)
+            if normalized != frontWindowCycleProfile {
+                frontWindowCycleProfile = normalized
+                return
+            }
+            guard !isLoading else { return }
+            if normalized == AppDefaults.frontWindowCycleProfile {
+                defaults.removeObject(forKey: AppDefaults.frontWindowCycleProfileKey)
+                return
+            }
+            save(AppDefaults.frontWindowCycleProfileKey, normalized)
+        }
+    }
+
+    @Published var frontWindowCustomCycleCommandIDs: [String] {
+        didSet {
+            let normalized = FrontWindowManager.normalizedCustomCycleCommandRawValues(
+                frontWindowCustomCycleCommandIDs
+            )
+            if normalized != frontWindowCustomCycleCommandIDs {
+                frontWindowCustomCycleCommandIDs = normalized
+                return
+            }
+            save(AppDefaults.frontWindowCustomCycleCommandIDsKey, normalized)
+        }
+    }
+
     @Published var fameAutoPulseAfterSnapshot: Bool {
         didSet { save("fameAutoPulseAfterSnapshot", fameAutoPulseAfterSnapshot) }
     }
@@ -516,6 +575,18 @@ final class SettingsStore: ObservableObject {
         ]
     }
 
+    var frontWindowCycleProfileValue: FrontWindowCycleProfile {
+        get { FrontWindowCycleProfile(rawValue: frontWindowCycleProfile) ?? .full }
+        set { frontWindowCycleProfile = newValue.rawValue }
+    }
+
+    var frontWindowCustomCycleCommands: [FrontWindowLayoutCommand] {
+        get { FrontWindowManager.customCycleCommands(fromRawValues: frontWindowCustomCycleCommandIDs) }
+        set {
+            frontWindowCustomCycleCommandIDs = FrontWindowLayoutCommand.cycleCommandRawValues(newValue)
+        }
+    }
+
     var availableVoices: [AVSpeechSynthesisVoice] {
         AVSpeechSynthesisVoice.speechVoices()
             .sorted { left, right in
@@ -538,6 +609,13 @@ final class SettingsStore: ObservableObject {
             "saveRecentItems": AppDefaults.saveRecentItems,
             "saveClipboardHistory": AppDefaults.saveClipboardHistory,
             "readerAlwaysOnTop": AppDefaults.readerAlwaysOnTop,
+            AppDefaults.showMenuBarItemKey: AppDefaults.showMenuBarItem,
+            AppDefaults.launcherCompactModeKey: AppDefaults.launcherCompactMode,
+            AppDefaults.launcherIndexedRootPathsKey: LocalFileSearchCatalog.defaultRootPaths(),
+            AppDefaults.frontWindowGapPointsKey: AppDefaults.frontWindowGapPoints,
+            AppDefaults.frontWindowCycleProfileKey: AppDefaults.frontWindowCycleProfile,
+            AppDefaults.frontWindowCustomCycleCommandIDsKey:
+                FrontWindowManager.normalizedCustomCycleCommandRawValues([]),
             "fameAutoPulseAfterSnapshot": AppDefaults.fameAutoPulseAfterSnapshot,
             "fameAutoPulseQuietMode": AppDefaults.fameAutoPulseQuietMode,
             "fameMorningBriefOnLaunch": AppDefaults.fameMorningBriefOnLaunch,
@@ -620,6 +698,25 @@ final class SettingsStore: ObservableObject {
         saveRecentItems = defaults.bool(forKey: "saveRecentItems")
         saveClipboardHistory = defaults.bool(forKey: "saveClipboardHistory")
         readerAlwaysOnTop = defaults.bool(forKey: "readerAlwaysOnTop")
+        showMenuBarItem = defaults.object(forKey: AppDefaults.showMenuBarItemKey) as? Bool
+            ?? AppDefaults.showMenuBarItem
+        launcherCompactMode = defaults.object(forKey: AppDefaults.launcherCompactModeKey) as? Bool
+            ?? AppDefaults.launcherCompactMode
+        launcherIndexedRootPaths = LocalFileSearchCatalog.normalizedRootPaths(
+            defaults.stringArray(forKey: AppDefaults.launcherIndexedRootPathsKey)
+                ?? LocalFileSearchCatalog.defaultRootPaths()
+        )
+        frontWindowGapPoints = AppDefaults.normalizedFrontWindowGapPoints(
+            defaults.object(forKey: AppDefaults.frontWindowGapPointsKey) as? Int
+                ?? AppDefaults.frontWindowGapPoints
+        )
+        frontWindowCycleProfile = FrontWindowManager.normalizedCycleProfileRawValue(
+            defaults.string(forKey: AppDefaults.frontWindowCycleProfileKey)
+                ?? AppDefaults.frontWindowCycleProfile
+        )
+        frontWindowCustomCycleCommandIDs = FrontWindowManager.normalizedCustomCycleCommandRawValues(
+            defaults.stringArray(forKey: AppDefaults.frontWindowCustomCycleCommandIDsKey) ?? []
+        )
         fameAutoPulseAfterSnapshot = defaults.bool(forKey: "fameAutoPulseAfterSnapshot")
         fameAutoPulseQuietMode = defaults.bool(forKey: "fameAutoPulseQuietMode")
         fameMorningBriefOnLaunch = defaults.bool(forKey: "fameMorningBriefOnLaunch")

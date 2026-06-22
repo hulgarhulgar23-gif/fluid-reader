@@ -215,17 +215,11 @@ private struct ReaderView: View {
     var body: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
-                .opacity(0.86)
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 14) {
+            ScrollView {
+              VStack(alignment: .leading, spacing: 14) {
                 header
-                fameAutoOpsBundleStatusPill
-                fameLaunchRescueAutoStatusPill
-                readerStatusShortcutLegend
-                cadenceExecutionKitMomentumPanel
-                famePulsePanel
-                fameDailyScorecardPanel
 
                 editor(
                     title: "Selected text",
@@ -314,8 +308,10 @@ private struct ReaderView: View {
                         .controlSize(.small)
                     }
                 }
+              }
+              .padding(18)
+              .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(18)
         }
         .frame(minWidth: 460, minHeight: 440)
         .animation(.easeInOut(duration: 0.18), value: state.isWorking)

@@ -9,6 +9,7 @@ struct CommandUsageRecord: Codable, Equatable {
 final class CommandUsageStore: ObservableObject {
     private static let defaultKey = "commandUsageRecords"
     private static let defaultFavoritesKey = "favoriteCommandIDs"
+    private static let maxActionIDLength = 120
 
     private let defaults: UserDefaults
     private let key: String
@@ -29,9 +30,20 @@ final class CommandUsageStore: ObservableObject {
     }
 
     func recordRun(actionID: String, at date: Date = Date()) {
-        let oldRecord = records[actionID]
-        records[actionID] = CommandUsageRecord(
-            useCount: (oldRecord?.useCount ?? 0) + 1,
+        guard let sanitizedActionID = Self.sanitizedActionID(actionID) else {
+            return
+        }
+
+        let oldRecord = records[sanitizedActionID]
+        let useCount: Int
+        if let existingUseCount = oldRecord?.useCount {
+            useCount = existingUseCount < Int.max ? existingUseCount + 1 : Int.max
+        } else {
+            useCount = 1
+        }
+
+        records[sanitizedActionID] = CommandUsageRecord(
+            useCount: useCount,
             lastUsedAt: date
         )
         save()
@@ -43,14 +55,21 @@ final class CommandUsageStore: ObservableObject {
     }
 
     func isFavorite(actionID: String) -> Bool {
-        favoriteActionIDs.contains(actionID)
+        guard let sanitizedActionID = Self.sanitizedActionID(actionID) else {
+            return false
+        }
+        return favoriteActionIDs.contains(sanitizedActionID)
     }
 
     func toggleFavorite(actionID: String) {
-        if favoriteActionIDs.contains(actionID) {
-            favoriteActionIDs.remove(actionID)
+        guard let sanitizedActionID = Self.sanitizedActionID(actionID) else {
+            return
+        }
+
+        if favoriteActionIDs.contains(sanitizedActionID) {
+            favoriteActionIDs.remove(sanitizedActionID)
         } else {
-            favoriteActionIDs.insert(actionID)
+            favoriteActionIDs.insert(sanitizedActionID)
         }
         saveFavorites()
     }
@@ -71,14 +90,46 @@ final class CommandUsageStore: ObservableObject {
 
     private static func loadRecords(from defaults: UserDefaults, key: String) -> [String: CommandUsageRecord] {
         guard let data = defaults.data(forKey: key),
-              let records = try? JSONDecoder().decode([String: CommandUsageRecord].self, from: data) else {
+              let decodedRecords = try? JSONDecoder().decode([String: CommandUsageRecord].self, from: data) else {
             return [:]
         }
-        return records
+
+        var sanitizedRecords: [String: CommandUsageRecord] = [:]
+        for (actionID, record) in decodedRecords {
+            guard let normalizedActionID = sanitizedActionID(actionID),
+                  record.useCount > 0 else {
+                continue
+            }
+
+            if let existing = sanitizedRecords[normalizedActionID] {
+                sanitizedRecords[normalizedActionID] = CommandUsageRecord(
+                    useCount: max(existing.useCount, record.useCount),
+                    lastUsedAt: max(existing.lastUsedAt, record.lastUsedAt)
+                )
+                continue
+            }
+
+            sanitizedRecords[normalizedActionID] = record
+        }
+        return sanitizedRecords
     }
 
     private static func loadFavoriteActionIDs(from defaults: UserDefaults, key: String) -> Set<String> {
-        Set(defaults.stringArray(forKey: key) ?? [])
+        Set(
+            (defaults.stringArray(forKey: key) ?? [])
+                .compactMap(sanitizedActionID(_:))
+        )
+    }
+
+    private static func sanitizedActionID(_ rawValue: String) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
+
+        if trimmed.count <= maxActionIDLength {
+            return trimmed
+        }
+        return String(trimmed.prefix(maxActionIDLength))
     }
 }
 
@@ -107,6 +158,7 @@ final class PaletteSession: ObservableObject {
         fameMomentumPanelRouteStabilizationRecoverySuggestionPressureCalibrationSampleIdleDecayOpenInterval = 6
     private static let fameMomentumPanelRouteStabilizationRecoverySuggestionPressureCalibrationBiasRange =
         -3...3
+    private static let recommendationPairMaxActionIDLength = 120
 
     struct LaunchRecoveryHotKeyLegendRiskStickyPromotion: Equatable {
         let actionID: String
@@ -1276,7 +1328,9 @@ final class PaletteSession: ObservableObject {
         guard openCount > 0 else { return false }
         guard recommendationOpportunityOpenCount != openCount else { return false }
         recommendationOpportunityOpenCount = openCount
-        recommendationConversionOpportunities += 1
+        recommendationConversionOpportunities = Self.incrementSaturating(
+            recommendationConversionOpportunities
+        )
         persistRecommendationConversionSnapshot()
         return true
     }
@@ -1297,7 +1351,9 @@ final class PaletteSession: ObservableObject {
             return false
         }
         recommendationPairOpportunityOpenCount[token] = openCount
-        recommendationConversionPairOpportunities[token, default: 0] += 1
+        recommendationConversionPairOpportunities[token] = Self.incrementSaturating(
+            recommendationConversionPairOpportunities[token] ?? 0
+        )
         persistRecommendationPairSnapshot()
         return true
     }
@@ -1364,15 +1420,15 @@ final class PaletteSession: ObservableObject {
         at date: Date = Date()
     ) -> Bool {
         guard openCount > 0 else { return false }
-        let normalizedSourceActionID = sourceActionID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedRecommendedActionID = recommendedActionID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedSourceActionID.isEmpty,
-              !normalizedRecommendedActionID.isEmpty,
-              normalizedSourceActionID != normalizedRecommendedActionID else {
+        guard let token = Self.recommendationPairToken(
+            sourceActionID: sourceActionID,
+            recommendedActionID: recommendedActionID
+        ),
+        let normalizedPair = Self.recommendationPairToken(from: token) else {
             return false
         }
+        let normalizedSourceActionID = normalizedPair.sourceActionID
+        let normalizedRecommendedActionID = normalizedPair.recommendedActionID
         guard !didRecordRecommendationConversionInCurrentOpen else {
             return false
         }
@@ -1386,50 +1442,47 @@ final class PaletteSession: ObservableObject {
             conversions: Int,
             opensSinceLastConversion: Int
         )?
-        if let token = Self.recommendationPairToken(
-            sourceActionID: normalizedSourceActionID,
-            recommendedActionID: normalizedRecommendedActionID
-        ) {
-            let pairOpportunities = max(
-                0,
-                recommendationConversionPairOpportunities[token] ?? 0
-            )
-            let pairConversionsBefore = min(
+        let pairOpportunities = max(
+            0,
+            recommendationConversionPairOpportunities[token] ?? 0
+        )
+        let pairConversionsBefore = min(
+            pairOpportunities,
+            max(0, recommendationConversionPairConversions[token] ?? 0)
+        )
+        let pairLastConversionOpenCount = max(
+            0,
+            recommendationConversionPairLastConversionOpenCount[token] ?? 0
+        )
+        let opensSinceLastConversion = pairLastConversionOpenCount > 0
+            ? max(0, openCount - pairLastConversionOpenCount)
+            : nil
+        let pairWasColdAndHighConfidence = CommandPaletteTopPicks.recommendationPairIsHighConfidence(
+            opportunities: pairOpportunities,
+            conversionCount: pairConversionsBefore
+        ) && (opensSinceLastConversion ?? 0) >= 7
+
+        recommendationConversionPairConversions[token] = Self.incrementSaturating(
+            recommendationConversionPairConversions[token] ?? 0
+        )
+        recommendationConversionPairLastConversionOpenCount[token] = max(1, openCount)
+        if pairWasColdAndHighConfidence,
+           let opensSinceLastConversion {
+            let normalizedConversions = min(
                 pairOpportunities,
                 max(0, recommendationConversionPairConversions[token] ?? 0)
             )
-            let pairLastConversionOpenCount = max(
-                0,
-                recommendationConversionPairLastConversionOpenCount[token] ?? 0
-            )
-            let opensSinceLastConversion = pairLastConversionOpenCount > 0
-                ? max(0, openCount - pairLastConversionOpenCount)
-                : nil
-            let pairWasColdAndHighConfidence = CommandPaletteTopPicks.recommendationPairIsHighConfidence(
+            rescuedPairSnapshot = (
                 opportunities: pairOpportunities,
-                conversionCount: pairConversionsBefore
-            ) && (opensSinceLastConversion ?? 0) >= 7
-
-            recommendationConversionPairConversions[token, default: 0] += 1
-            recommendationConversionPairLastConversionOpenCount[token] = max(1, openCount)
-            if pairWasColdAndHighConfidence,
-               let opensSinceLastConversion {
-                let normalizedConversions = min(
-                    pairOpportunities,
-                    max(0, recommendationConversionPairConversions[token] ?? 0)
-                )
-                rescuedPairSnapshot = (
-                    opportunities: pairOpportunities,
-                    conversions: normalizedConversions,
-                    opensSinceLastConversion: opensSinceLastConversion
-                )
-            }
-            persistRecommendationPairSnapshot()
+                conversions: normalizedConversions,
+                opensSinceLastConversion: opensSinceLastConversion
+            )
         }
-        recommendationConversionCount += 1
+        persistRecommendationPairSnapshot()
+        recommendationConversionCount = Self.incrementSaturating(recommendationConversionCount)
         let previousBestOpenStreak = recommendationConversionBestOpenStreak
         didRecordRecommendationConversionInCurrentOpen = true
-        recommendationConversionOpenStreak += 1
+        recommendationConversionOpenStreak = Self.incrementSaturating(recommendationConversionOpenStreak)
         recommendationConversionBestOpenStreak = max(
             recommendationConversionBestOpenStreak,
             recommendationConversionOpenStreak
@@ -1448,7 +1501,9 @@ final class PaletteSession: ObservableObject {
             recordRecommendationMomentumRescueLeaderboardRun(now: date)
             let previousRescueStreak = recommendationMomentumRescueStreak
             let previousBestRescueStreak = recommendationMomentumRescueBestStreak
-            recommendationMomentumRescueStreak += 1
+            recommendationMomentumRescueStreak = Self.incrementSaturating(
+                recommendationMomentumRescueStreak
+            )
             recommendationMomentumRescueBestStreak = max(
                 recommendationMomentumRescueBestStreak,
                 recommendationMomentumRescueStreak
@@ -2347,10 +2402,10 @@ final class PaletteSession: ObservableObject {
         sourceActionID: String,
         recommendedActionID: String
     ) -> String? {
-        let normalizedSourceActionID = sourceActionID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedRecommendedActionID = recommendedActionID
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalizedSourceActionID = normalizedRecommendationPairActionID(sourceActionID),
+              let normalizedRecommendedActionID = normalizedRecommendationPairActionID(recommendedActionID) else {
+            return nil
+        }
         guard !normalizedSourceActionID.isEmpty,
               !normalizedRecommendedActionID.isEmpty,
               normalizedSourceActionID != normalizedRecommendedActionID else {
@@ -2364,16 +2419,35 @@ final class PaletteSession: ObservableObject {
     ) -> (sourceActionID: String, recommendedActionID: String)? {
         let cleanToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let separatorRange = cleanToken.range(of: "->") else { return nil }
-        let source = String(cleanToken[..<separatorRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let recommended = String(cleanToken[separatorRange.upperBound...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !source.isEmpty,
-              !recommended.isEmpty,
-              source != recommended else {
+        let sourceActionID = String(cleanToken[..<separatorRange.lowerBound])
+        let recommendedActionID = String(cleanToken[separatorRange.upperBound...])
+        guard let normalizedToken = recommendationPairToken(
+            sourceActionID: sourceActionID,
+            recommendedActionID: recommendedActionID
+        ),
+        let normalizedSeparatorRange = normalizedToken.range(of: "->") else {
             return nil
         }
-        return (source, recommended)
+        return (
+            sourceActionID: String(normalizedToken[..<normalizedSeparatorRange.lowerBound]),
+            recommendedActionID: String(normalizedToken[normalizedSeparatorRange.upperBound...])
+        )
+    }
+
+    private static func normalizedRecommendationPairActionID(_ rawValue: String) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count <= recommendationPairMaxActionIDLength else { return nil }
+        guard trimmed.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return nil }
+        guard !trimmed.contains("->") else { return nil }
+        return trimmed
+    }
+
+    private static func incrementSaturating(_ value: Int) -> Int {
+        guard value < Int.max else {
+            return Int.max
+        }
+        return value + 1
     }
 
     private static func bestChannelLaunchPackPressureToneToken(
@@ -4349,23 +4423,30 @@ enum CommandPaletteGroup: String, CaseIterable, Identifiable {
     static func parseScopedQuery(_ rawQuery: String) -> CommandPaletteScopedQuery {
         let trimmedQuery = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else {
-            return CommandPaletteScopedQuery(group: nil, searchQuery: rawQuery, hasScope: false)
+            return CommandPaletteScopedQuery(group: nil, sourceKinds: nil, searchQuery: rawQuery, hasScope: false)
         }
 
         guard let separatorIndex = trimmedQuery.firstIndex(where: { $0 == ":" || $0 == "/" }) else {
-            return CommandPaletteScopedQuery(group: nil, searchQuery: rawQuery, hasScope: false)
+            return CommandPaletteScopedQuery(group: nil, sourceKinds: nil, searchQuery: rawQuery, hasScope: false)
         }
 
         let token = trimmedQuery[..<separatorIndex]
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        guard let group = scopeTokenToGroup[token] else {
-            return CommandPaletteScopedQuery(group: nil, searchQuery: rawQuery, hasScope: false)
+        let group = scopeTokenToGroup[token]
+        let sourceKinds = scopeTokenToSourceKinds[token]
+        guard group != nil || sourceKinds != nil else {
+            return CommandPaletteScopedQuery(group: nil, sourceKinds: nil, searchQuery: rawQuery, hasScope: false)
         }
 
         let remainderStart = trimmedQuery.index(after: separatorIndex)
         let remainder = String(trimmedQuery[remainderStart...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return CommandPaletteScopedQuery(group: group, searchQuery: remainder, hasScope: true)
+        return CommandPaletteScopedQuery(
+            group: group,
+            sourceKinds: sourceKinds,
+            searchQuery: remainder,
+            hasScope: true
+        )
     }
 
     static func classify(
@@ -4442,7 +4523,9 @@ enum CommandPaletteGroup: String, CaseIterable, Identifiable {
 
         if containsAny(id, markers: [
             "ask-anything",
+            "run-best-local-action",
             "inline-ask",
+            "inline-route",
             "prompt-"
         ]) || containsAny(searchable, markers: [
             "ask",
@@ -4656,12 +4739,103 @@ enum CommandPaletteGroup: String, CaseIterable, Identifiable {
         "trouble": .support,
         "troubleshoot": .support
     ]
+
+    private static let scopeTokenToSourceKinds: [String: Set<CommandPaletteAction.SourceKind>] = [
+        "snippet": [.snippet],
+        "snippets": [.snippet],
+        "snip": [.snippet],
+        "note": [.snippet],
+        "notes": [.snippet],
+        "clipboard": [.clipboard],
+        "clip": [.clipboard],
+        "clips": [.clipboard],
+        "recent": [.recent],
+        "history": [.recent, .clipboard],
+        "link": [.link],
+        "links": [.link],
+        "bookmark": [.link],
+        "bookmarks": [.link],
+        "app": [.app],
+        "apps": [.app],
+        "file": [.file, .path],
+        "files": [.file, .path],
+        "folder": [.folder, .path],
+        "doc": [.file, .folder, .path],
+        "docs": [.file, .folder, .path],
+        "site": [.web, .link],
+        "sites": [.web, .link],
+        "web": [.web, .link],
+        "website": [.web, .link],
+        "browser": [.web, .link],
+        "url": [.web, .link],
+        "path": [.path, .file, .folder],
+        "script": [.script],
+        "scripts": [.script]
+    ]
 }
 
 struct CommandPaletteScopedQuery {
     let group: CommandPaletteGroup?
+    let sourceKinds: Set<CommandPaletteAction.SourceKind>?
     let searchQuery: String
     let hasScope: Bool
+}
+
+struct CommandPaletteLauncherHomeSection: Equatable {
+    let title: String
+    let actionIDs: [String]
+}
+
+struct CommandPaletteBrowseSummary: Equatable {
+    struct Source: Identifiable, Equatable {
+        let id: String
+        let title: String
+        let count: Int
+        let systemImage: String
+        let helpText: String
+
+        var countTitle: String {
+            CommandPaletteBrowseSummary.compactCountLabel(count)
+        }
+    }
+
+    struct Scope: Identifiable, Equatable {
+        let id: String
+        let title: String
+        let insertedText: String
+        let systemImage: String
+        let helpText: String
+    }
+
+    let detail: String
+    let sources: [Source]
+    let scopes: [Scope]
+
+    static let empty = CommandPaletteBrowseSummary(detail: "", sources: [], scopes: [])
+
+    nonisolated static func compactCountLabel(_ count: Int) -> String {
+        let normalizedCount = max(0, count)
+        switch normalizedCount {
+        case 0..<1_000:
+            return "\(normalizedCount)"
+        case 1_000..<10_000:
+            let thousands = Double(normalizedCount) / 1_000
+            let rounded = (thousands * 10).rounded() / 10
+            if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(rounded))k"
+            }
+            return String(format: "%.1fk", rounded)
+        case 10_000..<1_000_000:
+            return "\(Int((Double(normalizedCount) / 1_000).rounded()))k"
+        default:
+            let millions = Double(normalizedCount) / 1_000_000
+            let rounded = (millions * 10).rounded() / 10
+            if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(rounded))m"
+            }
+            return String(format: "%.1fm", rounded)
+        }
+    }
 }
 
 struct CommandPaletteTopPickContext {
@@ -5721,6 +5895,7 @@ enum CommandPaletteTopPicks {
         "pick-and-read",
         "read-selected",
         "ask-anything",
+        "run-best-local-action",
         "run-fame-onboarding-fill-gap",
         "run-fame-onboarding-daily-brief",
         "run-fame-onboarding-scorecard",
@@ -7120,11 +7295,65 @@ enum CommandPaletteTopPicks {
         }
 
         return Array(
-            history
-                .sorted { lhs, rhs in
-                    (Int(lhs.weekStamp) ?? 0) > (Int(rhs.weekStamp) ?? 0)
-                }
+            normalizedRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistory(history)
                 .prefix(limit)
+        )
+    }
+
+    private static func normalizedRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistory(
+        _ history: [RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek]
+    ) -> [RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek] {
+        var historyByWeek:
+            [String: RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek] = [:]
+        historyByWeek.reserveCapacity(history.count)
+        for item in history {
+            guard
+                let normalizedItem =
+                    normalizedRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+                        item
+                    )
+            else {
+                continue
+            }
+            historyByWeek[normalizedItem.weekStamp] = normalizedItem
+        }
+
+        return historyByWeek.values.sorted { lhs, rhs in
+            (Int(lhs.weekStamp) ?? 0) > (Int(rhs.weekStamp) ?? 0)
+        }
+    }
+
+    private static func normalizedRecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+        _ week: RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek
+    ) -> RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek? {
+        guard let normalizedWeekStamp = normalizedLeagueHistoryWeekStamp(week.weekStamp) else {
+            return nil
+        }
+
+        let normalizedRunsToday = max(0, week.runsToday)
+        let normalizedRunsThisWeek = max(0, week.runsThisWeek)
+        let normalizedBestWeekRuns = max(normalizedRunsThisWeek, max(0, week.bestWeekRuns))
+        let normalizedCurrentStreak = max(0, week.currentStreak)
+        let normalizedBestStreak = max(normalizedCurrentStreak, max(0, week.bestStreak))
+        let normalizedTier = recommendationMomentumRescueHallOfFameAutoDefenseLeagueTier(
+            currentWeekRuns: normalizedRunsThisWeek,
+            currentStreak: normalizedCurrentStreak
+        )
+        let normalizedLeagueScore = recommendationMomentumRescueHallOfFameAutoDefenseLeagueScore(
+            runsToday: normalizedRunsToday,
+            currentWeekRuns: normalizedRunsThisWeek,
+            currentStreak: normalizedCurrentStreak
+        )
+
+        return RecommendationMomentumRescueHallOfFameAutoDefenseLeagueHistoryWeek(
+            weekStamp: normalizedWeekStamp,
+            runsToday: normalizedRunsToday,
+            runsThisWeek: normalizedRunsThisWeek,
+            bestWeekRuns: normalizedBestWeekRuns,
+            currentStreak: normalizedCurrentStreak,
+            bestStreak: normalizedBestStreak,
+            leagueScore: normalizedLeagueScore,
+            tier: normalizedTier
         )
     }
 
@@ -10154,7 +10383,13 @@ enum CommandPaletteTopPicks {
             now: now,
             calendar: calendar
         )
-        return (todayStamp, max(1, currentRunsToday + 1))
+        let updatedRunsToday: Int
+        if currentRunsToday < Int.max {
+            updatedRunsToday = currentRunsToday + 1
+        } else {
+            updatedRunsToday = Int.max
+        }
+        return (todayStamp, max(1, updatedRunsToday))
     }
 
     static func launchRecoveryHotKeyAutoTrustSurgeWeekStamp(
@@ -10199,7 +10434,12 @@ enum CommandPaletteTopPicks {
             now: now,
             calendar: calendar
         )
-        let updatedRunsThisWeek = max(1, runsThisWeek + 1)
+        let updatedRunsThisWeek: Int
+        if runsThisWeek < Int.max {
+            updatedRunsThisWeek = runsThisWeek + 1
+        } else {
+            updatedRunsThisWeek = Int.max
+        }
         let updatedBestWeekCount = max(max(0, bestWeekCount), updatedRunsThisWeek)
         return (
             weekStamp: currentWeekStamp,
@@ -10611,12 +10851,62 @@ enum CommandPaletteTopPicks {
         }
 
         return Array(
-            history
-                .sorted { lhs, rhs in
-                    (Int(lhs.weekStamp) ?? 0) > (Int(rhs.weekStamp) ?? 0)
-                }
+            normalizedLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistory(history)
                 .prefix(limit)
         )
+    }
+
+    private static func normalizedLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistory(
+        _ history: [LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek]
+    ) -> [LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek] {
+        var historyByWeek: [String: LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek] = [:]
+        historyByWeek.reserveCapacity(history.count)
+        for item in history {
+            guard let normalizedItem = normalizedLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(item) else {
+                continue
+            }
+            historyByWeek[normalizedItem.weekStamp] = normalizedItem
+        }
+
+        return historyByWeek.values.sorted { lhs, rhs in
+            (Int(lhs.weekStamp) ?? 0) > (Int(rhs.weekStamp) ?? 0)
+        }
+    }
+
+    private static func normalizedLaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+        _ week: LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek
+    ) -> LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek? {
+        guard let normalizedWeekStamp = normalizedLeagueHistoryWeekStamp(week.weekStamp) else {
+            return nil
+        }
+
+        let metrics = launchRecoveryHotKeyAutoTrustSurgeLeagueMetrics(
+            runsToday: week.runsToday,
+            currentWeekRuns: week.runsThisWeek,
+            bestWeekRuns: week.bestWeekRuns,
+            currentStreak: week.currentStreak,
+            bestStreak: week.bestStreak
+        )
+        let normalizedTier = launchRecoveryHotKeyAutoTrustSurgeLeagueTier(metrics: metrics)
+
+        return LaunchRecoveryHotKeyAutoTrustSurgeLeagueHistoryWeek(
+            weekStamp: normalizedWeekStamp,
+            runsToday: metrics.runsToday,
+            runsThisWeek: metrics.currentWeekRuns,
+            bestWeekRuns: metrics.bestWeekRuns,
+            currentStreak: metrics.currentStreak,
+            bestStreak: metrics.bestStreak,
+            leagueScore: metrics.score,
+            tier: normalizedTier
+        )
+    }
+
+    private static func normalizedLeagueHistoryWeekStamp(_ rawValue: String) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let stamp = Int(trimmed), stamp > 0 else {
+            return nil
+        }
+        return String(stamp)
     }
 
     static func launchRecoveryHotKeyAutoTrustSurgeRecordedLeagueHistory(
@@ -12941,6 +13231,133 @@ struct CommandPaletteAction: Identifiable {
     nonisolated static let autoOpsBundleStatusActionID = "run-fame-auto-bundle-status"
     nonisolated static let launchRescueAutoStatusActionID = "run-fame-launch-rescue-burst-auto-status"
 
+    struct SecondaryAction: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let systemImage: String
+        let isEnabled: Bool
+        let disabledReason: String
+        let closesPaletteAfterRun: Bool
+        let closesPanelAfterRun: Bool
+        let run: () -> Void
+
+        init(
+            id: String,
+            title: String,
+            subtitle: String = "",
+            systemImage: String,
+            isEnabled: Bool = true,
+            disabledReason: String = "Not ready",
+            closesPaletteAfterRun: Bool = true,
+            closesPanelAfterRun: Bool = true,
+            run: @escaping () -> Void
+        ) {
+            self.id = id
+            self.title = title
+            self.subtitle = subtitle.isEmpty ? title : subtitle
+            self.systemImage = systemImage
+            self.isEnabled = isEnabled
+            self.disabledReason = disabledReason
+            self.closesPaletteAfterRun = closesPaletteAfterRun
+            self.closesPanelAfterRun = closesPanelAfterRun
+            self.run = run
+        }
+    }
+
+    enum SourceKind: Equatable, Hashable {
+        case command
+        case ask
+        case app
+        case file
+        case folder
+        case script
+        case link
+        case clipboard
+        case path
+        case web
+        case math
+        case unit
+        case color
+        case date
+        case snippet
+        case recent
+
+        var badgeTitle: String? {
+            switch self {
+            case .command:
+                return nil
+            case .ask:
+                return "Ask"
+            case .app:
+                return "App"
+            case .file:
+                return "File"
+            case .folder:
+                return "Folder"
+            case .script:
+                return "Script"
+            case .link:
+                return "Link"
+            case .clipboard:
+                return "Clipboard"
+            case .path:
+                return "Path"
+            case .web:
+                return "Web"
+            case .math:
+                return "Math"
+            case .unit:
+                return "Unit"
+            case .color:
+                return "Color"
+            case .date:
+                return "Date"
+            case .snippet:
+                return "Snippet"
+            case .recent:
+                return "Recent"
+            }
+        }
+
+        var helpText: String? {
+            switch self {
+            case .command:
+                return nil
+            case .ask:
+                return "Inline question for the current reader context."
+            case .app:
+                return "Installed app matched from root search."
+            case .file:
+                return "Indexed local file matched from root search."
+            case .folder:
+                return "Common folder matched from root search."
+            case .script:
+                return "User script command loaded from the Script Commands folder."
+            case .link:
+                return "Saved quick link matched from root search."
+            case .clipboard:
+                return "Clipboard history item matched from root search."
+            case .path:
+                return "Existing local path matched from root search."
+            case .web:
+                return "Web or URL result matched from root search."
+            case .math:
+                return "Inline calculator result."
+            case .unit:
+                return "Inline conversion result."
+            case .color:
+                return "Inline color conversion result."
+            case .date:
+                return "Inline date or timezone result."
+            case .snippet:
+                return "Saved note or snippet matched from root search."
+            case .recent:
+                return "Recent reader item matched from root search."
+            }
+        }
+    }
+
     struct SignalBadge: Equatable {
         enum Tone: String, Equatable {
             case low
@@ -13004,11 +13421,17 @@ struct CommandPaletteAction: Identifiable {
     let subtitle: String
     let systemImage: String
     let group: CommandPaletteGroup?
+    let sourceKind: SourceKind
     let keywords: [String]
     let signalBadge: SignalBadge?
     let isEnabled: Bool
     let disabledReason: String
     let canFavorite: Bool
+    let aliasBadgeTitle: String?
+    let aliasHelpText: String?
+    let hotKeyBadgeTitle: String?
+    let hotKeyHelpText: String?
+    let secondaryActions: [SecondaryAction]
     let run: () -> Void
 
     init(
@@ -13017,11 +13440,17 @@ struct CommandPaletteAction: Identifiable {
         subtitle: String = "",
         systemImage: String,
         group: CommandPaletteGroup? = nil,
+        sourceKind: SourceKind = .command,
         keywords: [String] = [],
         signalBadge: SignalBadge? = nil,
         isEnabled: Bool = true,
         disabledReason: String = "Not ready",
         canFavorite: Bool = true,
+        aliasBadgeTitle: String? = nil,
+        aliasHelpText: String? = nil,
+        hotKeyBadgeTitle: String? = nil,
+        hotKeyHelpText: String? = nil,
+        secondaryActions: [SecondaryAction] = [],
         run: @escaping () -> Void
     ) {
         self.id = id
@@ -13029,11 +13458,17 @@ struct CommandPaletteAction: Identifiable {
         self.subtitle = subtitle.isEmpty ? title : subtitle
         self.systemImage = systemImage
         self.group = group
+        self.sourceKind = sourceKind
         self.keywords = keywords
         self.signalBadge = signalBadge
         self.isEnabled = isEnabled
         self.disabledReason = disabledReason
         self.canFavorite = canFavorite
+        self.aliasBadgeTitle = aliasBadgeTitle
+        self.aliasHelpText = aliasHelpText
+        self.hotKeyBadgeTitle = hotKeyBadgeTitle
+        self.hotKeyHelpText = hotKeyHelpText
+        self.secondaryActions = secondaryActions
         self.run = run
     }
 
@@ -13372,12 +13807,25 @@ struct CommandPaletteAction: Identifiable {
         query: String,
         usageRecords: [String: CommandUsageRecord] = [:],
         favoriteActionIDs: Set<String> = [],
-        requiredGroup: CommandPaletteGroup? = nil
+        requiredGroup: CommandPaletteGroup? = nil,
+        requiredSourceKinds: Set<SourceKind>? = nil,
+        priorityActionIDs: Set<String> = [],
+        preferredSourceKinds: Set<SourceKind> = []
     ) -> [CommandPaletteAction] {
         let terms = searchTerms(from: query)
         let matchedActions = actions.enumerated().compactMap { index, action -> RankedCommandAction? in
             guard let matchScore = action.matchScore(terms: terms) else { return nil }
-            return RankedCommandAction(index: index, action: action, matchScore: matchScore)
+            return RankedCommandAction(
+                index: index,
+                action: action,
+                matchScore: matchScore,
+                priorityBoost: searchPriorityBoost(
+                    for: action,
+                    priorityActionIDs: priorityActionIDs,
+                    preferredSourceKinds: preferredSourceKinds,
+                    termCount: terms.count
+                )
+            )
         }
 
         return matchedActions
@@ -13390,6 +13838,16 @@ struct CommandPaletteAction: Identifiable {
                 let rhsIsFavorite = favoriteActionIDs.contains(rhs.action.id) && rhs.action.canFavorite
                 if terms.isEmpty && lhsIsFavorite != rhsIsFavorite {
                     return lhsIsFavorite
+                }
+
+                let lhsEffectiveMatchScore = lhs.matchScore + lhs.priorityBoost
+                let rhsEffectiveMatchScore = rhs.matchScore + rhs.priorityBoost
+                if !terms.isEmpty && lhsEffectiveMatchScore != rhsEffectiveMatchScore {
+                    return lhsEffectiveMatchScore > rhsEffectiveMatchScore
+                }
+
+                if !terms.isEmpty && lhs.priorityBoost != rhs.priorityBoost {
+                    return lhs.priorityBoost > rhs.priorityBoost
                 }
 
                 if !terms.isEmpty && lhs.matchScore != rhs.matchScore {
@@ -13421,6 +13879,28 @@ struct CommandPaletteAction: Identifiable {
                 guard let requiredGroup else { return true }
                 return action.resolvedGroup == requiredGroup
             }
+            .filter { action in
+                guard let requiredSourceKinds, !requiredSourceKinds.isEmpty else { return true }
+                return requiredSourceKinds.contains(action.sourceKind)
+            }
+    }
+
+    private static func searchPriorityBoost(
+        for action: CommandPaletteAction,
+        priorityActionIDs: Set<String>,
+        preferredSourceKinds: Set<SourceKind>,
+        termCount: Int
+    ) -> Int {
+        guard termCount == 1 else { return 0 }
+
+        var boost = 0
+        if priorityActionIDs.contains(action.id) {
+            boost += 32
+        }
+        if preferredSourceKinds.contains(action.sourceKind) {
+            boost += 22
+        }
+        return boost
     }
 
     private static func searchTerms(from query: String) -> [String] {
@@ -13534,6 +14014,44 @@ private struct RankedCommandAction {
     let index: Int
     let action: CommandPaletteAction
     let matchScore: Int
+    let priorityBoost: Int
+}
+
+enum CommandPaletteInlineRoute {
+    static let minimumPromptLength = 3
+    static let titleLimit = 72
+    private static let prefixes = ["route:", "route ", "do:", "do "]
+
+    static func makeAction(
+        query: String,
+        run: @escaping (String) -> Void
+    ) -> CommandPaletteAction? {
+        guard let prompt = prefixedPrompt(from: query), prompt.count >= minimumPromptLength else {
+            return nil
+        }
+
+        return CommandPaletteAction(
+            id: "inline-route",
+            title: "Route: \(FreeformPrompt.preview(prompt, limit: titleLimit))",
+            subtitle: "Run the best local AI command or script for this request",
+            systemImage: "bolt.horizontal.circle",
+            sourceKind: .ask,
+            keywords: ["route", "local", "action", "script", "prompt", prompt],
+            canFavorite: false
+        ) {
+            run(prompt)
+        }
+    }
+
+    private static func prefixedPrompt(from query: String) -> String? {
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        for prefix in prefixes where cleanQuery.lowercased().hasPrefix(prefix) {
+            let prompt = String(cleanQuery.dropFirst(prefix.count))
+            let cleanPrompt = FreeformPrompt.clean(prompt)
+            return cleanPrompt.isEmpty ? nil : cleanPrompt
+        }
+        return nil
+    }
 }
 
 enum CommandPaletteInlineAsk {
@@ -13552,6 +14070,7 @@ enum CommandPaletteInlineAsk {
             title: "Ask: \(FreeformPrompt.preview(prompt, limit: titleLimit))",
             subtitle: "Ask about current, selected, clipboard, or picked text",
             systemImage: "sparkles",
+            sourceKind: .ask,
             keywords: ["ask", "ai", "llm", "question", prompt],
             canFavorite: false
         ) {
@@ -13562,7 +14081,99 @@ enum CommandPaletteInlineAsk {
 
 @MainActor
 final class CommandPaletteWindow {
-    private static let preferredContentSize = NSSize(width: 640, height: 460)
+    struct LayoutMetrics: Equatable {
+        let preferredContentSize: NSSize
+        let bodyMinSize: NSSize
+        let stackSpacing: CGFloat
+        let searchFieldSpacing: CGFloat
+        let searchHorizontalPadding: CGFloat
+        let searchVerticalPadding: CGFloat
+        let contentPadding: CGFloat
+        let emptyStateVerticalPadding: CGFloat
+        let groupChipSpacing: CGFloat
+        let groupChipHorizontalPadding: CGFloat
+        let groupChipVerticalPadding: CGFloat
+        let groupBarHorizontalPadding: CGFloat
+        let groupBadgeHorizontalPadding: CGFloat
+        let groupBadgeVerticalPadding: CGFloat
+        let rowHorizontalPadding: CGFloat
+        let rowVerticalPadding: CGFloat
+        let commandLabelSpacing: CGFloat
+        let footerSpacing: CGFloat
+        let actionPanelSpacing: CGFloat
+        let actionPanelRowSpacing: CGFloat
+        let actionPanelPadding: CGFloat
+        let actionPanelWidth: CGFloat
+        let actionPanelOverlayPadding: CGFloat
+        let secondaryRowHorizontalPadding: CGFloat
+        let secondaryRowVerticalPadding: CGFloat
+        let shortcutBadgeHorizontalPadding: CGFloat
+        let shortcutBadgeVerticalPadding: CGFloat
+    }
+
+    nonisolated static func layoutMetrics(isCompact: Bool) -> LayoutMetrics {
+        if isCompact {
+            return LayoutMetrics(
+                preferredContentSize: NSSize(width: 596, height: 404),
+                bodyMinSize: NSSize(width: 520, height: 332),
+                stackSpacing: 10,
+                searchFieldSpacing: 8,
+                searchHorizontalPadding: 12,
+                searchVerticalPadding: 10,
+                contentPadding: 10,
+                emptyStateVerticalPadding: 36,
+                groupChipSpacing: 6,
+                groupChipHorizontalPadding: 8,
+                groupChipVerticalPadding: 5,
+                groupBarHorizontalPadding: 0,
+                groupBadgeHorizontalPadding: 4,
+                groupBadgeVerticalPadding: 2,
+                rowHorizontalPadding: 10,
+                rowVerticalPadding: 8,
+                commandLabelSpacing: 10,
+                footerSpacing: 10,
+                actionPanelSpacing: 8,
+                actionPanelRowSpacing: 5,
+                actionPanelPadding: 10,
+                actionPanelWidth: 272,
+                actionPanelOverlayPadding: 10,
+                secondaryRowHorizontalPadding: 8,
+                secondaryRowVerticalPadding: 6,
+                shortcutBadgeHorizontalPadding: 5,
+                shortcutBadgeVerticalPadding: 2
+            )
+        }
+
+        return LayoutMetrics(
+            preferredContentSize: NSSize(width: 640, height: 460),
+            bodyMinSize: NSSize(width: 560, height: 380),
+            stackSpacing: 12,
+            searchFieldSpacing: 10,
+            searchHorizontalPadding: 16,
+            searchVerticalPadding: 14,
+            contentPadding: 14,
+            emptyStateVerticalPadding: 48,
+            groupChipSpacing: 8,
+            groupChipHorizontalPadding: 10,
+            groupChipVerticalPadding: 6,
+            groupBarHorizontalPadding: 2,
+            groupBadgeHorizontalPadding: 5,
+            groupBadgeVerticalPadding: 2,
+            rowHorizontalPadding: 12,
+            rowVerticalPadding: 10,
+            commandLabelSpacing: 12,
+            footerSpacing: 12,
+            actionPanelSpacing: 10,
+            actionPanelRowSpacing: 6,
+            actionPanelPadding: 12,
+            actionPanelWidth: 304,
+            actionPanelOverlayPadding: 14,
+            secondaryRowHorizontalPadding: 10,
+            secondaryRowVerticalPadding: 8,
+            shortcutBadgeHorizontalPadding: 6,
+            shortcutBadgeVerticalPadding: 3
+        )
+    }
 
     private let state: ReaderState
     private let settings: SettingsStore
@@ -13573,17 +14184,28 @@ final class CommandPaletteWindow {
     )
     private let refreshClock = CommandPaletteRefreshClock()
     private let actions: () -> [CommandPaletteAction]
+    private let browseActions: () -> [CommandPaletteAction]
+    private let browseSummary: () -> CommandPaletteBrowseSummary
     private let inlineActions: (String) -> [CommandPaletteAction]
     private let onShow: () -> Void
+    private let prepareRun: (String) -> Void
     private var window: NSPanel?
     private var testIsVisible = false
+    private nonisolated static let rootSearchInlinePrefixes = ["route:", "route ", "do:", "do "]
+
+    private var currentLayoutMetrics: LayoutMetrics {
+        Self.layoutMetrics(isCompact: settings.launcherCompactMode)
+    }
 
     init(
         state: ReaderState,
         settings: SettingsStore,
         actions: @escaping () -> [CommandPaletteAction],
+        browseActions: @escaping () -> [CommandPaletteAction] = { [] },
+        browseSummary: @escaping () -> CommandPaletteBrowseSummary = { .empty },
         inlineActions: @escaping (String) -> [CommandPaletteAction] = { _ in [] },
         onShow: @escaping () -> Void = {},
+        prepareRun: @escaping (String) -> Void = { _ in },
         topPickMilestone: @escaping (Int) -> Void = { _ in },
         recordBestChannelLaunchPackPressureActivity: @escaping (
             CommandPaletteBestChannelLaunchPackPressureActivity
@@ -13593,13 +14215,17 @@ final class CommandPaletteWindow {
         self.state = state
         self.settings = settings
         self.actions = actions
+        self.browseActions = browseActions
+        self.browseSummary = browseSummary
         self.inlineActions = inlineActions
         self.onShow = onShow
+        self.prepareRun = prepareRun
 
         guard !RuntimeEnvironment.suppressesExternalEffects else { return }
 
+        let layoutMetrics = currentLayoutMetrics
         let window = NSPanel(
-            contentRect: NSRect(origin: .zero, size: Self.preferredContentSize),
+            contentRect: NSRect(origin: .zero, size: layoutMetrics.preferredContentSize),
             styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -13616,12 +14242,7 @@ final class CommandPaletteWindow {
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.animationBehavior = .utilityWindow
-        WindowBounds.reset(
-            window,
-            preferredContentSize: Self.preferredContentSize,
-            minContentSize: Self.preferredContentSize,
-            maxContentSize: Self.preferredContentSize
-        )
+        applyWindowLayout(to: window)
         window.contentViewController = NSHostingController(
             rootView: CommandPaletteView(
                 state: state,
@@ -13630,7 +14251,10 @@ final class CommandPaletteWindow {
                 session: session,
                 refreshClock: refreshClock,
                 actions: actions,
+                browseActions: browseActions,
+                browseSummary: browseSummary,
                 inlineActions: inlineActions,
+                prepareRun: prepareRun,
                 topPickMilestone: topPickMilestone,
                 recordBestChannelLaunchPackPressureActivity:
                     recordBestChannelLaunchPackPressureActivity,
@@ -13648,12 +14272,7 @@ final class CommandPaletteWindow {
             return
         }
         guard let window else { return }
-        WindowBounds.reset(
-            window,
-            preferredContentSize: Self.preferredContentSize,
-            minContentSize: Self.preferredContentSize,
-            maxContentSize: Self.preferredContentSize
-        )
+        applyWindowLayout(to: window)
         placeNearTopOfScreen()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -13678,8 +14297,25 @@ final class CommandPaletteWindow {
         refreshClock.bump()
     }
 
+    func refreshLayout() {
+        refreshClock.bump()
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+        guard let window else { return }
+        applyWindowLayout(to: window)
+        if window.isVisible {
+            placeNearTopOfScreen()
+        }
+    }
+
     func clearCommandLearning() {
         usageStore.clearRecords()
+    }
+
+    var currentWindowContentSize: NSSize? {
+        if RuntimeEnvironment.suppressesExternalEffects {
+            return currentLayoutMetrics.preferredContentSize
+        }
+        return window?.contentView?.bounds.size
     }
 
     var hasCommandFavorites: Bool {
@@ -13690,12 +14326,161 @@ final class CommandPaletteWindow {
         usageStore.clearFavorites()
     }
 
+    func recordExternalRun(actionID: String) {
+        usageStore.recordRun(actionID: actionID)
+        session.recordLaunchRecoveryHotKeyInterventionRun(actionID: actionID)
+    }
+
+    nonisolated static func baseActionIDsForSearchState(
+        allActions: [CommandPaletteAction],
+        browseActions: [CommandPaletteAction],
+        searchQuery: String,
+        hasScopedQuery: Bool,
+        activeGroup: CommandPaletteGroup?
+    ) -> [String] {
+        let cleanQuery = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanQuery.isEmpty && !hasScopedQuery && activeGroup == nil {
+            return browseActions.map(\.id)
+        }
+        return allActions.map(\.id)
+    }
+
+    nonisolated static func launcherHomeSections(
+        availableActionIDs: [String]
+    ) -> [CommandPaletteLauncherHomeSection] {
+        let availableActionIDSet = Set(availableActionIDs)
+        let sectionDefinitions = [
+            CommandPaletteLauncherHomeSection(
+                title: "Start",
+                actionIDs: [
+                    "pick-and-read",
+                    "screenshot-line",
+                    "ask-anything",
+                    "run-best-local-action"
+                ]
+            ),
+            CommandPaletteLauncherHomeSection(
+                title: "Spaces",
+                actionIDs: [
+                    "open-notes-workspace",
+                    "open-extensions-workspace",
+                    "window-settings",
+                    "setup-checklist"
+                ]
+            )
+        ]
+
+        return sectionDefinitions
+            .map { section in
+                CommandPaletteLauncherHomeSection(
+                    title: section.title,
+                    actionIDs: section.actionIDs.filter { availableActionIDSet.contains($0) }
+                )
+            }
+            .filter { !$0.actionIDs.isEmpty }
+    }
+
+    nonisolated static func launcherHomeUtilityActionIDs(
+        availableActionIDs: [String]
+    ) -> [String] {
+        let availableActionIDSet = Set(availableActionIDs)
+        let preferredActionIDs = [
+            "show-reader",
+            "refresh-app-launcher",
+            "toggle-menu-bar-item",
+            "settings"
+        ]
+        return preferredActionIDs.filter { availableActionIDSet.contains($0) }
+    }
+
+    nonisolated static let platformFirstSearchSourceKinds: Set<CommandPaletteAction.SourceKind> = [
+        .app,
+        .file,
+        .folder,
+        .snippet,
+        .link,
+        .clipboard,
+        .recent,
+        .script,
+        .path,
+        .web
+    ]
+
+    nonisolated static func normalizedSelectionID(
+        actionIDs: [String],
+        currentID: String?
+    ) -> String? {
+        guard !actionIDs.isEmpty else { return nil }
+        if let currentID, actionIDs.contains(currentID) {
+            return currentID
+        }
+        return actionIDs.first
+    }
+
+    nonisolated static func shiftedSelectionID(
+        actionIDs: [String],
+        currentID: String?,
+        offset: Int
+    ) -> String? {
+        guard !actionIDs.isEmpty else { return nil }
+        let currentIndex = currentID.flatMap { actionIDs.firstIndex(of: $0) } ?? 0
+        let count = actionIDs.count
+        let nextIndex = ((currentIndex + offset) % count + count) % count
+        return actionIDs[nextIndex]
+    }
+
+    nonisolated static func queryByApplyingScope(
+        _ insertedText: String,
+        currentQuery: String
+    ) -> String {
+        let normalizedInsertedText = insertedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedInsertedText.isEmpty else { return currentQuery }
+
+        let scopedQuery = CommandPaletteGroup.parseScopedQuery(currentQuery)
+        let existingRemainder: String
+        if scopedQuery.hasScope {
+            existingRemainder = scopedQuery.searchQuery
+        } else if let inlinePrompt = inlinePrompt(from: currentQuery) {
+            existingRemainder = inlinePrompt
+        } else {
+            existingRemainder = currentQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let cleanRemainder = existingRemainder.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanRemainder.isEmpty else {
+            return "\(normalizedInsertedText) "
+        }
+        return "\(normalizedInsertedText) \(cleanRemainder)"
+    }
+
+    private nonisolated static func inlinePrompt(from query: String) -> String? {
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        for prefix in rootSearchInlinePrefixes where cleanQuery.lowercased().hasPrefix(prefix) {
+            let prompt = String(cleanQuery.dropFirst(prefix.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !prompt.isEmpty else { return nil }
+            return prompt
+        }
+        return nil
+    }
+
     private func hide() {
         guard !RuntimeEnvironment.suppressesExternalEffects else {
             testIsVisible = false
             return
         }
         window?.orderOut(nil)
+    }
+
+    private func applyWindowLayout(to window: NSPanel) {
+        let layoutMetrics = currentLayoutMetrics
+        WindowBounds.reset(
+            window,
+            preferredContentSize: layoutMetrics.preferredContentSize,
+            minContentSize: layoutMetrics.preferredContentSize,
+            maxContentSize: layoutMetrics.preferredContentSize
+        )
     }
 
     private func placeNearTopOfScreen() {
@@ -13759,7 +14544,10 @@ private struct CommandPaletteView: View {
     @ObservedObject var session: CommandPaletteSession
     @ObservedObject var refreshClock: CommandPaletteRefreshClock
     let actions: () -> [CommandPaletteAction]
+    let browseActions: () -> [CommandPaletteAction]
+    let browseSummary: () -> CommandPaletteBrowseSummary
     let inlineActions: (String) -> [CommandPaletteAction]
+    let prepareRun: (String) -> Void
     let topPickMilestone: (Int) -> Void
     let recordBestChannelLaunchPackPressureActivity:
         (CommandPaletteBestChannelLaunchPackPressureActivity) -> Void
@@ -13769,6 +14557,13 @@ private struct CommandPaletteView: View {
     @State private var query = ""
     @State private var selectedGroup: CommandPaletteGroup?
     @State private var selectedActionID: String?
+    @State private var isActionPanelPresented = false
+    @State private var selectedSecondaryActionID: String?
+    // While the user is moving the selection with the keyboard, rows can scroll
+    // under a stationary cursor and wrongly fire `.onHover`, stealing the
+    // selection. We suppress hover-selection until the pointer actually moves.
+    @State private var isKeyboardNavigating = false
+    @State private var lastHoverLocation: CGPoint?
     @State private var previousTopPickIDs: [String] = []
     @State private var highlightedTopPickIDs: Set<String> = []
     @State private var topPickHighlightTask: Task<Void, Never>?
@@ -13871,18 +14666,46 @@ private struct CommandPaletteView: View {
     }
 
     private var activeGroup: CommandPaletteGroup? {
-        scopedQuery.group ?? selectedGroup
+        scopedQuery.hasScope ? scopedQuery.group : selectedGroup
+    }
+
+    private var layoutMetrics: CommandPaletteWindow.LayoutMetrics {
+        CommandPaletteWindow.layoutMetrics(isCompact: settings.launcherCompactMode)
     }
 
     private var matchedActions: [CommandPaletteAction] {
         _ = refreshClock.tick
-        let availableActions = actions() + inlineActions(effectiveSearchQuery)
+        let allActions = actions()
+        let idleBrowseActions = browseActions()
+        let baseActionIDs = Set(
+            CommandPaletteWindow.baseActionIDsForSearchState(
+                allActions: allActions,
+                browseActions: idleBrowseActions,
+                searchQuery: effectiveSearchQuery,
+                hasScopedQuery: scopedQuery.hasScope,
+                activeGroup: activeGroup
+            )
+        )
+        let baseActions = allActions.filter { baseActionIDs.contains($0.id) }
+        let availableActions = baseActions + inlineActions(effectiveSearchQuery)
+        let usePlatformFirstSearchRanking = !effectiveSearchQuery
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty && !scopedQuery.hasScope && activeGroup == nil
+        let priorityActionIDs = usePlatformFirstSearchRanking
+            ? Set(idleBrowseActions.map(\.id))
+            : []
+        let preferredSourceKinds = usePlatformFirstSearchRanking
+            ? CommandPaletteWindow.platformFirstSearchSourceKinds
+            : []
 
         return CommandPaletteAction.filter(
             availableActions,
             query: effectiveSearchQuery,
             usageRecords: usageStore.records,
-            favoriteActionIDs: usageStore.favoriteActionIDs
+            favoriteActionIDs: usageStore.favoriteActionIDs,
+            requiredSourceKinds: scopedQuery.sourceKinds,
+            priorityActionIDs: priorityActionIDs,
+            preferredSourceKinds: preferredSourceKinds
         )
     }
 
@@ -13900,13 +14723,48 @@ private struct CommandPaletteView: View {
     }
 
     private var availableGroups: [CommandPaletteGroup] {
-        CommandPaletteGroup.allCases
+        // Only surface group filter chips that actually contain visible actions,
+        // so the bar never shows empty categories.
+        let counts = groupCounts
+        return CommandPaletteGroup.allCases.filter { (counts[$0] ?? 0) > 0 }
     }
 
     private var shouldShowTopPicks: Bool {
         let cleanQuery = effectiveSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         return cleanQuery.isEmpty && !scopedQuery.hasScope && activeGroup == nil
     }
+
+    private var currentBrowseSummary: CommandPaletteBrowseSummary {
+        browseSummary()
+    }
+
+    private var idleBrowseActions: [CommandPaletteAction] {
+        browseActions()
+    }
+
+    private var launcherHomeSections: [CommandPaletteLauncherHomeSection] {
+        CommandPaletteWindow.launcherHomeSections(
+            availableActionIDs: idleBrowseActions.map(\.id)
+        )
+    }
+
+    private var launcherHomeActionsByID: [String: CommandPaletteAction] {
+        Dictionary(uniqueKeysWithValues: idleBrowseActions.map { ($0.id, $0) })
+    }
+
+    private var launcherHomeUtilityActions: [CommandPaletteAction] {
+        let actionsByID = launcherHomeActionsByID
+        let actionIDs = CommandPaletteWindow.launcherHomeUtilityActionIDs(
+            availableActionIDs: idleBrowseActions.map(\.id)
+        )
+        return actionIDs.compactMap { actionsByID[$0] }
+    }
+
+    // The "Fame Ops" growth widgets (momentum/trust/confidence/scorecard cards,
+    // header chips, and the recommendation rationale card) are hidden so the
+    // Command Palette stays focused on real reader actions. Flip to `true` to
+    // bring the growth tooling back.
+    private var showFameTopPicksExtras: Bool { false }
 
     private var topPickContext: CommandPaletteTopPickContext {
         let onboardingRecoverySnapshot = CommandPaletteTopPicks.onboardingRecoverySnapshot()
@@ -14632,6 +15490,69 @@ private struct CommandPaletteView: View {
         return filteredActions.first { $0.id == activeActionID }
     }
 
+    private var activeActionPanelActions: [CommandPaletteAction.SecondaryAction] {
+        guard let action = activeAction else { return [] }
+
+        var panelActions: [CommandPaletteAction.SecondaryAction] = []
+        if !action.secondaryActions.isEmpty || action.canFavorite {
+            panelActions.append(
+                CommandPaletteAction.SecondaryAction(
+                    id: "run-primary-\(action.id)",
+                    title: action.title,
+                    subtitle: action.subtitle,
+                    systemImage: action.systemImage,
+                    isEnabled: action.isEnabled,
+                    disabledReason: action.disabledReason,
+                    closesPaletteAfterRun: false
+                ) {
+                    run(action)
+                }
+            )
+        }
+
+        panelActions.append(contentsOf: action.secondaryActions)
+
+        if action.canFavorite {
+            let isFavorite = usageStore.isFavorite(actionID: action.id)
+            panelActions.append(
+                CommandPaletteAction.SecondaryAction(
+                    id: "favorite-\(action.id)",
+                    title: isFavorite ? "Unfavorite Command" : "Favorite Command",
+                    subtitle: isFavorite
+                        ? "Remove from launcher favorites"
+                        : "Pin higher in launcher results",
+                    systemImage: isFavorite ? "star.slash" : "star",
+                    closesPaletteAfterRun: false,
+                    closesPanelAfterRun: false
+                ) {
+                    usageStore.toggleFavorite(actionID: action.id)
+                }
+            )
+        }
+
+        return panelActions
+    }
+
+    private var activeSecondaryActionID: String? {
+        CommandPaletteWindow.normalizedSelectionID(
+            actionIDs: activeActionPanelActions.map(\.id),
+            currentID: selectedSecondaryActionID
+        )
+    }
+
+    private var activeSecondaryAction: CommandPaletteAction.SecondaryAction? {
+        guard let activeSecondaryActionID else { return nil }
+        return activeActionPanelActions.first { $0.id == activeSecondaryActionID }
+    }
+
+    private var actionPanelContextToken: String {
+        let actionToken = activeAction?.id ?? "none"
+        let panelActionToken = activeActionPanelActions
+            .map { "\($0.id):\($0.title):\($0.isEnabled)" }
+            .joined(separator: "|")
+        return "\(actionToken)|\(panelActionToken)"
+    }
+
     private var selectedActionRecommendationPanelModel: CommandPaletteAction.RecommendationPanelModel? {
         CommandPaletteAction.recommendationPanelModel(for: activeAction)
     }
@@ -14731,26 +15652,28 @@ private struct CommandPaletteView: View {
     var body: some View {
         paletteBodyEventBindings
             .onMoveCommand(perform: moveSelection)
-            .onExitCommand(perform: close)
+            .onExitCommand(perform: handleExitCommand)
     }
 
     private var paletteBodyContent: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
+        VStack(spacing: layoutMetrics.stackSpacing) {
+            HStack(spacing: layoutMetrics.searchFieldSpacing) {
                 Image(systemName: "magnifyingglass")
                     .font(.title3)
                     .foregroundStyle(.secondary)
 
-                TextField("Search actions", text: $query)
+                TextField("Search commands, apps, files, notes…", text: $query)
                     .textFieldStyle(.plain)
                     .font(.title3)
                     .focused($searchIsFocused)
                     .onSubmit(runActiveAction)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.horizontal, layoutMetrics.searchHorizontalPadding)
+            .padding(.vertical, layoutMetrics.searchVerticalPadding)
             .background(Color(nsColor: .textBackgroundColor).opacity(0.86))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            launcherSummaryCard
 
             groupFilterBar
 
@@ -14765,11 +15688,11 @@ private struct CommandPaletteView: View {
                         }
 
                         if filteredActions.isEmpty {
-                            Text("No actions found. Try shorter search text.")
+                            Text("No results found. Try app:, file:, note:, link:, script:, q:, or shorter text.")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 48)
+                                .padding(.vertical, layoutMetrics.emptyStateVerticalPadding)
                         }
                     }
                 }
@@ -14779,9 +15702,22 @@ private struct CommandPaletteView: View {
                         proxy.scrollTo(id, anchor: .center)
                     }
                 }
+                .onContinuousHover(coordinateSpace: .local) { phase in
+                    switch phase {
+                    case .active(let location):
+                        // A changed location means the user actually moved the
+                        // pointer, so hand control back to mouse hover.
+                        if let last = lastHoverLocation, location != last {
+                            isKeyboardNavigating = false
+                        }
+                        lastHoverLocation = location
+                    case .ended:
+                        lastHoverLocation = nil
+                    }
+                }
             }
 
-            if let selectedActionRecommendationPanelModel {
+            if showFameTopPicksExtras, let selectedActionRecommendationPanelModel {
                 selectedActionRecommendationPanel(
                     selectedActionRecommendationPanelModel,
                     ctaAction: selectedActionRecommendationCTAAction
@@ -14793,14 +15729,310 @@ private struct CommandPaletteView: View {
             autoOpsBundleStatusDedicatedShortcutRegistrar
             launchRescueAutoStatusDedicatedShortcutRegistrar
             selectedActionRecommendationShortcutRegistrar
+            actionPanelToggleShortcutRegistrar
         }
+    }
+
+    @ViewBuilder
+    private var launcherSummaryCard: some View {
+        let summary = currentBrowseSummary
+        let homeSections = launcherHomeSections
+        let utilityActions = launcherHomeUtilityActions
+        if shouldShowTopPicks
+            && (
+                !summary.sources.isEmpty
+                    || !summary.scopes.isEmpty
+                    || !homeSections.isEmpty
+                    || !utilityActions.isEmpty
+            ) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Label("Launcher Home", systemImage: "square.grid.2x2")
+                        .font(.caption.weight(.semibold))
+                    Text("Quiet local launcher for reading, notes, scripts, files, AI, and windows.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                if !summary.detail.isEmpty {
+                    Text(summary.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                if !homeSections.isEmpty {
+                    ForEach(Array(homeSections.enumerated()), id: \.offset) { _, section in
+                        VStack(alignment: .leading, spacing: 6) {
+                            launcherSummarySectionLabel(section.title)
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(
+                                        .adaptive(
+                                            minimum: settings.launcherCompactMode ? 116 : 128
+                                        ),
+                                        spacing: 8,
+                                        alignment: .leading
+                                    )
+                                ],
+                                alignment: .leading,
+                                spacing: 8
+                            ) {
+                                ForEach(section.actionIDs, id: \.self) { actionID in
+                                    if let action = launcherHomeActionsByID[actionID] {
+                                        launcherHomeActionTile(action)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !utilityActions.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        launcherSummarySectionLabel("Platform")
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(utilityActions) { action in
+                                    launcherHomeUtilityActionChip(action)
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                    }
+                }
+
+                if !summary.sources.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        launcherSummarySectionLabel("Search")
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(summary.sources) { source in
+                                    launcherSummarySourceChip(source)
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                    }
+                }
+
+                if !summary.scopes.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        launcherSummarySectionLabel("Try")
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(summary.scopes) { scope in
+                                    launcherSummaryScopeChip(scope)
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            )
+        }
+    }
+
+    private func launcherSummarySectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+    }
+
+    private func launcherHomeActionTile(_ action: CommandPaletteAction) -> some View {
+        Button {
+            run(action)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: action.systemImage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(action.isEnabled ? Color.accentColor : .secondary)
+                    .frame(width: 14)
+
+                Text(launcherHomeActionTitle(for: action))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(action.isEnabled ? .primary : .secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                if let badgeTitle = launcherHomeActionShortcutBadgeTitle(for: action) {
+                    shortcutBadge(badgeTitle)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                action.isEnabled
+                    ? Color.accentColor.opacity(0.08)
+                    : Color.secondary.opacity(0.08)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(
+                        action.isEnabled
+                            ? Color.accentColor.opacity(0.16)
+                            : Color.secondary.opacity(0.12),
+                        lineWidth: 1
+                    )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!action.isEnabled)
+        .help(launcherHomeActionHelpText(for: action))
+    }
+
+    private func launcherHomeUtilityActionChip(_ action: CommandPaletteAction) -> some View {
+        Button {
+            run(action)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: action.systemImage)
+                    .font(.caption.weight(.semibold))
+                Text(launcherHomeActionTitle(for: action))
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                if let badgeTitle = launcherHomeActionShortcutBadgeTitle(for: action) {
+                    shortcutBadge(badgeTitle)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                action.isEnabled
+                    ? Color.secondary.opacity(0.1)
+                    : Color.secondary.opacity(0.06)
+            )
+            .foregroundStyle(action.isEnabled ? .primary : .secondary)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(!action.isEnabled)
+        .help(launcherHomeActionHelpText(for: action))
+    }
+
+    private func launcherHomeActionTitle(for action: CommandPaletteAction) -> String {
+        switch action.id {
+        case "pick-and-read":
+            return "Pick & Read"
+        case "screenshot-line":
+            return "Screenshot"
+        case "ask-anything":
+            return "Ask"
+        case "run-best-local-action":
+            return "Route Request"
+        case "open-notes-workspace":
+            return "Notes"
+        case "open-extensions-workspace":
+            return "Extensions"
+        case "window-settings":
+            return "Windows"
+        case "setup-checklist":
+            return "Setup"
+        case "refresh-app-launcher":
+            return "Refresh Search"
+        case "toggle-menu-bar-item":
+            return action.title.replacingOccurrences(of: " Menu Bar Item", with: "")
+        case "show-reader":
+            return "Reader"
+        default:
+            return action.title
+        }
+    }
+
+    private func launcherHomeActionShortcutBadgeTitle(
+        for action: CommandPaletteAction
+    ) -> String? {
+        action.hotKeyBadgeTitle ?? CommandPaletteAction.dedicatedShortcutBadgeTitle(for: action.id)
+    }
+
+    private func launcherHomeActionHelpText(for action: CommandPaletteAction) -> String {
+        guard action.isEnabled else {
+            return "\(action.subtitle). \(action.disabledReason)"
+        }
+        if let badgeTitle = launcherHomeActionShortcutBadgeTitle(for: action) {
+            return "\(action.subtitle). Shortcut: \(badgeTitle)."
+        }
+        return action.subtitle
+    }
+
+    private func launcherSummarySourceChip(_ source: CommandPaletteBrowseSummary.Source) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: source.systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(source.title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(source.countTitle)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.primary.opacity(0.08))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.secondary.opacity(0.1))
+        .clipShape(Capsule())
+        .help(source.helpText)
+    }
+
+    private func launcherSummaryScopeChip(_ scope: CommandPaletteBrowseSummary.Scope) -> some View {
+        Button {
+            query = CommandPaletteWindow.queryByApplyingScope(
+                scope.insertedText,
+                currentQuery: query
+            )
+            selectedGroup = nil
+            isActionPanelPresented = false
+            selectedSecondaryActionID = nil
+            searchIsFocused = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: scope.systemImage)
+                    .font(.caption.weight(.semibold))
+                Text(scope.title)
+                    .font(.caption2.weight(.semibold))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.accentColor.opacity(0.14))
+            .foregroundStyle(Color.accentColor)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(scope.helpText)
     }
 
     private var paletteBodyStyled: some View {
         paletteBodyContent
-            .padding(14)
-            .frame(minWidth: 560, minHeight: 380)
-            .background(.regularMaterial)
+            .padding(layoutMetrics.contentPadding)
+            .frame(
+                minWidth: layoutMetrics.bodyMinSize.width,
+                minHeight: layoutMetrics.bodyMinSize.height
+            )
+            // Solid panel instead of a translucent material so the windows
+            // behind the palette don't bleed through as blurred text.
+            .background(Color(nsColor: .windowBackgroundColor))
+            .overlay(alignment: .bottomTrailing) {
+                if isActionPanelPresented, !activeActionPanelActions.isEmpty {
+                    actionPanelOverlay
+                        .padding(layoutMetrics.actionPanelOverlayPadding)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
     }
 
     private var paletteBodyLifecycleBindings: some View {
@@ -14877,6 +16109,7 @@ private struct CommandPaletteView: View {
             .onChange(of: query) { _, _ in
                 clearFameMomentumPanelRouteStabilizationRecoveryDiagnosticsFocus()
                 selectedActionID = filteredActions.first?.id
+                dismissActionPanel()
             }
             .onChange(
                 of: fameMomentumPanelRouteStabilizationRecoveryDiagnosticsTelemetryToken
@@ -14918,6 +16151,10 @@ private struct CommandPaletteView: View {
                 if !filteredActions.contains(where: { $0.id == selectedActionID }) {
                     selectedActionID = filteredActions.first?.id
                 }
+                normalizeActionPanelSelection()
+            }
+            .onChange(of: actionPanelContextToken) { _, _ in
+                normalizeActionPanelSelection()
             }
             .onChange(of: selectedActionRecommendationOpportunityToken) { _, _ in
                 recordRecommendationOpportunityIfNeeded()
@@ -15232,6 +16469,8 @@ private struct CommandPaletteView: View {
         query = ""
         selectedGroup = nil
         selectedActionID = filteredActions.first?.id
+        isActionPanelPresented = false
+        selectedSecondaryActionID = nil
         highlightedTopPickIDs = []
         visibleTopPickMilestone = nil
         previousTopPickIDs = topPickActions.map(\.id)
@@ -16368,7 +17607,7 @@ private struct CommandPaletteView: View {
     @ViewBuilder
     private var groupFilterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: layoutMetrics.groupChipSpacing) {
                 groupChip(
                     title: "All",
                     systemImage: "square.grid.2x2",
@@ -16391,7 +17630,7 @@ private struct CommandPaletteView: View {
                     }
                 }
             }
-            .padding(.horizontal, 2)
+            .padding(.horizontal, layoutMetrics.groupBarHorizontalPadding)
         }
     }
 
@@ -16415,7 +17654,7 @@ private struct CommandPaletteView: View {
         let key = KeyEquivalent(Character(String(shortcutDigit)))
 
         return Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: layoutMetrics.groupChipSpacing) {
                 Image(systemName: systemImage)
                     .font(.caption.weight(.semibold))
                 Text(title)
@@ -16423,20 +17662,20 @@ private struct CommandPaletteView: View {
                 Text("\(count)")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, layoutMetrics.groupBadgeHorizontalPadding)
+                    .padding(.vertical, layoutMetrics.groupBadgeVerticalPadding)
                     .background(Color.secondary.opacity(0.14))
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 Text("⌃\(shortcutDigit)")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, layoutMetrics.groupBadgeHorizontalPadding)
+                    .padding(.vertical, layoutMetrics.groupBadgeVerticalPadding)
                     .background(Color.secondary.opacity(0.14))
                     .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, layoutMetrics.groupChipHorizontalPadding)
+            .padding(.vertical, layoutMetrics.groupChipVerticalPadding)
             .background(isSelected ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08))
             .opacity(isSelected || !isEmpty ? 1 : 0.72)
             .clipShape(Capsule())
@@ -16448,7 +17687,11 @@ private struct CommandPaletteView: View {
 
     @ViewBuilder
     private var topPicksBar: some View {
-        if shouldShowTopPicks && !topPickActions.isEmpty {
+        // The whole "Top Picks" / Fame Ops bar is growth tooling, not a reader
+        // action. Hiding it keeps the palette short enough to never overflow the
+        // fixed window (which was clipping the search field at the top) and
+        // removes the wall of text above the command list.
+        if showFameTopPicksExtras && shouldShowTopPicks && !topPickActions.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 let confidenceScore = launchRecoveryHotKeyConfidenceScore
                 let winMeter = launchRecoveryHotKeyWinMeter
@@ -16832,6 +18075,7 @@ private struct CommandPaletteView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
 
+                    if showFameTopPicksExtras {
                     if let topPicksStatusShortcutBadgeTitle {
                         Label(topPicksStatusShortcutBadgeTitle, systemImage: "keyboard")
                             .font(.caption2.weight(.semibold))
@@ -17041,8 +18285,10 @@ private struct CommandPaletteView: View {
                             bestWeekRuns: autoTrustSurgeWeeklyRuns.best
                         )
                     }
+                    } // end showFameTopPicksExtras (Top Picks header chips)
                 }
 
+                if showFameTopPicksExtras {
                 if let fameMomentumPanel {
                     topPicksFameMomentumPanelCard(
                         fameMomentumPanel,
@@ -17243,6 +18489,7 @@ private struct CommandPaletteView: View {
                 if shouldShowCadenceExecutionKitMomentumCard {
                     cadenceExecutionKitMomentumCard
                 }
+                } // end showFameTopPicksExtras (Top Picks cards)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -21156,14 +22403,17 @@ private struct CommandPaletteView: View {
                     .frame(width: 30, height: 30)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, layoutMetrics.rowHorizontalPadding)
+        .padding(.vertical, layoutMetrics.rowVerticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
         .onHover { isHovering in
-            if isHovering {
+            // Ignore hover events caused by rows scrolling under a stationary
+            // cursor during keyboard navigation; only a real pointer move
+            // (detected by `.onContinuousHover` on the list) re-enables this.
+            if isHovering && !isKeyboardNavigating {
                 selectedActionID = action.id
             }
         }
@@ -21191,7 +22441,7 @@ private struct CommandPaletteView: View {
     }
 
     private func commandLabel(_ action: CommandPaletteAction, shortcutNumber: Int?) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: layoutMetrics.commandLabelSpacing) {
             Image(systemName: action.systemImage)
                 .font(.title3)
                 .foregroundStyle(action.isEnabled ? .primary : .secondary)
@@ -21214,6 +22464,21 @@ private struct CommandPaletteView: View {
                     .help(signalBadge.helpText)
             }
 
+            if let sourceBadgeTitle = action.sourceKind.badgeTitle {
+                commandSourceBadge(sourceBadgeTitle)
+                    .help(action.sourceKind.helpText ?? sourceBadgeTitle)
+            }
+
+            if let aliasBadgeTitle = action.aliasBadgeTitle {
+                commandAliasBadge(aliasBadgeTitle)
+                    .help(action.aliasHelpText ?? aliasBadgeTitle)
+            }
+
+            if let hotKeyBadgeTitle = action.hotKeyBadgeTitle {
+                shortcutBadge(hotKeyBadgeTitle)
+                    .help(action.hotKeyHelpText ?? hotKeyBadgeTitle)
+            }
+
             if !action.isEnabled {
                 Text(action.disabledReason)
                     .font(.caption2.weight(.medium))
@@ -21232,6 +22497,28 @@ private struct CommandPaletteView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+
+    private func commandSourceBadge(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.secondary.opacity(0.12))
+            .clipShape(Capsule())
+            .lineLimit(1)
+    }
+
+    private func commandAliasBadge(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.accentColor.opacity(0.14))
+            .clipShape(Capsule())
+            .lineLimit(1)
     }
 
     private func commandSignalBadge(_ badge: CommandPaletteAction.SignalBadge) -> some View {
@@ -21437,8 +22724,8 @@ private struct CommandPaletteView: View {
         Text(title)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .padding(.horizontal, layoutMetrics.shortcutBadgeHorizontalPadding)
+            .padding(.vertical, layoutMetrics.shortcutBadgeVerticalPadding)
             .background(Color.secondary.opacity(0.14))
             .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
@@ -21459,7 +22746,7 @@ private struct CommandPaletteView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: layoutMetrics.footerSpacing) {
             if settings.llmEnabled {
                 Label("LLM on", systemImage: "sparkles")
             } else {
@@ -21480,74 +22767,45 @@ private struct CommandPaletteView: View {
 
             Spacer()
 
-            Text("Return")
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.secondary.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            shortcutBadge("Return")
             Text("Run")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("⌘1-9")
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.secondary.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            shortcutBadge("⌘1-9")
             Text("Quick run")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            if launchRecoveryDedicatedShortcutAction != nil {
-                Text("⌥⌘R")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if showFameTopPicksExtras, launchRecoveryDedicatedShortcutAction != nil {
+                shortcutBadge("⌥⌘R")
                 Text("Launch recovery")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if autoOpsBundleStatusDedicatedShortcutAction != nil {
-                Text("⌥⌘O")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if showFameTopPicksExtras, autoOpsBundleStatusDedicatedShortcutAction != nil {
+                shortcutBadge("⌥⌘O")
                 Text("Auto bundle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if launchRescueAutoStatusDedicatedShortcutAction != nil {
-                Text("⌥⌘L")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if showFameTopPicksExtras, launchRescueAutoStatusDedicatedShortcutAction != nil {
+                shortcutBadge("⌥⌘L")
                 Text("Rescue auto")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if selectedActionRecommendationCTAAction != nil {
-                Text("⌘↩")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if showFameTopPicksExtras, selectedActionRecommendationCTAAction != nil {
+                shortcutBadge("⌘↩")
                 Text("Recommend")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text("⌃0-8")
-                .font(.caption2.weight(.semibold))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.secondary.opacity(0.14))
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            if !activeActionPanelActions.isEmpty {
+                shortcutBadge("⌘K")
+                Text("Actions")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            shortcutBadge("⌃0-8")
             Text("Groups")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -21555,6 +22813,117 @@ private struct CommandPaletteView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
+    }
+
+    private var actionPanelOverlay: some View {
+        VStack(alignment: .leading, spacing: layoutMetrics.actionPanelSpacing) {
+            HStack(spacing: 8) {
+                Label("Actions", systemImage: "square.grid.2x2")
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                shortcutBadge("⌘K")
+                    .help("Toggle action panel")
+            }
+
+            if let activeAction {
+                Text(activeAction.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            VStack(spacing: layoutMetrics.actionPanelRowSpacing) {
+                ForEach(activeActionPanelActions) { action in
+                    secondaryActionButton(action)
+                }
+            }
+
+            HStack(spacing: 8) {
+                shortcutBadge("Return")
+                Text("Run")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                shortcutBadge("Esc")
+                Text("Close")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(layoutMetrics.actionPanelPadding)
+        .frame(width: layoutMetrics.actionPanelWidth, alignment: .leading)
+        .background(Color(nsColor: .underPageBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.secondary.opacity(0.18))
+        )
+        .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 8)
+    }
+
+    private func secondaryActionButton(_ action: CommandPaletteAction.SecondaryAction) -> some View {
+        Button {
+            runSecondaryAction(action)
+        } label: {
+            secondaryActionLabel(action)
+        }
+        .buttonStyle(.plain)
+        .disabled(!action.isEnabled)
+    }
+
+    private func secondaryActionLabel(_ action: CommandPaletteAction.SecondaryAction) -> some View {
+        let isSelected = activeSecondaryActionID == action.id
+        return HStack(spacing: layoutMetrics.commandLabelSpacing) {
+            Image(systemName: action.systemImage)
+                .font(.body)
+                .foregroundStyle(action.isEnabled ? .primary : .secondary)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(action.title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(action.isEnabled ? .primary : .secondary)
+                Text(action.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if !action.isEnabled {
+                Text(action.disabledReason)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, layoutMetrics.secondaryRowHorizontalPadding)
+        .padding(.vertical, layoutMetrics.secondaryRowVerticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { isHovering in
+            if isHovering && !isKeyboardNavigating {
+                selectedSecondaryActionID = action.id
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionPanelToggleShortcutRegistrar: some View {
+        if !activeActionPanelActions.isEmpty {
+            Button {
+                toggleActionPanel()
+            } label: {
+                Text(" ")
+            }
+            .keyboardShortcut("k", modifiers: [.command])
+            .frame(width: 0, height: 0)
+            .opacity(0.001)
+            .accessibilityHidden(true)
+            .allowsHitTesting(false)
+        }
     }
 
     @ViewBuilder
@@ -21628,32 +22997,105 @@ private struct CommandPaletteView: View {
     private func moveSelection(_ direction: MoveCommandDirection) {
         switch direction {
         case .down:
-            shiftSelection(by: 1)
+            isKeyboardNavigating = true
+            if isActionPanelPresented {
+                shiftSecondarySelection(by: 1)
+            } else {
+                shiftSelection(by: 1)
+            }
         case .up:
-            shiftSelection(by: -1)
+            isKeyboardNavigating = true
+            if isActionPanelPresented {
+                shiftSecondarySelection(by: -1)
+            } else {
+                shiftSelection(by: -1)
+            }
         default:
             break
         }
     }
 
     private func shiftSelection(by offset: Int) {
-        let ids = filteredActions.map(\.id)
-        guard !ids.isEmpty else {
-            selectedActionID = nil
-            return
-        }
-
-        let currentIndex = activeActionID.flatMap { ids.firstIndex(of: $0) } ?? 0
-        let nextIndex = min(max(currentIndex + offset, 0), ids.count - 1)
-        selectedActionID = ids[nextIndex]
+        selectedActionID = CommandPaletteWindow.shiftedSelectionID(
+            actionIDs: filteredActions.map(\.id),
+            currentID: activeActionID,
+            offset: offset
+        )
     }
 
     private func runActiveAction() {
+        if isActionPanelPresented, let activeSecondaryAction {
+            runSecondaryAction(activeSecondaryAction)
+            return
+        }
         guard let activeActionID,
               let action = filteredActions.first(where: { $0.id == activeActionID }) else {
             return
         }
         run(action)
+    }
+
+    private func shiftSecondarySelection(by offset: Int) {
+        selectedSecondaryActionID = CommandPaletteWindow.shiftedSelectionID(
+            actionIDs: activeActionPanelActions.map(\.id),
+            currentID: activeSecondaryActionID,
+            offset: offset
+        )
+    }
+
+    private func handleExitCommand() {
+        if isActionPanelPresented {
+            dismissActionPanel()
+            return
+        }
+        close()
+    }
+
+    private func toggleActionPanel() {
+        guard !activeActionPanelActions.isEmpty else { return }
+        if isActionPanelPresented {
+            dismissActionPanel()
+            return
+        }
+        isKeyboardNavigating = true
+        withAnimation(.easeOut(duration: 0.12)) {
+            isActionPanelPresented = true
+        }
+        selectedSecondaryActionID = activeActionPanelActions.first?.id
+    }
+
+    private func dismissActionPanel() {
+        withAnimation(.easeOut(duration: 0.12)) {
+            isActionPanelPresented = false
+        }
+        selectedSecondaryActionID = nil
+    }
+
+    private func normalizeActionPanelSelection() {
+        guard isActionPanelPresented else {
+            selectedSecondaryActionID = nil
+            return
+        }
+        guard !activeActionPanelActions.isEmpty else {
+            dismissActionPanel()
+            return
+        }
+        selectedSecondaryActionID = CommandPaletteWindow.normalizedSelectionID(
+            actionIDs: activeActionPanelActions.map(\.id),
+            currentID: selectedSecondaryActionID
+        )
+    }
+
+    private func runSecondaryAction(_ action: CommandPaletteAction.SecondaryAction) {
+        guard action.isEnabled else { return }
+        prepareRun(action.id)
+        if action.closesPanelAfterRun {
+            dismissActionPanel()
+        }
+        if action.closesPaletteAfterRun {
+            close()
+        }
+        action.run()
     }
 
     private func run(
@@ -21698,6 +23140,7 @@ private struct CommandPaletteView: View {
         session.recordLaunchRecoveryHotKeyInterventionRun(actionID: action.id)
         usageStore.recordRun(actionID: action.id)
         recordRun(action)
+        prepareRun(action.id)
 
         if wasCadenceExecutionKitAction,
            let pulse = CommandPaletteCadenceExecutionKitStreak.momentumPulse(

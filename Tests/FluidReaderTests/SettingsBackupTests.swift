@@ -17,6 +17,12 @@ final class SettingsBackupTests: XCTestCase {
         object.removeValue(forKey: "autoPastePickedText")
         object.removeValue(forKey: "autoPasteLLMAnswers")
         object.removeValue(forKey: "saveClipboardHistory")
+        object.removeValue(forKey: "showMenuBarItem")
+        object.removeValue(forKey: "launcherCompactMode")
+        object.removeValue(forKey: "launcherIndexedRootPaths")
+        object.removeValue(forKey: "frontWindowGapPoints")
+        object.removeValue(forKey: "frontWindowCycleProfile")
+        object.removeValue(forKey: "frontWindowCustomCycleCommandIDs")
         object.removeValue(forKey: "fameAutoPulseAfterSnapshot")
         object.removeValue(forKey: "fameAutoPulseQuietMode")
         object.removeValue(forKey: "fameMorningBriefOnLaunch")
@@ -35,6 +41,11 @@ final class SettingsBackupTests: XCTestCase {
         object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoCoachCooldownMinutes")
         object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoRescueEnabled")
         object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes")
+        object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled")
+        object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes")
+        object.removeValue(forKey: "fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap")
+        object.removeValue(forKey: "fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens")
+        object.removeValue(forKey: "fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled")
         object.removeValue(forKey: "fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled")
         object.removeValue(forKey: "fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes")
         object.removeValue(forKey: "fameRecommendationMomentumRescueHallOfFameLegendRiskStickyPromotionOpens")
@@ -46,6 +57,8 @@ final class SettingsBackupTests: XCTestCase {
         object.removeValue(forKey: "fameCadenceAutopilotCelebrationIntensity")
         object.removeValue(forKey: "fameOnboardingNudgeEnabled")
         object.removeValue(forKey: "fameOnboardingNudgeWindowDays")
+        object.removeValue(forKey: "commandAliasEntries")
+        object.removeValue(forKey: "commandHotKeyEntries")
         let oldData = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         let oldJSON = try XCTUnwrap(String(data: oldData, encoding: .utf8))
 
@@ -54,6 +67,15 @@ final class SettingsBackupTests: XCTestCase {
         XCTAssertFalse(backup.autoPastePickedText)
         XCTAssertFalse(backup.autoPasteLLMAnswers)
         XCTAssertFalse(backup.saveClipboardHistory)
+        XCTAssertEqual(backup.showMenuBarItem, AppDefaults.showMenuBarItem)
+        XCTAssertEqual(backup.launcherCompactMode, AppDefaults.launcherCompactMode)
+        XCTAssertEqual(backup.launcherIndexedRootPaths, LocalFileSearchCatalog.defaultRootPaths())
+        XCTAssertEqual(backup.frontWindowGapPoints, AppDefaults.frontWindowGapPoints)
+        XCTAssertEqual(backup.frontWindowCycleProfile, AppDefaults.frontWindowCycleProfile)
+        XCTAssertEqual(
+            backup.frontWindowCustomCycleCommandIDs,
+            FrontWindowManager.normalizedCustomCycleCommandRawValues([])
+        )
         XCTAssertTrue(backup.fameAutoPulseAfterSnapshot)
         XCTAssertFalse(backup.fameAutoPulseQuietMode)
         XCTAssertFalse(backup.fameMorningBriefOnLaunch)
@@ -106,6 +128,26 @@ final class SettingsBackupTests: XCTestCase {
             AppDefaults.fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes
         )
         XCTAssertEqual(
+            backup.fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled,
+            AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled
+        )
+        XCTAssertEqual(
+            backup.fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes,
+            AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes
+        )
+        XCTAssertEqual(
+            backup.fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap,
+            AppDefaults.fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap
+        )
+        XCTAssertEqual(
+            backup.fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens,
+            AppDefaults.fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens
+        )
+        XCTAssertEqual(
+            backup.fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled,
+            AppDefaults.fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled
+        )
+        XCTAssertEqual(
             backup.fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled,
             AppDefaults.fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled
         )
@@ -140,6 +182,8 @@ final class SettingsBackupTests: XCTestCase {
             backup.fameOnboardingNudgeWindowDays,
             AppDefaults.fameOnboardingNudgeWindowDays
         )
+        XCTAssertTrue(backup.commandAliasEntries.isEmpty)
+        XCTAssertTrue(backup.commandHotKeyEntries.isEmpty)
     }
 
     func testBackupJSONDoesNotIncludeAPIKey() throws {
@@ -165,6 +209,61 @@ final class SettingsBackupTests: XCTestCase {
         XCTAssertThrowsError(try SettingsBackup.decode(futureJSON))
     }
 
+    @MainActor
+    func testMakeAndApplyPreserveLauncherIndexedRootPaths() {
+        let settings = SettingsStore.shared
+        let originalPaths = settings.launcherIndexedRootPaths
+        let expectedPaths = LocalFileSearchCatalog.normalizedRootPaths([
+            "~/Desktop",
+            FileManager.default.temporaryDirectory.path
+        ])
+
+        defer {
+            settings.launcherIndexedRootPaths = originalPaths
+        }
+
+        settings.launcherIndexedRootPaths = expectedPaths
+
+        let backup = SettingsBackup.make(settings: settings)
+        settings.launcherIndexedRootPaths = LocalFileSearchCatalog.defaultRootPaths()
+        backup.apply(to: settings)
+
+        XCTAssertEqual(backup.launcherIndexedRootPaths, expectedPaths)
+        XCTAssertEqual(settings.launcherIndexedRootPaths, expectedPaths)
+    }
+
+    @MainActor
+    func testMakeAndApplyPreserveCommandAliasesAndHotKeys() throws {
+        let settings = SettingsStore.shared
+        let aliasDefaults = try makeDefaults()
+        let hotKeyDefaults = try makeDefaults()
+        let aliasStore = CommandAliasStore(defaults: aliasDefaults)
+        let hotKeyStore = CommandHotKeyStore(defaults: hotKeyDefaults)
+
+        XCTAssertTrue(aliasStore.setAliases(actionID: "settings", aliasText: "prefs, settings panel"))
+        XCTAssertTrue(hotKeyStore.setShortcutText(actionID: "settings", shortcutText: "cmd+shift+p"))
+
+        let backup = SettingsBackup.make(
+            settings: settings,
+            commandAliasStore: aliasStore,
+            commandHotKeyStore: hotKeyStore
+        )
+
+        XCTAssertTrue(aliasStore.clearAliases(actionID: "settings"))
+        XCTAssertTrue(hotKeyStore.clearShortcut(actionID: "settings"))
+
+        backup.apply(
+            to: settings,
+            commandAliasStore: aliasStore,
+            commandHotKeyStore: hotKeyStore
+        )
+
+        XCTAssertEqual(backup.commandAliasEntries["settings"], ["prefs", "settings panel"])
+        XCTAssertEqual(backup.commandHotKeyEntries["settings"], "⇧⌘P")
+        XCTAssertEqual(aliasStore.aliases(for: "settings"), ["prefs", "settings panel"])
+        XCTAssertEqual(hotKeyStore.shortcutText(for: "settings"), "⇧⌘P")
+    }
+
     private func makeBackup() -> SettingsBackup {
         SettingsBackup(
             version: SettingsBackup.currentVersion,
@@ -179,6 +278,18 @@ final class SettingsBackupTests: XCTestCase {
             saveRecentItems: true,
             saveClipboardHistory: true,
             readerAlwaysOnTop: false,
+            showMenuBarItem: false,
+            launcherCompactMode: true,
+            launcherIndexedRootPaths: LocalFileSearchCatalog.normalizedRootPaths([
+                "~/Desktop",
+                FileManager.default.temporaryDirectory.path
+            ]),
+            frontWindowGapPoints: 16,
+            frontWindowCycleProfile: FrontWindowCycleProfile.custom.rawValue,
+            frontWindowCustomCycleCommandIDs: [
+                FrontWindowLayoutCommand.leftHalf.rawValue,
+                FrontWindowLayoutCommand.maximize.rawValue
+            ],
             fameAutoPulseAfterSnapshot: true,
             fameAutoPulseQuietMode: false,
             fameMorningBriefOnLaunch: true,
@@ -197,6 +308,11 @@ final class SettingsBackupTests: XCTestCase {
             fameLaunchRecoveryHotKeyAutoCoachCooldownMinutes: 15,
             fameLaunchRecoveryHotKeyAutoRescueEnabled: true,
             fameLaunchRecoveryHotKeyAutoRescueCooldownMinutes: 15,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeEnabled: true,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeCooldownMinutes: 30,
+            fameLaunchRecoveryHotKeyAutoTrustSurgeDailyCap: 8,
+            fameLaunchRecoveryHotKeyLegendRiskStickyPromotionOpens: 5,
+            fameLaunchRecoveryHotKeyLegendRiskStickUntilRecoveredEnabled: true,
             fameRecommendationMomentumRescueHallOfFameAutoDefenseEnabled: true,
             fameRecommendationMomentumRescueHallOfFameAutoDefenseCooldownMinutes: 15,
             fameRecommendationMomentumRescueHallOfFameLegendRiskStickyPromotionOpens: 5,
@@ -227,7 +343,20 @@ final class SettingsBackupTests: XCTestCase {
             customPromptTitle2: "Risks",
             customPromptText2: "Find risks.",
             customPromptTitle3: "Next",
-            customPromptText3: "Find next steps."
+            customPromptText3: "Find next steps.",
+            commandAliasEntries: [
+                "settings": ["prefs", "settings panel"]
+            ],
+            commandHotKeyEntries: [
+                "settings": "⇧⌘P"
+            ]
         )
+    }
+
+    private func makeDefaults() throws -> UserDefaults {
+        let suiteName = "FluidReaderTests.SettingsBackup.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 }

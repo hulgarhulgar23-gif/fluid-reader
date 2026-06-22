@@ -85,10 +85,37 @@ enum UpdateChecker {
         guard !version.isEmpty,
               !numericComponents(of: version).isEmpty,
               let pageURL = URL(string: payload.htmlUrl),
-              pageURL.scheme == "https" else {
+              pageURL.scheme == "https",
+              pageURL.user == nil,
+              pageURL.password == nil,
+              pageURL.host?.lowercased() == "github.com",
+              isTrustedReleasesPath(pageURL.path) else {
             throw UpdateError.badPayload
         }
         return Release(version: version, pageURL: pageURL)
+    }
+
+    private static func isTrustedReleasesPath(_ path: String) -> Bool {
+        let expectedPrefix = repositorySlug
+            .split(separator: "/")
+            .map(String.init) + ["releases"]
+        let segments = path.split(separator: "/").map(String.init)
+        guard segments.count >= expectedPrefix.count,
+              segments.starts(with: expectedPrefix) else {
+            return false
+        }
+
+        for segment in segments {
+            let decoded = segment.removingPercentEncoding ?? segment
+            if decoded == "."
+                || decoded == ".."
+                || decoded.contains("\\")
+                || decoded.contains("/") {
+                return false
+            }
+        }
+
+        return true
     }
 
     static func fetchLatestRelease(session: URLSession = .shared) async throws -> Release {

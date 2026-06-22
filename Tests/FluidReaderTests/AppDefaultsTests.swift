@@ -13,6 +13,17 @@ final class AppDefaultsTests: XCTestCase {
         XCTAssertFalse(AppDefaults.customPromptText.isEmpty)
         XCTAssertTrue(AppDefaults.saveRecentItems)
         XCTAssertFalse(AppDefaults.readerAlwaysOnTop)
+        XCTAssertEqual(AppDefaults.showMenuBarItemKey, "showMenuBarItem")
+        XCTAssertTrue(AppDefaults.showMenuBarItem)
+        XCTAssertEqual(AppDefaults.frontWindowGapPointsKey, "frontWindowGapPoints")
+        XCTAssertEqual(AppDefaults.frontWindowGapPoints, 0)
+        XCTAssertEqual(AppDefaults.frontWindowGapPointOptions, [0, 8, 12, 16, 20, 24, 32])
+        XCTAssertEqual(AppDefaults.frontWindowCycleProfileKey, "frontWindowCycleProfile")
+        XCTAssertEqual(AppDefaults.frontWindowCycleProfile, "full")
+        XCTAssertEqual(
+            AppDefaults.frontWindowCustomCycleCommandIDsKey,
+            "frontWindowCustomCycleCommandIDs"
+        )
         XCTAssertFalse(AppDefaults.autoCopyNewText)
         XCTAssertFalse(AppDefaults.autoPastePickedText)
         XCTAssertFalse(AppDefaults.autoPasteLLMAnswers)
@@ -499,6 +510,15 @@ final class AppDefaultsTests: XCTestCase {
     func testBlankValueFallsBack() {
         XCTAssertEqual(AppDefaults.value("  ", fallback: "fallback"), "fallback")
         XCTAssertEqual(AppDefaults.value(" custom ", fallback: "fallback"), "custom")
+    }
+
+    func testFrontWindowGapNormalization() {
+        XCTAssertEqual(AppDefaults.normalizedFrontWindowGapPoints(0), 0)
+        XCTAssertEqual(AppDefaults.normalizedFrontWindowGapPoints(16), 16)
+        XCTAssertEqual(
+            AppDefaults.normalizedFrontWindowGapPoints(7),
+            AppDefaults.frontWindowGapPoints
+        )
     }
 
     func testOpsBundleCooldownNormalization() {

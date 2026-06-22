@@ -51,10 +51,22 @@ final class ActivityLogStore {
 
     private static func loadItems(from defaults: UserDefaults, storageKey: String) -> [ActivityLogItem] {
         guard let data = defaults.data(forKey: storageKey),
-              let items = try? JSONDecoder().decode([ActivityLogItem].self, from: data) else {
+              let decodedItems = try? JSONDecoder().decode([ActivityLogItem].self, from: data) else {
             return []
         }
-        return Array(items.prefix(maxItemCount))
+
+        return Array(
+            decodedItems
+                .prefix(maxItemCount)
+                .map { item in
+                    ActivityLogItem(
+                        id: item.id,
+                        createdAt: item.createdAt,
+                        category: ActivityLogText.safeOneLine(item.category, fallback: "event"),
+                        detail: ActivityLogText.safeOneLine(item.detail, fallback: "ok")
+                    )
+                }
+        )
     }
 }
 

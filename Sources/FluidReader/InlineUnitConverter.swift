@@ -12,6 +12,7 @@ enum InlineUnitConverter {
             title: "Convert: \(conversion.result)",
             subtitle: conversion.subtitle,
             systemImage: "ruler",
+            sourceKind: .unit,
             keywords: [query, conversion.source, conversion.result],
             canFavorite: false
         ) {

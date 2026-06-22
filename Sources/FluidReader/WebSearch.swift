@@ -17,6 +17,7 @@ enum WebSearch {
                 title: "Open URL: \(FreeformPrompt.preview(cleanQuery, limit: titleLimit))",
                 subtitle: "Open in your default browser",
                 systemImage: "safari",
+                sourceKind: .web,
                 keywords: [cleanQuery],
                 canFavorite: false
             ) {
@@ -30,6 +31,7 @@ enum WebSearch {
             title: "Search Web: \(FreeformPrompt.preview(cleanQuery, limit: titleLimit))",
             subtitle: "Search with DuckDuckGo",
             systemImage: "magnifyingglass.circle",
+            sourceKind: .web,
             keywords: [cleanQuery],
             canFavorite: false
         ) {
@@ -52,10 +54,35 @@ enum WebSearch {
             title: "Clean URL: \(FreeformPrompt.preview(cleanURL, limit: titleLimit))",
             subtitle: "Copy without tracking",
             systemImage: "link.badge.minus",
+            sourceKind: .web,
             keywords: [cleanQuery, cleanURL],
             canFavorite: false
         ) {
             copy(cleanURL)
+        }
+    }
+
+    static func makeSaveQuickLinkAction(
+        query: String,
+        existingItems: [QuickLinkItem],
+        save: @escaping (String) -> Void
+    ) -> CommandPaletteAction? {
+        let cleanQuery = cleanedQuery(query)
+        guard let item = QuickLinkItem.make(urlString: cleanQuery),
+              !existingItems.contains(where: { $0.urlString == item.urlString }) else {
+            return nil
+        }
+
+        return CommandPaletteAction(
+            id: "inline-save-quick-link",
+            title: "Save Link: \(FreeformPrompt.preview(item.displayURL, limit: titleLimit))",
+            subtitle: "Add to Quick Links",
+            systemImage: "link.badge.plus",
+            sourceKind: .link,
+            keywords: [cleanQuery, item.title, item.urlString, "link", "quick link", "bookmark"],
+            canFavorite: false
+        ) {
+            save(item.urlString)
         }
     }
 
@@ -75,6 +102,13 @@ enum WebSearch {
 
         var components = URLComponents(string: "https://duckduckgo.com/")
         components?.queryItems = [URLQueryItem(name: "q", value: cleanQuery)]
+        // URLComponents leaves "+" unescaped in query values, but servers
+        // decode "+" as a space. Escape it so queries like "c++ tutorial"
+        // reach DuckDuckGo intact. (Spaces are already encoded as %20 here,
+        // so every remaining "+" came from the user's text.)
+        if let encodedQuery = components?.percentEncodedQuery {
+            components?.percentEncodedQuery = encodedQuery.replacingOccurrences(of: "+", with: "%2B")
+        }
         return components?.url
     }
 
@@ -94,6 +128,10 @@ enum WebSearch {
         guard let url = URL(string: candidate),
               let scheme = url.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
+              // Reject embedded credentials ("apple.com@evil.com") so a string
+              // that looks like a trusted domain cannot open a different host.
+              url.user == nil,
+              url.password == nil,
               let host = url.host,
               !host.isEmpty else {
             return nil

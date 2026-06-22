@@ -132,17 +132,23 @@ enum ClipboardUtility {
         guard var components = URLComponents(string: candidate),
               let scheme = components.scheme?.lowercased(),
               ["http", "https"].contains(scheme),
+              components.user == nil,
+              components.password == nil,
               let host = components.host,
               !host.isEmpty else {
             return nil
         }
 
         components.scheme = scheme
-        components.queryItems = components.queryItems?.filter { item in
-            !Self.trackingQueryNames.contains(item.name.lowercased())
+        // Filter on the percent-encoded items so encoded values (e.g. "%2B")
+        // survive unchanged. Reading `queryItems` would decode "%2B" to "+",
+        // silently changing the URL's meaning for form-encoded servers.
+        components.percentEncodedQueryItems = components.percentEncodedQueryItems?.filter { item in
+            let name = item.name.removingPercentEncoding ?? item.name
+            return !Self.trackingQueryNames.contains(name.lowercased())
         }
-        if components.queryItems?.isEmpty == true {
-            components.queryItems = nil
+        if components.percentEncodedQueryItems?.isEmpty == true {
+            components.percentEncodedQueryItems = nil
         }
 
         return components.url?.absoluteString

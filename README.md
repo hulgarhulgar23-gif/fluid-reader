@@ -4,7 +4,22 @@
 [Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
 [Power User Guide](docs/POWER_USER_GUIDE.md)
 
-Fluid Reader is a small macOS menu-bar app. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
+Fluid Reader is a small macOS background launcher for macOS. By default, press `Option + Shift + Space` for one root search across commands, apps, common files and folders, quick links, saved snippets, clipboard history, and recent reader items, or `Option + Shift + R` to draw around any screen content and read the text it finds. You can rebind the dedicated launcher shortcuts in `Settings -> Launcher` and hide the menu-bar item in `Settings -> App`.
+When the launcher is idle, it now also shows a compact root-search summary with live source counts plus one-tap scope chips like `app:`, `file:`, `note:`, `clip:`, `link:`, `script:`, `route:`, and `tile:` so the one-bar platform stays obvious without bringing back clutter.
+That idle view now also acts like a small launcher home: fast tiles for `Pick and Read`, `Screenshot`, `Ask`, `Route Request`, `Notes`, `Extensions`, `Windows`, and `Setup`, plus compact platform chips for `Reader`, `Refresh Search`, `Hide/Show Menu Bar`, and `Settings`.
+
+When Commands is idle, it stays focused on launcher hubs and the core reader workflow; current-text and answer actions only surface when they are actually ready. Start typing, scope a category, or add custom command aliases, dedicated launcher shortcuts, and per-command global hotkeys in `Settings -> Launcher` to search the broader command catalog without losing the clean default surface.
+Press `Command + K` on the selected launcher result to open the Action Panel for contextual actions like reveal, copy path, copy link, or favorite.
+If you want a tighter Raycast-style presentation, turn on `Compact launcher mode` in `Settings -> Launcher` to shrink the window, rows, footer, and Action Panel without removing any results.
+`Settings -> Launcher` now also shows a compact customization summary plus quick filters for `Customized`, `Platform`, `AI`, `Windows`, `Scripts`, and `All`, so aliases and hotkeys feel like one clean launcher surface instead of a long flat list.
+You can also drop shell, Python, Node, Ruby, Swift, PHP, or PowerShell scripts into `~/Library/Application Support/FluidReader/ScriptCommands`. They appear in the same launcher, support the same aliases and custom global hotkeys, and can be revealed or copied from the Action Panel.
+Saved snippets now also power a built-in `Notes Workspace`, and that same window now acts like a broader saved workspace for notes, quick links, clipboard history, and recent reader items. Your personal items stay local, searchable from the launcher, and manageable in one place, with quick counts and focused filters for `All`, `Notes`, `Links`, `Clipboard`, `Recent`, and `Pinned`.
+`Open Extensions Workspace` pulls AI Commands, starter extensions, and Script Commands into one local extension hub, so the launcher feels like one platform without cluttering the idle view. That workspace now also shows quick counts plus focused filters for `All`, `AI`, `Scripts`, and `Starter`, so AI commands, local automation, and installable helpers read like one extension platform instead of three unrelated lists.
+Launcher file search is no longer locked to just a fixed trio of folders: `Settings -> Launcher` now lets you add or remove indexed roots, and `Refresh Apps & Files` reloads the broader root-search catalog on demand.
+The same Extensions Workspace now includes a starter-extension library, so users can install safe local script extensions without leaving the app or adopting a remote store.
+Installed script commands can now also be exported as portable local extension packs and re-imported later, giving the extension surface a real local-first share/install loop.
+Window layouts also live in the same launcher now: search `tile:`, assign your own hotkeys, and use `Window Settings` to preview the active cycle, choose a saved profile plus shared layout gap, and tune direct window hotkeys without losing the clean default idle view.
+`Settings -> LLM` now also acts like a compact AI command center: quick summary cards for AI hubs, built-in prompts, saved prompts, local scripts, and readiness, plus one-click launch buttons for `Ask Anything`, `Run Best Local Action`, and `Open Extensions Workspace`, along with focused filters for `Ready`, `Built-In`, `Custom`, `Scripts`, and `All`.
 
 The default mode is local:
 
@@ -75,8 +90,8 @@ zsh scripts/verify_release.sh
 
 1. Open `FluidReader.app`.
 2. Allow Screen Recording when macOS asks.
-3. Press `Option + Shift + Space` to open Commands.
-4. Run `Pick and Read` or press `Option + Shift + R`.
+3. Press `Option + Shift + Space` by default to open Commands.
+4. Run `Pick and Read` or press `Option + Shift + R` by default.
 5. Draw a freehand shape around the content, then release to read it.
 
 When onboarding recovery is active, press `Option + Shift + L` for `Launch Recovery Next` from anywhere.
@@ -210,7 +225,7 @@ zsh scripts/check_fast.sh
 
 ## Optional LLM
 
-LLM is off by default. To use it, open Settings, turn on LLM, and add an OpenAI API key. The app can then ask about the selected text and image. Cloud voice for LLM answers is also optional, and its voice style can be changed in Settings.
+LLM is off by default. To use it, open Settings, turn on LLM, and add an OpenAI API key. The app can then ask about the selected text and image. Cloud voice for LLM answers is also optional, and its voice style can be changed in Settings. Saved prompts stay editable in that same LLM section even before you turn the provider on, so your reusable AI command layer stays visible as one platform surface.
 
 ## Founder & Growth Docs
 

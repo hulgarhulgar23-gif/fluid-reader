@@ -92,6 +92,69 @@ final class ReaderHistoryTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadHistorySanitizesInvalidAndDedupesByTextAndAnswer() throws {
+        let defaults = try makeDefaults()
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let seededItems = [
+            ReaderHistoryItem(
+                id: UUID(),
+                createdAt: createdAt,
+                text: "  Saved text  ",
+                answer: "  Saved answer  "
+            ),
+            ReaderHistoryItem(
+                id: UUID(),
+                createdAt: createdAt.addingTimeInterval(1),
+                text: "   ",
+                answer: "   "
+            ),
+            ReaderHistoryItem(
+                id: UUID(),
+                createdAt: createdAt.addingTimeInterval(2),
+                text: "Saved text",
+                answer: "Saved answer"
+            ),
+            ReaderHistoryItem(
+                id: UUID(),
+                createdAt: createdAt.addingTimeInterval(3),
+                text: " ",
+                answer: "Answer only"
+            )
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "readerHistoryItems")
+
+        let state = ReaderState(defaults: defaults)
+
+        XCTAssertEqual(state.recentItems.count, 2)
+        XCTAssertEqual(state.recentItems[0].text, "Saved text")
+        XCTAssertEqual(state.recentItems[0].answer, "Saved answer")
+        XCTAssertEqual(state.recentItems[1].text, "")
+        XCTAssertEqual(state.recentItems[1].answer, "Answer only")
+    }
+
+    @MainActor
+    func testLoadSnippetsSanitizesInvalidAndDedupesByTextPreservingPinned() throws {
+        let defaults = try makeDefaults()
+        let primaryID = UUID()
+        let seededItems = [
+            ReaderSnippetItem(id: primaryID, text: "Saved snippet", title: "Primary", isPinned: false),
+            ReaderSnippetItem(id: UUID(), text: "   ", title: "Invalid", isPinned: false),
+            ReaderSnippetItem(id: UUID(), text: "Saved snippet", title: "Pinned duplicate", isPinned: true),
+            ReaderSnippetItem(id: UUID(), text: "Other snippet", title: nil, isPinned: false)
+        ]
+        defaults.set(try JSONEncoder().encode(seededItems), forKey: "readerSnippetItems")
+
+        let state = ReaderState(defaults: defaults)
+
+        XCTAssertEqual(state.snippets.count, 2)
+        XCTAssertEqual(state.snippets.first?.id, primaryID)
+        XCTAssertEqual(state.snippets.first?.text, "Saved snippet")
+        XCTAssertEqual(state.snippets.first?.title, "Primary")
+        XCTAssertTrue(state.snippets.first?.isPinned == true)
+        XCTAssertEqual(state.snippets.last?.text, "Other snippet")
+    }
+
+    @MainActor
     func testRestoreAndClearHistory() throws {
         let defaults = try makeDefaults()
         let state = ReaderState(defaults: defaults)
@@ -257,6 +320,33 @@ final class ReaderHistoryTests: XCTestCase {
         XCTAssertTrue(state.recentItems.isEmpty)
         XCTAssertEqual(state.petMessage, "Keep this")
         XCTAssertEqual(state.petMood, .happy)
+    }
+
+    @MainActor
+    func testDisablingSavesRecentItemsStopsRememberingNewItems() throws {
+        let defaults = try makeDefaults()
+        let state = ReaderState(defaults: defaults)
+        state.savesRecentItems = false
+
+        state.remember(text: "Private text", answer: "Secret answer")
+
+        XCTAssertTrue(state.recentItems.isEmpty)
+        XCTAssertTrue(ReaderState(defaults: defaults).recentItems.isEmpty)
+    }
+
+    @MainActor
+    func testDisablingSavesRecentItemsPurgesExistingHistory() throws {
+        let defaults = try makeDefaults()
+        let state = ReaderState(defaults: defaults)
+        state.remember(text: "Saved text", answer: "Saved answer")
+        XCTAssertEqual(state.recentItems.count, 1)
+
+        state.savesRecentItems = false
+
+        XCTAssertTrue(state.recentItems.isEmpty)
+        // Opting out must wipe the on-disk copy, not just the in-memory list.
+        XCTAssertNil(defaults.data(forKey: "readerHistoryItems"))
+        XCTAssertTrue(ReaderState(defaults: defaults).recentItems.isEmpty)
     }
 
     private func makeDefaults() throws -> UserDefaults {

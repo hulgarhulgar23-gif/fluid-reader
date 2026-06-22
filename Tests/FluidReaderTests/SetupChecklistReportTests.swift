@@ -14,7 +14,14 @@ final class SetupChecklistReportTests: XCTestCase {
 
         XCTAssertEqual(report.actionNeededCount, 2)
         XCTAssertEqual(report.summary, "2 setup steps need attention.")
-        XCTAssertEqual(report.focusedItems.map(\.id), ["screen-recording", "accessibility"])
+        XCTAssertEqual(report.focusedItems.map(\.id), [
+            "screen-recording",
+            "accessibility",
+            "launcher-platform",
+            "notes-workspace",
+            "extensions-workspace",
+            "window-commands"
+        ])
         XCTAssertEqual(report.items.first { $0.id == "screen-recording" }?.state, .actionNeeded)
         XCTAssertEqual(
             report.items.first { $0.id == "screen-recording" }?.detail,
@@ -46,11 +53,19 @@ final class SetupChecklistReportTests: XCTestCase {
             "accessibility",
             "launch-at-login",
             "recent-items",
-            "clipboard-history"
+            "clipboard-history",
+            "launcher-platform",
+            "notes-workspace",
+            "extensions-workspace",
+            "window-commands"
         ])
         XCTAssertEqual(report.items.first { $0.id == "launch-at-login" }?.state, .ready)
         XCTAssertEqual(report.items.first { $0.id == "recent-items" }?.state, .ready)
         XCTAssertEqual(report.items.first { $0.id == "clipboard-history" }?.state, .ready)
+        XCTAssertEqual(report.items.first { $0.id == "launcher-platform" }?.action, .openCommands)
+        XCTAssertEqual(report.items.first { $0.id == "notes-workspace" }?.action, .openNotesWorkspace)
+        XCTAssertEqual(report.items.first { $0.id == "extensions-workspace" }?.action, .openExtensionsWorkspace)
+        XCTAssertEqual(report.items.first { $0.id == "window-commands" }?.action, .openWindowSettings)
     }
 
     func testLLMEnabledWithoutAPIKeyNeedsAction() {
@@ -69,6 +84,8 @@ final class SetupChecklistReportTests: XCTestCase {
         XCTAssertEqual(report.items.first { $0.id == "launch-at-login" }?.state, .actionNeeded)
         XCTAssertEqual(report.items.first { $0.id == "recent-items" }?.state, .optional)
         XCTAssertEqual(report.items.first { $0.id == "clipboard-history" }?.state, .optional)
+        XCTAssertTrue(report.focusedItems.map(\.id).contains("launcher-platform"))
+        XCTAssertTrue(report.focusedItems.map(\.id).contains("extensions-workspace"))
     }
 
     func testOptionalItemsUseCanSkipCopy() {

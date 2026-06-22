@@ -43,6 +43,39 @@ final class FrontWindowManagerTests: XCTestCase {
         )
     }
 
+    func testWindowGapInsetsTiledFrames() {
+        let screen = CGRect(x: 0, y: 24, width: 1440, height: 876)
+        let options = WindowLayoutOptions(gap: 20)
+
+        XCTAssertEqual(
+            WindowLayout.targetFrame(
+                command: .leftHalf,
+                screenFrame: screen,
+                currentFrame: nil,
+                options: options
+            ),
+            CGRect(x: 10, y: 34, width: 700, height: 856)
+        )
+        XCTAssertEqual(
+            WindowLayout.targetFrame(
+                command: .rightHalf,
+                screenFrame: screen,
+                currentFrame: nil,
+                options: options
+            ),
+            CGRect(x: 730, y: 34, width: 700, height: 856)
+        )
+        XCTAssertEqual(
+            WindowLayout.targetFrame(
+                command: .maximize,
+                screenFrame: screen,
+                currentFrame: nil,
+                options: options
+            ),
+            CGRect(x: 10, y: 34, width: 1420, height: 856)
+        )
+    }
+
     func testThirdWindowFrames() {
         let screen = CGRect(x: 0, y: 24, width: 1440, height: 876)
 
@@ -318,5 +351,52 @@ final class FrontWindowManagerTests: XCTestCase {
         XCTAssertEqual(FrontWindowManager.cycleProfile(defaults: defaults), .focus)
         FrontWindowManager.setCycleProfile(.full, defaults: defaults)
         XCTAssertEqual(FrontWindowManager.cycleProfile(defaults: defaults), .full)
+    }
+
+    func testCustomCycleCommandsPersistAndNormalize() {
+        let suiteName = "FrontWindowManagerTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        FrontWindowManager.setCustomCycleCommands(
+            [.rightHalf, .maximize, .rightHalf, .undoLastMove],
+            defaults: defaults
+        )
+
+        XCTAssertEqual(
+            FrontWindowManager.customCycleCommands(defaults: defaults),
+            [.rightHalf, .maximize]
+        )
+
+        FrontWindowManager.setCycleProfile(.custom, defaults: defaults)
+        XCTAssertEqual(
+            FrontWindowManager.cycleCommands(defaults: defaults),
+            [.rightHalf, .maximize]
+        )
+    }
+
+    func testLayoutGapPersistsAndNormalizes() {
+        let suiteName = "FrontWindowManagerTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        XCTAssertEqual(FrontWindowManager.layoutGapPoints(defaults: defaults), AppDefaults.frontWindowGapPoints)
+
+        FrontWindowManager.setLayoutGapPoints(24, defaults: defaults)
+        XCTAssertEqual(FrontWindowManager.layoutGapPoints(defaults: defaults), 24)
+
+        defaults.set(99, forKey: AppDefaults.frontWindowGapPointsKey)
+        XCTAssertEqual(
+            FrontWindowManager.layoutGapPoints(defaults: defaults),
+            AppDefaults.frontWindowGapPoints
+        )
     }
 }

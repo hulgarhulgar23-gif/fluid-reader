@@ -14,6 +14,7 @@ enum InlineDate {
             title: "Date: \(calculation.result)",
             subtitle: calculation.subtitle,
             systemImage: "calendar",
+            sourceKind: .date,
             keywords: [query, calculation.source, calculation.result],
             canFavorite: false
         ) {

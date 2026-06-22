@@ -7,6 +7,10 @@ import UniformTypeIdentifiers
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = SettingsStore.shared
     private let readerState = ReaderState()
+    private let commandAliasStore = CommandAliasStore()
+    private let commandHotKeyStore = CommandHotKeyStore()
+    private let quickLinkStore = QuickLinkStore()
+    private let clipboardHistoryStore = ClipboardHistoryStore()
     private let speech = SpeechService()
     private let effects = EffectsService()
     private let activityLog = ActivityLogStore()
@@ -15,6 +19,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let ocr = OCRService()
     private let selectionController = SelectionController()
     private let hotKey = HotKeyManager()
+    private lazy var appLaunchItems = AppLaunchCatalog.load()
+    private lazy var fileSearchItems = LocalFileSearchCatalog.load(roots: launcherIndexedRootURLs())
+    private lazy var commonFolderItems = CommonFolderCatalog.load()
+    private lazy var scriptCommandItems = ScriptCommandCatalog.load()
+    /// The app that was frontmost when the user last started a pick or a
+    /// "read selected" action. Used as the target for the auto-paste settings.
+    /// `nil` when Fluid Reader itself was frontmost (nothing useful to paste).
+    private var lastPickFrontApp: NSRunningApplication?
+    private var lastCommandPaletteFrontApp: NSRunningApplication?
+    private var pendingCommandPalettePasteTarget: NSRunningApplication?
+    private var pendingPromptWindowPasteTarget: NSRunningApplication?
+    private var pendingQuickLLMQuestionAfterPick: String?
+    private var scriptCommandItemsForTesting: [ScriptCommandItem]?
+    private var scriptCommandTask: Task<Void, Never>?
+    private let agentDebugSessionID = AgentDebugLog.makeSessionID()
+    private lazy var agentDebugLogURL: URL? = AgentDebugLog.logURL(sessionID: agentDebugSessionID)
+
+    // #region agent log
+    private func agentDebugLog(
+        runId: String = "initial",
+        hypothesisId: String,
+        location: String,
+        message: String,
+        data: [String: Any]
+    ) {
+        guard let url = agentDebugLogURL else { return }
+        let payload: [String: Any] = [
+            "sessionId": agentDebugSessionID,
+            "runId": runId,
+            "hypothesisId": hypothesisId,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
+            return
+        }
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        guard FileManager.default.fileExists(atPath: url.path)
+            || FileManager.default.createFile(atPath: url.path, contents: nil) else {
+            return
+        }
+        guard let handle = try? FileHandle(forWritingTo: url) else { return }
+        do {
+            try handle.seekToEnd()
+            try handle.write(contentsOf: jsonData)
+            try handle.write(contentsOf: Data("\n".utf8))
+            try handle.close()
+        } catch {
+            try? handle.close()
+        }
+    }
+
+    private func agentDebugAppData(_ app: NSRunningApplication?) -> [String: Any] {
+        [
+            "hasApp": app != nil,
+            "bundleIdentifier": app?.bundleIdentifier ?? "",
+            "pid": app.map { Int($0.processIdentifier) } ?? 0,
+            "isTerminated": app?.isTerminated ?? false
+        ]
+    }
+
+    private func agentDebugSettingsData() -> [String: Any] {
+        [
+            "autoCopyNewText": settings.autoCopyNewText,
+            "autoPastePickedText": settings.autoPastePickedText,
+            "autoPasteLLMAnswers": settings.autoPasteLLMAnswers,
+            "readAfterPick": settings.readAfterPick,
+            "saveRecentItems": settings.saveRecentItems,
+            "llmEnabled": settings.llmEnabled,
+            "ocrLanguageCode": settings.ocrLanguageCode
+        ]
+    }
+    // #endregion
+
     private lazy var readerWindow = ReaderWindowController(
         state: readerState,
         settings: settings,
@@ -26,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         saveResult: { [weak self] in self?.saveResult() },
         saveImage: { [weak self] in self?.saveLastImage() },
         saveSnippet: { [weak self] text in self?.saveSnippet(text) },
-        askLLM: { [weak self] question in self?.askLLM(question: question) },
+        askLLM: { [weak self] question in self?.runQuickLLMCommand(question: question) },
         stop: { [weak self] in self?.stopSpeech() },
         famePulseState: { [weak self] in
             self?.famePulseWidgetState() ?? .unknown
@@ -98,8 +182,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.openLatestOperatorDashboard()
         }
     )
+    private lazy var notesWorkspaceWindow = SavedWorkspaceWindowController(
+        settings: settings,
+        state: readerState,
+        quickLinkStore: quickLinkStore,
+        clipboardHistoryStore: clipboardHistoryStore,
+        copyNote: { [weak self] item in
+            self?.copyNote(item)
+        },
+        openNote: { [weak self] item in
+            self?.openNote(item)
+        },
+        createNote: { [weak self] title, text in
+            self?.createNote(title: title, text: text)
+        },
+        updateNote: { [weak self] item, title, text in
+            self?.updateNote(item, title: title, text: text)
+        },
+        toggleNotePinned: { [weak self] item in
+            self?.toggleNotePinned(item)
+        },
+        deleteNote: { [weak self] item in
+            self?.deleteNote(item)
+        },
+        clearNotes: { [weak self] in
+            self?.clearNotes()
+        },
+        openQuickLink: { [weak self] item in
+            self?.openQuickLink(item)
+        },
+        copyQuickLink: { [weak self] item in
+            self?.copyQuickLink(item)
+        },
+        updateQuickLink: { [weak self] item, title, urlString in
+            self?.updateQuickLink(item, title: title, urlString: urlString)
+        },
+        toggleQuickLinkPinned: { [weak self] item in
+            self?.toggleQuickLinkPinned(item)
+        },
+        deleteQuickLink: { [weak self] item in
+            self?.deleteQuickLink(item)
+        },
+        clearQuickLinks: { [weak self] in
+            self?.clearQuickLinks()
+        },
+        copyClipboardHistoryItem: { [weak self] item in
+            self?.copyClipboardHistoryItem(item)
+        },
+        deleteClipboardHistoryItem: { [weak self] item in
+            self?.deleteClipboardHistoryItem(item)
+        },
+        clearClipboardHistory: { [weak self] in
+            self?.clearClipboardHistoryItems()
+        },
+        restoreRecentItem: { [weak self] item in
+            self?.restoreRecentItem(item)
+        },
+        copyRecentItem: { [weak self] item in
+            self?.copyRecentItem(item)
+        },
+        deleteRecentItem: { [weak self] item in
+            self?.deleteRecentItem(item)
+        },
+        clearRecentItems: { [weak self] in
+            self?.clearRecentItems()
+        },
+        importClipboardLinks: { [weak self] in
+            self?.importClipboardLinks()
+        }
+    )
     private lazy var settingsWindow = SettingsWindowController(
         settings: settings,
+        commandAliasStore: commandAliasStore,
+        commandHotKeyStore: commandHotKeyStore,
+        launcherActions: { [weak self] in
+            self?.commandPaletteActions() ?? []
+        },
         testVoice: { [weak self] in self?.read("This is Fluid Reader.") },
         testEffect: { [weak self] in
             self?.previewFeelFlow()
@@ -121,11 +279,111 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         },
         openLatestFameExceptionalLoopRecap: { [weak self] in
             self?.openLatestFameExceptionalLoopRecapFromSettings()
+        },
+        openExtensionsWorkspace: { [weak self] in
+            self?.openExtensionsWorkspace()
+        },
+        openScriptCommandsFolder: { [weak self] in
+            self?.openScriptCommandsFolder()
+        },
+        refreshLauncherCatalogs: { [weak self] in
+            self?.refreshLauncherSearchCatalogs()
+        },
+        pickIndexedRoot: { [weak self] in
+            self?.pickLauncherIndexedRootFromSettings()
+        },
+        refreshScriptCommands: { [weak self] in
+            self?.refreshScriptCommands()
         }
     )
-    private lazy var askPromptWindow = AskPromptWindow { [weak self] prompt in
-        self?.askLLM(question: prompt)
-    }
+    private lazy var extensionsWorkspaceWindow = ExtensionsWorkspaceWindowController(
+        settings: settings,
+        promptTemplates: { [weak self] in
+            self?.availablePromptTemplates() ?? []
+        },
+        scriptCommands: { [weak self] in
+            self?.currentScriptCommandItems() ?? []
+        },
+        starterExtensions: {
+            StarterExtensionCatalog.templates
+        },
+        runPromptTemplate: { [weak self] template in
+            self?.runQuickLLMCommand(question: template.prompt)
+        },
+        runScriptCommand: { [weak self] item in
+            self?.runScriptCommand(item)
+        },
+        installStarterExtension: { [weak self] template in
+            self?.installStarterExtension(template)
+        },
+        revealStarterExtension: { [weak self] template in
+            self?.revealStarterExtension(template)
+        },
+        importExtensionPack: { [weak self] in
+            self?.importExtensionPack()
+        },
+        exportScriptCommand: { [weak self] item in
+            self?.exportScriptCommand(item)
+        },
+        openScriptCommandsFolder: { [weak self] in
+            self?.openScriptCommandsFolder()
+        },
+        refreshScriptCommands: { [weak self] in
+            self?.refreshScriptCommands()
+        },
+        revealScript: { [weak self] url in
+            self?.revealURL(url)
+        },
+        openSettings: { [weak self] in
+            self?.settingsWindow.show()
+        }
+    )
+    private lazy var askPromptWindow = AskPromptWindow(
+        submit: { [weak self] prompt in
+            self?.runQuickLLMCommand(question: prompt)
+        },
+        cancel: { [weak self] in
+            self?.clearPendingPromptWindowPasteTarget()
+        }
+    )
+    private lazy var localActionPromptWindow = AskPromptWindow(
+        configuration: .init(
+            title: "Run Best Local Action",
+            systemImage: "bolt.horizontal.circle",
+            promptPlaceholder: "Describe what you want from a local AI command or script",
+            helperText: "Routes to the best matching reusable AI command or local script. Good for requests like meeting notes, draft reply, deploy preview, or refresh apps and files.",
+            submitTitle: "Run",
+            submitSystemImage: "bolt.circle.fill",
+            suggestions: [
+                .init(
+                    id: "meeting-notes",
+                    title: "Meeting Notes",
+                    prompt: "meeting minutes"
+                ),
+                .init(
+                    id: "draft-reply",
+                    title: "Draft Reply",
+                    prompt: "draft a short reply"
+                ),
+                .init(
+                    id: "deploy-preview",
+                    title: "Deploy Preview",
+                    prompt: "deploy preview"
+                ),
+                .init(
+                    id: "refresh-search",
+                    title: "Refresh Search",
+                    prompt: "refresh apps and files"
+                )
+            ]
+        ),
+        submit: { [weak self] prompt in
+            self?.runBestLocalAction(intent: prompt)
+        },
+        cancel: { [weak self] in
+            self?.clearPendingPromptWindowPasteTarget()
+        }
+    )
     private lazy var setupChecklistWindow = SetupChecklistWindow(
         report: { [weak self] in
             guard let self else { return .empty }
@@ -141,11 +399,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         actions: { [weak self] in
             self?.commandPaletteActions() ?? []
         },
+        browseActions: { [weak self] in
+            self?.visibleCommandPaletteActions() ?? []
+        },
+        browseSummary: { [weak self] in
+            self?.commandPaletteBrowseSummary() ?? .empty
+        },
         inlineActions: { [weak self] query in
             self?.commandPaletteInlineActions(query) ?? []
         },
         onShow: { [weak self] in
-            self?.refreshFameLaunchCountdownForTopCard()
+            guard let self else { return }
+            self.pendingCommandPalettePasteTarget = nil
+            self.lastCommandPaletteFrontApp = self.frontPasteTarget()
+            self.refreshFameLaunchCountdownForTopCard()
+        },
+        prepareRun: { [weak self] actionID in
+            self?.prepareCommandPaletteInteraction(actionID: actionID)
         },
         topPickMilestone: { [weak self] milestone in
             self?.handleTopPickMilestoneFeedback(milestone)
@@ -174,6 +444,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let fameOnboardingGapPulseCooldown: TimeInterval = 15 * 60
     private let fameOnboardingGapRecoveryCooldown: TimeInterval = 10 * 60
     private var launchCountdownLastRefreshAt: Date?
+    private var selectionProcessingTask: Task<Void, Never>?
+    private var selectionCaptureRequestID: UInt64 = 0
+    private var selectionOCRProviderForTesting: (@Sendable () async throws -> String)?
+    private var readSelectedTask: Task<Void, Never>?
+    private var readSelectedRequestID: UInt64 = 0
+    private var readSelectedTextProviderForTesting: (@Sendable () async -> String?)?
+    private var clipboardTextProviderForTesting: (() -> String?)?
+    private var frontPasteTargetProviderForTesting: (() -> NSRunningApplication?)?
+    private var quickLLMPreparationTask: Task<Void, Never>?
+    private var quickLLMPreparationRequestID: UInt64 = 0
+    private var startPickHandlerForTesting: ((SelectionCaptureMode) -> Void)?
+    private var askLLMTask: Task<Void, Never>?
+    private var askLLMRequestID: UInt64 = 0
+    private var askLLMAnswerProviderForTesting:
+    (@Sendable (_ prompt: String, _ selectedText: String, _ imageData: Data?) async throws -> String)?
     private var workingFeedbackTask: Task<Void, Never>?
     private var previewFeelTask: Task<Void, Never>?
     private var fameLaunchThresholdAlertsCooldownRefreshTask: Task<Void, Never>?
@@ -644,55 +929,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        setupMenu()
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H0,H4",
+            location: "AppDelegate.swift:711",
+            message: "app launched with debug instrumentation",
+            data: [
+                "bundleIdentifier": Bundle.main.bundleIdentifier ?? "",
+                "processIdentifier": Int(ProcessInfo.processInfo.processIdentifier),
+                "settings": agentDebugSettingsData()
+            ]
+        )
+        // #endregion
+        applyStatusItemVisibility()
         effects.preloadAllStyles()
         effects.warmAudioPath()
         bindSettings()
         refreshFamePulseBadge()
         startFamePulseBadgeMonitor()
         recordActivity(category: "app", detail: "app-launch-main")
-        let result = hotKey.register(
-            readAction: { [weak self] in
-                Task { @MainActor in
-                    self?.startPick()
-                }
-            },
-            screenshotAction: { [weak self] in
-                Task { @MainActor in
-                    self?.startPick()
-                }
-            },
-            commandAction: { [weak self] in
-                Task { @MainActor in
-                    self?.commandPalette.toggle()
-                }
-            },
-            launchRecoveryAction: { [weak self] in
-                Task { @MainActor in
-                    self?.runFameLaunchRecoveryHotKey()
-                }
-            },
-            fameExceptionalLoopAction: { [weak self] in
-                Task { @MainActor in
-                    self?.runFameExceptionalLoopHotKey()
-                }
-            }
-        )
-
-        if case .failure(let error) = result {
-            showHotKeyError(error)
+        if !registerGlobalHotKeys() {
             return
         }
-        if hotKey.skippedOptionalHotKeyNames.contains(HotKeyManager.launchRecoveryHotKeyDisplayName) {
-            recordActivity(category: "support", detail: Self.launchRecoveryHotKeyBusyActivityDetail())
-        }
-        fameExceptionalLoopHotKeyAvailable = !hotKey.skippedOptionalHotKeyNames.contains(
-            HotKeyManager.fameExceptionalLoopHotKeyDisplayName
-        )
-        if !fameExceptionalLoopHotKeyAvailable {
-            recordActivity(category: "support", detail: Self.fameExceptionalLoopHotKeyBusyActivityDetail())
-        }
-        updateFameExceptionalLoopMenuStatus()
 
         let didShowSetupChecklist = firstRunGuide.claimSetupChecklistLaunch()
         if didShowSetupChecklist {
@@ -705,14 +963,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusFlashTask?.cancel()
         famePulseBadgeTask?.cancel()
         fameLaunchThresholdAlertsCooldownRefreshTask?.cancel()
+        removeStatusItem()
     }
 
     private func bindSettings() {
+        commandAliasStore.$aliasesByActionID
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+            }
+            .store(in: &cancellables)
+
+        commandHotKeyStore.$shortcutTextByActionID
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+                _ = self?.registerGlobalHotKeys()
+            }
+            .store(in: &cancellables)
+
+        settings.$launcherCompactMode
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+                self?.commandPalette.refreshLayout()
+            }
+            .store(in: &cancellables)
+
+        settings.$showMenuBarItem
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+                self?.applyStatusItemVisibility()
+            }
+            .store(in: &cancellables)
+
+        settings.$launcherIndexedRootPaths
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.refreshIndexedFileSearch()
+            }
+            .store(in: &cancellables)
+
+        settings.$frontWindowGapPoints
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+            }
+            .store(in: &cancellables)
+
+        settings.$frontWindowCycleProfile
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+            }
+            .store(in: &cancellables)
+
+        settings.$frontWindowCustomCycleCommandIDs
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.commandPalette.requestRefresh()
+            }
+            .store(in: &cancellables)
+
         settings.$soundStyle
             .removeDuplicates()
             .sink { [weak self] style in
                 self?.effects.preload(style: style)
                 self?.updateStyleMenu()
+            }
+            .store(in: &cancellables)
+
+        settings.$saveRecentItems
+            .removeDuplicates()
+            .sink { [weak self] enabled in
+                self?.readerState.savesRecentItems = enabled
             }
             .store(in: &cancellables)
 
@@ -750,7 +1083,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .store(in: &cancellables)
     }
 
+    /// When false the menu-bar dropdown omits the large Fame-ops submenu, keeping
+    /// the status menu focused on reader actions. Set true to restore it; the
+    /// underlying commands and `makeFameMenuItem()` are unchanged.
+    private var showFameStatusMenu: Bool { false }
+
+    private func applyStatusItemVisibility() {
+        if settings.showMenuBarItem {
+            setupMenu()
+            refreshFamePulseBadge()
+        } else {
+            removeStatusItem()
+        }
+    }
+
     private func setupMenu() {
+        guard statusItem == nil else {
+            updateStyleMenu()
+            updateHitMenu()
+            return
+        }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem = item
         setStatusButton(symbol: statusBaseSymbol, tint: statusBaseTint)
@@ -762,7 +1114,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Show Reader", action: #selector(showReaderFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Ask Anything", action: #selector(askAnythingFromMenu), keyEquivalent: ""))
         menu.addItem(makeFeelMenuItem())
-        menu.addItem(makeFameMenuItem())
+        if showFameStatusMenu {
+            menu.addItem(makeFameMenuItem())
+        }
         menu.addItem(NSMenuItem(title: "Setup Checklist", action: #selector(setupChecklistFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Stop", action: #selector(stopFromMenu), keyEquivalent: ""))
@@ -774,6 +1128,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.menu = menu
         updateStyleMenu()
         updateHitMenu()
+    }
+
+    private func removeStatusItem() {
+        guard let statusItem else { return }
+        NSStatusBar.system.removeStatusItem(statusItem)
+        self.statusItem = nil
     }
 
     private func startFamePulseBadgeMonitor() {
@@ -883,8 +1243,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         flashStatus(symbol: "keyboard.badge.ellipsis", tint: .systemRed, length: 0.36)
 
         let alert = NSAlert()
-        alert.messageText = "Keyboard shortcut is busy."
-        alert.informativeText = "\(error.localizedDescription) You can still use Pick and Read from the menu bar."
+        switch error {
+        case .duplicateHotKey:
+            alert.messageText = "Keyboard shortcut conflict."
+        case .eventHandler:
+            alert.messageText = "Keyboard shortcut unavailable."
+        case .hotKey:
+            alert.messageText = "Keyboard shortcut is busy."
+        }
+        alert.informativeText = "\(error.localizedDescription) You can still open Commands from the launcher shortcuts or app settings."
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
@@ -2045,11 +2412,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startFameLaunchThresholdAlertsCooldownMenuRefresh(now: now)
     }
 
-    private func startPick() {
-        recordActivity(category: "core", detail: "pick-and-read")
+    private func startPick(mode: SelectionCaptureMode = .lasso) {
+        // Capture the paste target before the overlay activates our app.
+        if pendingQuickLLMQuestionAfterPick != nil {
+            lastPickFrontApp = frontPasteTarget() ?? lastPickFrontApp
+        } else {
+            lastPickFrontApp = capturePasteTargetForNewInteraction()
+        }
+        if let startPickHandlerForTesting {
+            startPickHandlerForTesting(mode)
+            return
+        }
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H1,H2,H4,H5",
+            location: "AppDelegate.swift:2062",
+            message: "startPick captured target and settings",
+            data: [
+                "mode": mode == .screenshotLine ? "screenshotLine" : "lasso",
+                "frontTarget": agentDebugAppData(lastPickFrontApp),
+                "settings": agentDebugSettingsData(),
+                "screenRecordingAllowed": PermissionStatus.screenRecordingAllowed(),
+                "accessibilityTrusted": PermissionStatus.accessibilityTrusted()
+            ]
+        )
+        // #endregion
+        recordActivity(category: "core", detail: mode == .screenshotLine ? "screenshot" : "pick-and-read")
         effects.hit(.wake, settings: settings, haptic: .alignment)
         flashStatus(symbol: "sparkles", tint: .systemCyan, length: 0.22)
         selectionController.start(
+            mode: mode,
             onDrawStart: { [weak self] in
                 guard let self else { return }
                 self.effects.hit(.drawStart, settings: self.settings, haptic: .alignment)
@@ -2062,34 +2454,228 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             },
             onCancel: { [weak self] in
                 guard let self else { return }
+                if self.pendingQuickLLMQuestionAfterPick != nil {
+                    self.pendingQuickLLMQuestionAfterPick = nil
+                    self.recordActivity(category: "ask", detail: "quick-command-pick-cancelled")
+                }
                 self.effects.play(.error, settings: self.settings)
                 self.flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.26)
             },
             completion: { [weak self] selectedImage in
                 guard let self else { return }
-                Task {
-                    await self.handleSelection(selectedImage)
-                }
+                // #region agent log
+                self.agentDebugLog(
+                    hypothesisId: "H1,H2,H3",
+                    location: "AppDelegate.swift:2084",
+                    message: "selection completed",
+                    data: [
+                        "mode": mode == .screenshotLine ? "screenshotLine" : "lasso",
+                        "imageWidth": selectedImage.cgImage.width,
+                        "imageHeight": selectedImage.cgImage.height,
+                        "pngBytes": selectedImage.pngData?.count ?? 0,
+                        "frontTarget": self.agentDebugAppData(self.lastPickFrontApp)
+                    ]
+                )
+                // #endregion
+                self.processSelectedImage(selectedImage, mode: mode)
             }
         )
     }
 
-    private func handleSelection(_ selectedImage: SelectedImage) async {
+    private func processSelectedImage(
+        _ selectedImage: SelectedImage,
+        mode: SelectionCaptureMode
+    ) {
+        let requestID = beginSelectionCaptureRequest()
+        selectionProcessingTask = Task { [weak self] in
+            guard let self else { return }
+            switch mode {
+            case .lasso:
+                await self.handleSelection(selectedImage, requestID: requestID)
+            case .screenshotLine:
+                await self.handleScreenshot(selectedImage, requestID: requestID)
+            }
+        }
+    }
+
+    private func prepareCommandPaletteInteraction(actionID: String) {
+        guard shouldPreservePasteTargetForCommandPaletteAction(actionID) else {
+            pendingCommandPalettePasteTarget = nil
+            return
+        }
+        pendingCommandPalettePasteTarget = lastCommandPaletteFrontApp
+    }
+
+    private func shouldPreservePasteTargetForCommandPaletteAction(_ actionID: String) -> Bool {
+        if actionID == "ask-anything"
+            || actionID == "inline-ask"
+            || actionID == "pick-and-read"
+            || actionID == "read-selected"
+            || actionID == "run-best-local-action" {
+            return true
+        }
+        if actionID.hasPrefix("prompt-") || actionID.hasPrefix("open-ask-anything-") {
+            return true
+        }
+        return false
+    }
+
+    private func capturePasteTargetForNewInteraction() -> NSRunningApplication? {
+        let pendingTarget = pendingCommandPalettePasteTarget
+        pendingCommandPalettePasteTarget = nil
+        return pendingTarget ?? frontPasteTarget()
+    }
+
+    private func capturePasteTargetForContinuingInteraction() -> NSRunningApplication? {
+        let pendingTarget = pendingCommandPalettePasteTarget
+            ?? pendingPromptWindowPasteTarget
+        pendingCommandPalettePasteTarget = nil
+        pendingPromptWindowPasteTarget = nil
+        return pendingTarget ?? frontPasteTarget()
+    }
+
+    private func clearPendingPromptWindowPasteTarget() {
+        pendingPromptWindowPasteTarget = nil
+    }
+
+    /// The frontmost app to paste into, or `nil` when it is Fluid Reader.
+    private func frontPasteTarget() -> NSRunningApplication? {
+        if let frontPasteTargetProviderForTesting {
+            return frontPasteTargetProviderForTesting()
+        }
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != NSRunningApplication.current.processIdentifier else {
+            return nil
+        }
+        return app
+    }
+
+    private func copyTextToPasteboard(_ text: String) {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(cleanText, forType: .string)
+    }
+
+    /// Fire-and-forget paste into the captured front app (auto-paste settings).
+    private func autoPaste(_ text: String, to app: NSRunningApplication?) {
+        Task { [weak self] in
+            guard let self else { return }
+            // #region agent log
+            self.agentDebugLog(
+                hypothesisId: "H1,H5",
+                location: "AppDelegate.swift:2117",
+                message: "autoPaste starting",
+                data: [
+                    "textLength": text.trimmingCharacters(in: .whitespacesAndNewlines).count,
+                    "target": self.agentDebugAppData(app),
+                    "accessibilityTrusted": PermissionStatus.accessibilityTrusted(),
+                    "pasteboardChangeCount": NSPasteboard.general.changeCount
+                ]
+            )
+            // #endregion
+            let result = await FrontAppPaster.paste(text, to: app)
+            // #region agent log
+            self.agentDebugLog(
+                hypothesisId: "H1,H5",
+                location: "AppDelegate.swift:2118",
+                message: "autoPaste finished",
+                data: [
+                    "result": String(describing: result),
+                    "isSuccess": result.isSuccess,
+                    "target": self.agentDebugAppData(app),
+                    "pasteboardChangeCount": NSPasteboard.general.changeCount
+                ]
+            )
+            // #endregion
+            if !result.isSuccess {
+                self.recordActivity(category: "core", detail: "auto-paste-skipped")
+            }
+        }
+    }
+
+    private func handleScreenshot(_ selectedImage: SelectedImage, requestID: UInt64) async {
+        guard isCurrentSelectionCaptureRequest(requestID) else { return }
+        pendingQuickLLMQuestionAfterPick = nil
+        readerState.errorText = ""
+        guard let data = selectedImage.pngData else {
+            readerState.errorText = "Could not capture screenshot."
+            effects.play(.error, settings: settings)
+            flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.30)
+            recordActivity(category: "capture", detail: "screenshot-failed")
+            clearSelectionProcessingTaskIfCurrent(requestID)
+            return
+        }
+
+        readerState.lastImageData = data
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        let didSetPNG = pasteboard.setData(data, forType: .png)
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H2,H3",
+            location: "AppDelegate.swift:2138",
+            message: "screenshot copied to pasteboard",
+            data: [
+                "pngBytes": data.count,
+                "didSetPNG": didSetPNG,
+                "pasteboardChangeCount": pasteboard.changeCount
+            ]
+        )
+        // #endregion
+
+        readerState.pulse()
+        readerState.petSay("Copied screenshot.", mood: .happy)
+        effects.hit(.success, settings: settings, haptic: .levelChange)
+        rewardHUD.show("Screenshot", mood: .success, intensity: settings.feelIntensity)
+        flashStatus(symbol: "camera.viewfinder", tint: .systemGreen, length: 0.36)
+        recordActivity(category: "capture", detail: "screenshot-copy")
+        clearSelectionProcessingTaskIfCurrent(requestID)
+    }
+
+    private func handleSelection(_ selectedImage: SelectedImage, requestID: UInt64) async {
+        guard isCurrentSelectionCaptureRequest(requestID) else { return }
         readerState.isWorking = true
         readerState.lastImageData = selectedImage.pngData
         readerState.errorText = ""
         rewardHUD.show("Reading", mood: .working, intensity: settings.feelIntensity)
         startWorkingFeedback()
+        let selectionOCRProviderForTesting = self.selectionOCRProviderForTesting
 
         do {
-            let text = try await ocr.recognizeText(
-                in: selectedImage.cgImage,
-                languageCode: settings.ocrLanguageCode
-            )
+            let text: String
+            if let selectionOCRProviderForTesting {
+                text = try await selectionOCRProviderForTesting()
+            } else {
+                text = try await ocr.recognizeText(
+                    in: selectedImage.cgImage,
+                    languageCode: settings.ocrLanguageCode
+                )
+            }
+            guard isCurrentSelectionCaptureRequest(requestID) else { return }
             stopWorkingFeedback()
             let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let pendingQuickLLMQuestion = pendingQuickLLMQuestionAfterPick
+            pendingQuickLLMQuestionAfterPick = nil
             readerState.lastText = cleanText
             readerState.isWorking = false
+            // #region agent log
+            agentDebugLog(
+                hypothesisId: "H3,H4",
+                location: "AppDelegate.swift:2163",
+                message: "OCR completed",
+                data: [
+                    "rawTextLength": text.count,
+                    "cleanTextLength": cleanText.count,
+                    "isEmpty": cleanText.isEmpty,
+                    "imageWidth": selectedImage.cgImage.width,
+                    "imageHeight": selectedImage.cgImage.height,
+                    "pngBytes": selectedImage.pngData?.count ?? 0,
+                    "settings": agentDebugSettingsData()
+                ]
+            )
+            // #endregion
 
             if cleanText.isEmpty {
                 readerState.errorText = "No readable text found."
@@ -2097,7 +2683,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 rewardHUD.show("No text", mood: .error, intensity: settings.feelIntensity)
                 flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.30)
                 recordActivity(category: "capture", detail: "ocr-empty")
+                if pendingQuickLLMQuestion != nil {
+                    recordActivity(category: "ask", detail: "quick-command-pick-empty")
+                }
                 readerWindow.show()
+                clearSelectionProcessingTaskIfCurrent(requestID)
                 return
             }
 
@@ -2108,22 +2698,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             flashStatus(symbol: "sparkles", tint: .systemGreen, length: 0.42)
             recordActivity(category: "capture", detail: "ocr-success")
 
-            if settings.readAfterPick {
+            if settings.autoCopyNewText {
+                copyTextToPasteboard(cleanText)
+            }
+
+            if settings.readAfterPick, pendingQuickLLMQuestion == nil {
                 read(cleanText)
             }
 
-            if settings.llmEnabled {
+            if settings.autoPastePickedText, pendingQuickLLMQuestion == nil {
+                autoPaste(cleanText, to: lastPickFrontApp)
+            }
+
+            if let pendingQuickLLMQuestion {
+                recordActivity(category: "ask", detail: "quick-command-after-pick")
+                if settings.llmEnabled {
+                    readerWindow.show()
+                }
+                askLLM(question: pendingQuickLLMQuestion)
+            } else if settings.llmEnabled {
                 readerWindow.show()
             }
-        } catch {
+            clearSelectionProcessingTaskIfCurrent(requestID)
+        } catch is CancellationError {
+            guard isCurrentSelectionCaptureRequest(requestID) else { return }
             stopWorkingFeedback()
             readerState.isWorking = false
+            pendingQuickLLMQuestionAfterPick = nil
+            clearSelectionProcessingTaskIfCurrent(requestID)
+        } catch {
+            guard isCurrentSelectionCaptureRequest(requestID) else { return }
+            stopWorkingFeedback()
+            readerState.isWorking = false
+            pendingQuickLLMQuestionAfterPick = nil
             readerState.errorText = error.localizedDescription
             effects.play(.error, settings: settings)
             rewardHUD.show("Error", mood: .error, intensity: settings.feelIntensity)
             flashStatus(symbol: "exclamationmark.triangle.fill", tint: .systemRed, length: 0.36)
             recordActivity(category: "capture", detail: "ocr-error")
             readerWindow.show()
+            clearSelectionProcessingTaskIfCurrent(requestID)
         }
     }
 
@@ -2143,6 +2757,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(cleanText, forType: .string)
+        if settings.saveClipboardHistory {
+            _ = clipboardHistoryStore.remember(text: cleanText)
+        }
         if announcePetMessage {
             readerState.petSay(message, mood: .happy)
         }
@@ -2259,6 +2876,275 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ = readerState.saveSnippet(text: text)
     }
 
+    private func openNotesWorkspace() {
+        notesWorkspaceWindow.show()
+        readerState.errorText = ""
+        readerState.petSay("Opened saved workspace.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "open-notes-workspace")
+    }
+
+    private func openExtensionsWorkspace() {
+        extensionsWorkspaceWindow.show()
+        readerState.errorText = ""
+        readerState.petSay("Opened extensions workspace.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "open", detail: "open-extensions-workspace")
+    }
+
+    private func toggleMenuBarItemVisibility() {
+        let nextValue = !settings.showMenuBarItem
+        settings.showMenuBarItem = nextValue
+        readerState.errorText = ""
+        readerState.petSay(
+            nextValue
+                ? "Menu bar item shown."
+                : "Menu bar item hidden. Commands and hotkeys still work.",
+            mood: .happy
+        )
+        readerState.pulse()
+        recordActivity(
+            category: "settings",
+            detail: nextValue ? "show-menu-bar-item" : "hide-menu-bar-item"
+        )
+    }
+
+    private func openNote(_ item: ReaderSnippetItem) {
+        readerState.useSnippet(item)
+        readerState.petSay("Opened note.", mood: .happy)
+        readerState.pulse()
+        readerWindow.show()
+        recordActivity(category: "saved", detail: "open-note")
+    }
+
+    private func copyNote(_ item: ReaderSnippetItem) {
+        copyToClipboard(item.text, message: "Copied note.")
+        recordActivity(category: "saved", detail: "copy-note")
+    }
+
+    private func createNote(title: String, text: String) {
+        guard let item = readerState.saveSnippet(text: text) else {
+            readerState.errorText = "Could not save note."
+            readerState.petSay("Could not save note.", mood: .error)
+            readerState.pulse()
+            return
+        }
+
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanTitle.isEmpty {
+            _ = readerState.renameSnippet(item, title: cleanTitle, announce: false)
+        }
+        readerState.petSay("Saved note.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "create-note")
+    }
+
+    private func updateNote(_ item: ReaderSnippetItem, title: String, text: String) {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else {
+            readerState.errorText = "Note needs text."
+            readerState.petSay("Note needs text.", mood: .ready)
+            readerState.pulse()
+            return
+        }
+
+        let renamed = readerState.renameSnippet(item, title: title, announce: false)
+        let edited = readerState.editSnippetText(item, text: cleanText, announce: false)
+        guard renamed || edited else { return }
+
+        readerState.errorText = ""
+        readerState.petSay("Updated note.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "update-note")
+    }
+
+    private func toggleNotePinned(_ item: ReaderSnippetItem) {
+        let shouldPin = !item.isPinned
+        guard readerState.setSnippetPinned(item, isPinned: shouldPin, announce: false) else {
+            return
+        }
+
+        readerState.errorText = ""
+        readerState.petSay(shouldPin ? "Pinned note." : "Unpinned note.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: shouldPin ? "pin-note" : "unpin-note")
+    }
+
+    private func deleteNote(_ item: ReaderSnippetItem) {
+        guard readerState.deleteSnippet(item, announce: false) else { return }
+        readerState.errorText = ""
+        readerState.petSay("Deleted note.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "delete-note")
+    }
+
+    private func clearNotes() {
+        guard !readerState.snippets.isEmpty else { return }
+        readerState.clearSnippets(announce: false)
+        readerState.errorText = ""
+        readerState.petSay("Notes cleared.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "clear-notes")
+    }
+
+    private func openQuickLink(_ item: QuickLinkItem) {
+        guard let url = item.url else {
+            readerState.errorText = "Quick link URL is invalid."
+            readerState.petSay("Quick link is not ready.", mood: .error)
+            readerState.pulse()
+            return
+        }
+
+        openURL(url)
+        readerState.errorText = ""
+        readerState.petSay("Opened quick link.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "open-quick-link")
+    }
+
+    private func copyQuickLink(_ item: QuickLinkItem) {
+        copyToClipboard(item.urlString, message: "Copied quick link.")
+        recordActivity(category: "saved", detail: "copy-quick-link")
+    }
+
+    private func updateQuickLink(_ item: QuickLinkItem, title: String, urlString: String) {
+        let updatedURL = quickLinkStore.updateURL(item, urlString: urlString)
+        let updatedTitle = quickLinkStore.updateTitle(item, title: title)
+
+        guard updatedURL || updatedTitle else {
+            readerState.errorText = "Could not update quick link."
+            readerState.petSay("Quick link update failed.", mood: .ready)
+            readerState.pulse()
+            return
+        }
+
+        readerState.errorText = ""
+        readerState.petSay("Updated quick link.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "update-quick-link")
+    }
+
+    private func toggleQuickLinkPinned(_ item: QuickLinkItem) {
+        let shouldPin = !item.isPinned
+        guard quickLinkStore.setPinned(item, isPinned: shouldPin) else { return }
+
+        readerState.errorText = ""
+        readerState.petSay(shouldPin ? "Pinned quick link." : "Unpinned quick link.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: shouldPin ? "pin-quick-link" : "unpin-quick-link")
+    }
+
+    private func deleteQuickLink(_ item: QuickLinkItem) {
+        guard quickLinkStore.delete(item) else { return }
+        readerState.errorText = ""
+        readerState.petSay("Deleted quick link.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "delete-quick-link")
+    }
+
+    private func clearQuickLinks() {
+        guard !quickLinkStore.items.isEmpty else { return }
+        quickLinkStore.clear()
+        readerState.errorText = ""
+        readerState.petSay("Quick links cleared.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "clear-quick-links")
+    }
+
+    private func importClipboardLinks() {
+        let pasteboard = NSPasteboard.general
+        guard let text = pasteboard.string(forType: .string),
+              let urls = ClipboardUtility.extractURLs(text) else {
+            readerState.errorText = "No valid links found in clipboard."
+            readerState.petSay("Copy one or more links first.", mood: .ready)
+            readerState.pulse()
+            return
+        }
+
+        let originalCount = quickLinkStore.items.count
+        urls
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+            .forEach { urlString in
+                _ = quickLinkStore.saveLink(urlString: urlString)
+            }
+
+        let addedCount = max(0, quickLinkStore.items.count - originalCount)
+        readerState.errorText = ""
+        if addedCount == 0 {
+            readerState.petSay("Clipboard links were already saved.", mood: .happy)
+        } else {
+            let noun = addedCount == 1 ? "link" : "links"
+            readerState.petSay("Imported \(addedCount) \(noun) from clipboard.", mood: .happy)
+        }
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "import-clipboard-links")
+    }
+
+    private func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
+        copyToClipboard(item.text, message: "Copied clipboard history.")
+        recordActivity(category: "saved", detail: "copy-clipboard-history-item")
+    }
+
+    private func deleteClipboardHistoryItem(_ item: ClipboardHistoryItem) {
+        guard clipboardHistoryStore.delete(item) else { return }
+        readerState.errorText = ""
+        readerState.petSay("Deleted clipboard item.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "delete-clipboard-history-item")
+    }
+
+    private func clearClipboardHistoryItems() {
+        guard !clipboardHistoryStore.items.isEmpty else { return }
+        clipboardHistoryStore.clear()
+        readerState.errorText = ""
+        readerState.petSay("Clipboard history cleared.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "clear-clipboard-history")
+    }
+
+    private func restoreRecentItem(_ item: ReaderHistoryItem) {
+        readerState.restore(item)
+        recordActivity(category: "saved", detail: "restore-recent-item")
+    }
+
+    private func copyRecentItem(_ item: ReaderHistoryItem) {
+        let text = item.text.isEmpty ? item.answer : item.text
+        copyToClipboard(text, message: "Copied recent item.")
+        recordActivity(category: "saved", detail: "copy-recent-item")
+    }
+
+    private func deleteRecentItem(_ item: ReaderHistoryItem) {
+        guard readerState.deleteHistoryItem(item, announce: false) else { return }
+        readerState.errorText = ""
+        readerState.petSay("Deleted recent item.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "delete-recent-item")
+    }
+
+    private func clearRecentItems() {
+        guard !readerState.recentItems.isEmpty else { return }
+        readerState.clearHistory(announce: false)
+        readerState.errorText = ""
+        readerState.petSay("Recent items cleared.", mood: .ready)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "clear-recent-items")
+    }
+
+    private func saveQuickLink(_ urlString: String) {
+        guard quickLinkStore.saveLink(urlString: urlString) != nil else {
+            readerState.errorText = "Could not save link."
+            readerState.petSay("Could not save link.", mood: .error)
+            readerState.pulse()
+            return
+        }
+
+        readerState.errorText = ""
+        readerState.petSay("Saved quick link.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "saved", detail: "save-quick-link")
+    }
+
     private func safeFileName(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallback = "fluid-reader"
@@ -2281,12 +3167,232 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return String(clean.prefix(48))
     }
 
+    /// IDs of the curated launcher actions surfaced in the idle command palette UI.
+    /// Fame-ops growth commands are intentionally hidden from the palette to keep it
+    /// focused (Raycast-style). `commandPaletteActions()` still returns the full set so
+    /// existing behaviour and tests remain unchanged; only the visible list is trimmed.
+    private nonisolated static let readerPalettePlatformActionOrder: [String] = [
+        "pick-and-read",
+        "screenshot-line",
+        "read-selected",
+        "ask-anything",
+        "run-best-local-action",
+        "show-reader",
+        "open-notes-workspace",
+        "open-extensions-workspace",
+        "refresh-app-launcher",
+        "window-settings",
+        "toggle-menu-bar-item",
+        "setup-checklist",
+        "settings",
+        "stop",
+    ]
+
+    private nonisolated static let readerPaletteContextualActionOrder: [String] = [
+        "read-last-text",
+        "copy-last-text",
+        "copy-answer",
+        "save-answer",
+        "search-selected-web"
+    ]
+
+    private nonisolated static let readerPaletteActionIDs = Set(
+        readerPalettePlatformActionOrder + readerPaletteContextualActionOrder
+    )
+
+    nonisolated static func readerPaletteActionOrder(
+        hasText: Bool,
+        hasAnswer: Bool,
+        hasSearchQuery: Bool
+    ) -> [String] {
+        var contextualActionIDs: [String] = []
+        if hasText {
+            contextualActionIDs.append("read-last-text")
+            contextualActionIDs.append("copy-last-text")
+        }
+        if hasAnswer {
+            contextualActionIDs.append("copy-answer")
+            contextualActionIDs.append("save-answer")
+        }
+        if hasSearchQuery {
+            contextualActionIDs.append("search-selected-web")
+        }
+
+        var order = readerPalettePlatformActionOrder
+        guard !contextualActionIDs.isEmpty else { return order }
+
+        let insertionIndex = min(
+            order.count,
+            (order.firstIndex(of: "show-reader") ?? 0) + 1
+        )
+        order.insert(contentsOf: contextualActionIDs, at: insertionIndex)
+        return order
+    }
+
+    /// The curated launcher subset of `commandPaletteActions()` shown in the palette UI.
+    /// Order is curated so idle Commands feels like one launcher platform instead of a raw dump.
+    /// Inline actions are merged separately.
+    private func visibleCommandPaletteActions() -> [CommandPaletteAction] {
+        let visibleActionOrder = Self.readerPaletteActionOrder(
+            hasText: !readerState.lastText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            hasAnswer: !readerState.answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            hasSearchQuery: !searchSeedText().isEmpty
+        )
+        let visibleActionsByID = Dictionary(
+            uniqueKeysWithValues: commandPaletteActions()
+                .filter { AppDelegate.readerPaletteActionIDs.contains($0.id) }
+                .map { ($0.id, $0) }
+        )
+        return visibleActionOrder.compactMap { visibleActionsByID[$0] }
+    }
+
+    private func commandPaletteBrowseSummary() -> CommandPaletteBrowseSummary {
+        let clipboardCount = settings.saveClipboardHistory ? clipboardHistoryStore.items.count : 0
+        let aiCommandCount = availablePromptTemplates().count
+        let scriptCommandCount = currentScriptCommandItems().count
+
+        let sources: [CommandPaletteBrowseSummary.Source] = [
+            CommandPaletteBrowseSummary.Source(
+                id: "apps",
+                title: "Apps",
+                count: appLaunchItems.count,
+                systemImage: "app.badge",
+                helpText: "Installed apps appear directly in root search."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "files",
+                title: "Files",
+                count: fileSearchItems.count,
+                systemImage: "doc",
+                helpText: "Indexed files from your configured launcher roots appear in root search."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "notes",
+                title: "Notes",
+                count: readerState.snippets.count,
+                systemImage: "note.text",
+                helpText: "Saved snippets and notes stay searchable from the launcher."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "links",
+                title: "Links",
+                count: quickLinkStore.items.count,
+                systemImage: "link",
+                helpText: "Quick Links stay searchable and openable from one bar."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "clipboard",
+                title: "Clipboard",
+                count: clipboardCount,
+                systemImage: "doc.on.clipboard",
+                helpText: settings.saveClipboardHistory
+                    ? "Clipboard history is searchable from root search."
+                    : "Turn on Save clipboard history in Settings to search clipboard items here."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "recent",
+                title: "Recent",
+                count: readerState.recentItems.count,
+                systemImage: "clock.arrow.circlepath",
+                helpText: "Recent reader items stay searchable from the launcher."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "ai",
+                title: "AI",
+                count: aiCommandCount,
+                systemImage: "sparkles",
+                helpText: "AI Commands stay in the same launcher as everything else."
+            ),
+            CommandPaletteBrowseSummary.Source(
+                id: "scripts",
+                title: "Scripts",
+                count: scriptCommandCount,
+                systemImage: "terminal",
+                helpText: "Local script commands appear in the same launcher and Action Panel flow."
+            )
+        ]
+            .filter { $0.count > 0 }
+
+        let detail: String
+        if settings.saveClipboardHistory {
+            detail = "Search apps, files, notes, links, clipboard history, recent items, AI commands, and local scripts from one bar."
+        } else {
+            detail = "Search apps, files, notes, links, recent items, AI commands, and local scripts from one bar."
+        }
+
+        return CommandPaletteBrowseSummary(
+            detail: detail,
+            sources: sources,
+            scopes: [
+                CommandPaletteBrowseSummary.Scope(
+                    id: "app",
+                    title: "app:",
+                    insertedText: "app:",
+                    systemImage: "app.badge",
+                    helpText: "Focus installed app results."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "file",
+                    title: "file:",
+                    insertedText: "file:",
+                    systemImage: "doc",
+                    helpText: "Focus indexed files and path matches."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "note",
+                    title: "note:",
+                    insertedText: "note:",
+                    systemImage: "note.text",
+                    helpText: "Focus local notes and snippets."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "clip",
+                    title: "clip:",
+                    insertedText: "clip:",
+                    systemImage: "doc.on.clipboard",
+                    helpText: "Focus clipboard history items."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "link",
+                    title: "link:",
+                    insertedText: "link:",
+                    systemImage: "link",
+                    helpText: "Focus saved quick links."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "script",
+                    title: "script:",
+                    insertedText: "script:",
+                    systemImage: "terminal",
+                    helpText: "Focus local script commands."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "route",
+                    title: "route:",
+                    insertedText: "route:",
+                    systemImage: "bolt.horizontal.circle",
+                    helpText: "Route a request to the best local AI command or script command."
+                ),
+                CommandPaletteBrowseSummary.Scope(
+                    id: "tile",
+                    title: "tile:",
+                    insertedText: "tile:",
+                    systemImage: "rectangle.3.offgrid",
+                    helpText: "Jump straight into window layouts and window actions."
+                )
+            ]
+        )
+    }
+
     private func commandPaletteActions() -> [CommandPaletteAction] {
         let hasText = !readerState.lastText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasAnswer = !readerState.answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasAnyResult = hasAnswer || hasText
         let searchQuery = searchSeedText()
         let hasSearchQuery = !searchQuery.isEmpty
+        let windowTargetApplication = commandPalette.isVisible
+            ? lastCommandPaletteFrontApp
+            : frontPasteTarget()
         let autoOpsBundleStatus = autoOpsBundleEscalationStatus()
         let launchRescueAutoStatus = launchRescueBurstAutoStatus()
         let launchRescueAutoTriggerReason = fameLaunchRescueBurstLastAutoTriggerReason()
@@ -2392,6 +3498,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         let exceptionalLoopOutcomeTuningResetStatus =
             fameExceptionalLoopOutcomeTuningResetStatus()
+        let promptTemplates = availablePromptTemplates()
+        let scriptCommandItems = currentScriptCommandItems()
+        let savedWorkspaceSummary = SavedWorkspaceCatalog.summary(
+            notes: readerState.snippets,
+            quickLinks: quickLinkStore.items,
+            clipboardHistory: settings.saveClipboardHistory ? clipboardHistoryStore.items : [],
+            recentItems: settings.saveRecentItems ? readerState.recentItems : [],
+            clipboardEnabled: settings.saveClipboardHistory,
+            recentEnabled: settings.saveRecentItems
+        )
+        let aiWorkspaceSummary = AIWorkspaceCatalog.summary(
+            promptTemplates: promptTemplates,
+            scriptCommands: scriptCommandItems,
+            llmEnabled: settings.llmEnabled,
+            apiKey: settings.openAIAPIKey
+        )
+        let extensionsWorkspaceSummary = ExtensionsWorkspaceCatalog.summary(
+            promptTemplates: promptTemplates,
+            scriptCommands: scriptCommandItems,
+            starterExtensions: StarterExtensionCatalog.templates,
+            llmEnabled: settings.llmEnabled,
+            apiKey: settings.openAIAPIKey
+        )
 
         var actions: [CommandPaletteAction] = [
             CommandPaletteAction(
@@ -2403,6 +3532,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 keywords: ["pick", "read", "ocr", "capture"]
             ) { [weak self] in
                 self?.startPick()
+            },
+            CommandPaletteAction(
+                id: "screenshot-line",
+                title: "Screenshot",
+                subtitle: "Capture a highlighted screenshot line",
+                systemImage: "camera.viewfinder",
+                group: .core,
+                keywords: ["screenshot", "screen", "capture", "image"]
+            ) { [weak self] in
+                self?.startPick(mode: .screenshotLine)
             },
             CommandPaletteAction(
                 id: "read-selected",
@@ -2426,12 +3565,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             CommandPaletteAction(
                 id: "ask-anything",
                 title: "Ask Anything",
-                subtitle: "Ask about current, selected, clipboard, or picked text",
+                subtitle: aiWorkspaceSummary.askAnythingSubtitle,
                 systemImage: "sparkles",
                 group: .ask,
                 keywords: ["ask", "llm", "question", "answer"]
             ) { [weak self] in
                 self?.askAnything()
+            },
+            CommandPaletteAction(
+                id: "run-best-local-action",
+                title: "Run Best Local Action",
+                subtitle: aiWorkspaceSummary.bestLocalActionSubtitle,
+                systemImage: "bolt.horizontal.circle",
+                group: .ask,
+                sourceKind: .ask,
+                keywords: [
+                    "route",
+                    "agent",
+                    "best",
+                    "local",
+                    "action",
+                    "automation",
+                    "script",
+                    "prompt",
+                    "extension",
+                    "extensions"
+                ],
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-extensions-workspace-run-best-local-action",
+                        title: "Open Extensions Workspace",
+                        subtitle: "Browse AI commands and script commands",
+                        systemImage: "puzzlepiece.extension"
+                    ) { [weak self] in
+                        self?.openExtensionsWorkspace()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-ask-anything-run-best-local-action",
+                        title: "Open Ask Anything",
+                        subtitle: "Ask a one-off AI question instead",
+                        systemImage: "sparkles"
+                    ) { [weak self] in
+                        self?.askAnything()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-settings-run-best-local-action",
+                        title: "Open LLM Settings",
+                        subtitle: aiWorkspaceSummary.llmReady
+                            ? aiWorkspaceSummary.settingsSubtitle
+                            : "Enable LLM or add an API key",
+                        systemImage: "gearshape"
+                    ) { [weak self] in
+                        self?.settingsWindow.show()
+                    }
+                ]
+            ) { [weak self] in
+                self?.openLocalActionPrompt()
             },
             CommandPaletteAction(
                 id: "read-last-text",
@@ -2501,6 +3690,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard let self else { return }
                 self.saveText(self.readerState.answerText, title: "Save Answer", fileNamePrefix: "answer")
                 self.recordActivity(category: "saved", detail: "save-answer")
+            },
+            CommandPaletteAction(
+                id: "open-notes-workspace",
+                title: "Open Notes Workspace",
+                subtitle: savedWorkspaceSummary.actionSubtitle,
+                systemImage: "note.text",
+                group: .saved,
+                keywords: [
+                    "note",
+                    "notes",
+                    "workspace",
+                    "snippet",
+                    "snippets",
+                    "saved",
+                    "personal",
+                    "links",
+                    "quick links",
+                    "clipboard",
+                    "recent",
+                    "history"
+                ]
+            ) { [weak self] in
+                self?.openNotesWorkspace()
+            },
+            CommandPaletteAction(
+                id: "open-extensions-workspace",
+                title: "Open Extensions Workspace",
+                subtitle: extensionsWorkspaceSummary.actionSubtitle,
+                systemImage: "puzzlepiece.extension",
+                group: .settings,
+                keywords: [
+                    "extensions",
+                    "extension",
+                    "workspace",
+                    "plugin",
+                    "plugins",
+                    "ai",
+                    "prompt",
+                    "script",
+                    "scripts",
+                    "starter",
+                    "install",
+                    "automation",
+                    "command",
+                    "packs"
+                ],
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-script-folder-open-extensions-workspace",
+                        title: "Open Script Commands Folder",
+                        subtitle: "Reveal local automation scripts",
+                        systemImage: "terminal"
+                    ) { [weak self] in
+                        self?.openScriptCommandsFolder()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "refresh-scripts-open-extensions-workspace",
+                        title: "Refresh Script Commands",
+                        subtitle: "Reload local automation scripts",
+                        systemImage: "arrow.clockwise"
+                    ) { [weak self] in
+                        self?.refreshScriptCommands()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-settings-open-extensions-workspace",
+                        title: "Open Settings",
+                        subtitle: "Manage LLM, aliases, and hotkeys",
+                        systemImage: "gearshape"
+                    ) { [weak self] in
+                        self?.settingsWindow.show()
+                    }
+                ]
+            ) { [weak self] in
+                self?.openExtensionsWorkspace()
             },
             CommandPaletteAction(
                 id: "search-selected-web",
@@ -3634,6 +4897,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self?.openFameSnapshotFolder()
             },
             CommandPaletteAction(
+                id: "refresh-app-launcher",
+                title: "Refresh Apps & Files",
+                subtitle: refreshLauncherCatalogSubtitle(),
+                systemImage: "arrow.clockwise",
+                group: .open,
+                keywords: [
+                    "refresh",
+                    "apps",
+                    "app",
+                    "files",
+                    "file",
+                    "launcher",
+                    "catalog",
+                    "folders",
+                    "indexed",
+                    "root",
+                    "roots"
+                ],
+                canFavorite: false,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-settings-refresh-app-launcher",
+                        title: "Open Settings",
+                        subtitle: "Manage indexed roots, aliases, and hotkeys",
+                        systemImage: "gearshape"
+                    ) { [weak self] in
+                        self?.settingsWindow.show()
+                    }
+                ]
+            ) { [weak self] in
+                self?.refreshLauncherSearchCatalogs()
+            },
+            CommandPaletteAction(
+                id: "import-extension-pack",
+                title: "Import Extension Pack",
+                subtitle: "Install a local script-extension pack into Extensions Workspace",
+                systemImage: "square.and.arrow.down.on.square",
+                group: .settings,
+                keywords: [
+                    "extension",
+                    "extensions",
+                    "pack",
+                    "import",
+                    "install",
+                    "script",
+                    "local",
+                    "workspace"
+                ],
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-extensions-workspace-import-extension-pack",
+                        title: "Open Extensions Workspace",
+                        subtitle: "Browse starter and installed extensions",
+                        systemImage: "puzzlepiece.extension"
+                    ) { [weak self] in
+                        self?.openExtensionsWorkspace()
+                    }
+                ]
+            ) { [weak self] in
+                self?.importExtensionPack()
+            },
+            CommandPaletteAction(
+                id: "open-script-commands-folder",
+                title: "Open Script Commands Folder",
+                subtitle: "Reveal user automation scripts",
+                systemImage: "terminal",
+                group: .settings,
+                keywords: ["script", "scripts", "automation", "folder", "open", "reveal", "commands"]
+            ) { [weak self] in
+                self?.openScriptCommandsFolder()
+            },
+            CommandPaletteAction(
+                id: "refresh-script-commands",
+                title: "Refresh Script Commands",
+                subtitle: "Reload user automation scripts",
+                systemImage: "arrow.clockwise",
+                group: .settings,
+                keywords: ["script", "scripts", "automation", "refresh", "reload", "commands"],
+                canFavorite: false
+            ) { [weak self] in
+                self?.refreshScriptCommands()
+            },
+            CommandPaletteAction(
                 id: "copy-win-card",
                 title: "Copy Win Card",
                 subtitle: "Copy visual share card",
@@ -3652,6 +4998,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 keywords: ["setup", "guide", "status", "onboarding"]
             ) { [weak self] in
                 self?.copySetupGuide()
+            },
+            CommandPaletteAction(
+                id: "toggle-menu-bar-item",
+                title: settings.showMenuBarItem ? "Hide Menu Bar Item" : "Show Menu Bar Item",
+                subtitle: settings.showMenuBarItem
+                    ? "Keep Fluid Reader quieter in the background; launcher shortcuts still work"
+                    : "Restore the status item for menu-bar access",
+                systemImage: "menubar.rectangle",
+                group: .settings,
+                keywords: [
+                    "menu",
+                    "menu bar",
+                    "status item",
+                    "background",
+                    "quiet",
+                    "tray",
+                    settings.showMenuBarItem ? "hide" : "show"
+                ],
+                canFavorite: false,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-settings-toggle-menu-bar-item",
+                        title: "Open Settings",
+                        subtitle: "Manage app visibility and launcher behavior",
+                        systemImage: "gearshape"
+                    ) { [weak self] in
+                        self?.settingsWindow.show()
+                    }
+                ]
+            ) { [weak self] in
+                self?.toggleMenuBarItemVisibility()
             },
             CommandPaletteAction(
                 id: "setup-checklist",
@@ -3685,6 +5062,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         ]
 
+        actions.insert(contentsOf: promptTemplatePaletteActions(), at: 4)
+        actions.insert(contentsOf: windowPaletteActions(targetApplication: windowTargetApplication), at: 3)
         actions.insert(fameNextMoveDraftPackAction(), at: 0)
         actions.insert(fameNextMoveCadenceExecutionKitAction(), at: 0)
         actions.insert(fameCadenceAutopilotLoopAction(), at: 0)
@@ -3746,8 +5125,523 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ) {
             actions.insert(launchRescueAutoSelfHealAttentionAction, at: 0)
         }
+        actions.append(contentsOf: scriptCommandPaletteActions())
 
-        return actions
+        return personalizedCommandPaletteActions(actions)
+    }
+
+    private func windowPaletteActions(
+        targetApplication: NSRunningApplication?
+    ) -> [CommandPaletteAction] {
+        let activeProfile = FrontWindowManager.cycleProfile()
+        let customCycleCommands = FrontWindowManager.customCycleCommands()
+        let gapPoints = FrontWindowManager.layoutGapPoints()
+        let activeCycleCount = FrontWindowManager
+            .cycleCommands(for: activeProfile)
+            .count
+
+        let settingsAction = CommandPaletteAction(
+            id: "window-settings",
+            title: "Window Settings",
+            subtitle: "Adjust gap (\(gapPoints) pt), cycle profile (\(activeProfile.title)), and \(activeCycleCount) cycle layouts",
+            systemImage: "slider.horizontal.3",
+            group: .window,
+            keywords: ["window", "tile", "snap", "layout", "gap", "padding", "profile", "settings", "hotkey", "cycle"],
+            canFavorite: false
+        ) { [weak self] in
+            self?.openWindowSettings()
+        }
+
+        let layoutActions = FrontWindowLayoutCommand.allCases.map { command in
+            CommandPaletteAction(
+                id: command.actionID,
+                title: command.title,
+                subtitle: command.subtitle,
+                systemImage: command.systemImage,
+                group: .window,
+                keywords: command.keywords,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "window-settings-\(command.actionID)",
+                        title: "Open Window Settings",
+                        subtitle: "Adjust gap, cycle profile, and window hotkeys",
+                        systemImage: "slider.horizontal.3"
+                    ) { [weak self] in
+                        self?.openWindowSettings()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "accessibility-settings-\(command.actionID)",
+                        title: "Open Accessibility Settings",
+                        subtitle: "Allow Fluid Reader to move other apps",
+                        systemImage: "hand.raised.fill"
+                    ) { [weak self] in
+                        self?.openSystemSettings(url: AppDefaults.accessibilitySettingsURL)
+                    }
+                ]
+            ) { [weak self] in
+                self?.runFrontWindowLayoutCommand(command, application: targetApplication)
+            }
+        }
+
+        let profileActions = FrontWindowCycleProfile.allCases.map { profile in
+            CommandPaletteAction(
+                id: profile.actionID,
+                title: profile.commandTitle,
+                subtitle: profile.subtitle(customCommands: customCycleCommands),
+                systemImage: profile.systemImage,
+                group: .window,
+                keywords: profile.keywords,
+                signalBadge: activeProfile == profile
+                    ? CommandPaletteAction.SignalBadge(
+                        title: "Active",
+                        tone: .medium,
+                        helpText: "This saved cycle profile is active for Window Cycle Layout."
+                    )
+                    : nil,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "window-settings-\(profile.actionID)",
+                        title: "Open Window Settings",
+                        subtitle: "Adjust gap, custom cycle layouts, and hotkeys",
+                        systemImage: "slider.horizontal.3"
+                    ) { [weak self] in
+                        self?.openWindowSettings()
+                    }
+                ]
+            ) { [weak self] in
+                self?.setFrontWindowCycleProfile(profile)
+            }
+        }
+
+        return [settingsAction] + layoutActions + profileActions
+    }
+
+    private func promptTemplatePaletteActions() -> [CommandPaletteAction] {
+        let isPromptExecutionReady = isPromptExecutionReady()
+        let disabledReason = promptExecutionDisabledReason()
+
+        return availablePromptTemplates().map { template in
+            CommandPaletteAction(
+                id: "prompt-\(template.id)",
+                title: template.title,
+                subtitle: "Run AI command on current, selected, clipboard, or picked text",
+                systemImage: template.systemImage,
+                group: .ask,
+                sourceKind: .ask,
+                keywords: template.keywords + ["ai", "prompt", "command", template.title],
+                isEnabled: isPromptExecutionReady,
+                disabledReason: disabledReason,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-ask-anything-prompt-\(template.id)",
+                        title: "Open Ask Anything",
+                        subtitle: "Type a different AI request",
+                        systemImage: "square.and.pencil"
+                    ) { [weak self] in
+                        self?.askAnything()
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "open-settings-prompt-\(template.id)",
+                        title: "Open LLM Settings",
+                        subtitle: "Enable LLM or add an API key",
+                        systemImage: "gearshape"
+                    ) { [weak self] in
+                        self?.settingsWindow.show()
+                    }
+                ]
+            ) { [weak self] in
+                self?.runQuickLLMCommand(question: template.prompt)
+            }
+        }
+    }
+
+    private func availablePromptTemplates() -> [PromptTemplate] {
+        PromptTemplate.all(customPrompts: settings.customPromptInputs)
+    }
+
+    private func isPromptExecutionReady() -> Bool {
+        settings.llmEnabled && !settings.openAIAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func promptExecutionDisabledReason() -> String {
+        settings.llmEnabled ? "Add an API key in Settings." : "Enable LLM in Settings."
+    }
+
+    private func localActionRouterCandidates() -> [LocalActionRouter.Candidate] {
+        let promptCandidates = availablePromptTemplates().map { template in
+            LocalActionRouter.Candidate(
+                id: "prompt-\(template.id)",
+                title: template.title,
+                subtitle: template.prompt,
+                keywords: template.keywords + ["ai", "prompt", "command", template.title],
+                kind: .prompt(template),
+                isEnabled: isPromptExecutionReady(),
+                disabledReason: promptExecutionDisabledReason()
+            )
+        }
+
+        let scriptCandidates = currentScriptCommandItems().map { item in
+            let executionConfiguration = item.executionConfiguration()
+            let isEnabled: Bool
+            let disabledReason: String?
+            switch executionConfiguration {
+            case .success:
+                isEnabled = true
+                disabledReason = nil
+            case .failure(let reason):
+                isEnabled = false
+                disabledReason = reason.errorDescription ?? "Script command is not ready."
+            }
+
+            return LocalActionRouter.Candidate(
+                id: item.actionID,
+                title: item.title,
+                subtitle: item.subtitle.isEmpty ? item.displayPath : item.subtitle,
+                keywords: item.keywords,
+                kind: .script(item),
+                isEnabled: isEnabled,
+                disabledReason: disabledReason
+            )
+        }
+
+        return promptCandidates + scriptCandidates
+    }
+
+    private func scriptCommandPaletteActions() -> [CommandPaletteAction] {
+        currentScriptCommandItems().map { item in
+            let executionConfiguration = item.executionConfiguration()
+            let disabledReason: String
+            let isEnabled: Bool
+            switch executionConfiguration {
+            case .success:
+                disabledReason = "Script command is not ready."
+                isEnabled = true
+            case .failure(let reason):
+                disabledReason = reason.errorDescription ?? "Script command is not ready."
+                isEnabled = false
+            }
+
+            return CommandPaletteAction(
+                id: item.actionID,
+                title: item.title,
+                subtitle: item.subtitle.isEmpty ? item.displayPath : item.subtitle,
+                systemImage: item.systemImage,
+                group: .core,
+                sourceKind: .script,
+                keywords: item.keywords,
+                isEnabled: isEnabled,
+                disabledReason: disabledReason,
+                secondaryActions: [
+                    CommandPaletteAction.SecondaryAction(
+                        id: "reveal-\(item.actionID)",
+                        title: "Reveal Script in Finder",
+                        subtitle: item.displayPath,
+                        systemImage: "folder.badge.questionmark"
+                    ) { [weak self] in
+                        self?.revealURL(item.url)
+                    },
+                    CommandPaletteAction.SecondaryAction(
+                        id: "copy-path-\(item.actionID)",
+                        title: "Copy Script Path",
+                        subtitle: item.displayPath,
+                        systemImage: "doc.on.doc"
+                    ) { [weak self] in
+                        self?.copyToClipboard(item.url.path, message: "Copied script path.")
+                    }
+                ]
+            ) { [weak self] in
+                self?.runScriptCommand(item)
+            }
+        }
+    }
+
+    private func openWindowSettings() {
+        settingsWindow.show()
+        readerState.errorText = ""
+        readerState.petSay("Opened window settings.", mood: .happy)
+        readerState.pulse()
+        recordActivity(category: "window", detail: "open-window-settings")
+    }
+
+    private func setFrontWindowCycleProfile(_ profile: FrontWindowCycleProfile) {
+        FrontWindowManager.setCycleProfile(profile)
+        commandPalette.requestRefresh()
+        readerState.errorText = ""
+        readerState.petSay("Cycle profile set to \(profile.title).", mood: .happy)
+        readerState.pulse()
+        effects.hit(.success, settings: settings, haptic: .alignment)
+        recordActivity(category: "window", detail: profile.activityDetail)
+    }
+
+    private func runFrontWindowLayoutCommand(
+        _ command: FrontWindowLayoutCommand,
+        application: NSRunningApplication?
+    ) {
+        let result = FrontWindowManager.move(command, application: application)
+        switch result {
+        case .moved:
+            readerState.errorText = ""
+            readerState.petSay(command.successMessage, mood: .happy)
+            readerState.pulse()
+            effects.hit(.success, settings: settings, haptic: .alignment)
+        case .accessibilityNotAllowed:
+            readerState.errorText = "Allow Accessibility to move other apps."
+            readerState.petSay("Allow Accessibility to move other apps.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .noTargetApplication:
+            readerState.errorText = "Open another app before running window commands."
+            readerState.petSay("Open another app before running window commands.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .noWindow:
+            readerState.errorText = "Could not find a movable front window."
+            readerState.petSay("Could not find a movable front window.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .noScreen:
+            readerState.errorText = "Could not read the current display layout."
+            readerState.petSay("Could not read the current display layout.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .noUndoMove:
+            readerState.errorText = "No previous window move to undo yet."
+            readerState.petSay("No previous window move to undo yet.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .noOtherScreen:
+            readerState.errorText = "Connect another display to move windows between screens."
+            readerState.petSay("Connect another display to move windows between screens.", mood: .ready)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        case .failed:
+            readerState.errorText = "Could not move the front window."
+            readerState.petSay("Could not move the front window.", mood: .error)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+        }
+
+        recordActivity(
+            category: "window",
+            detail: "\(command.activityDetail)-\(windowMoveResultActivityDetail(result))"
+        )
+    }
+
+    private func windowMoveResultActivityDetail(_ result: FrontWindowMoveResult) -> String {
+        switch result {
+        case .moved:
+            return "moved"
+        case .accessibilityNotAllowed:
+            return "accessibility-blocked"
+        case .noTargetApplication:
+            return "no-target"
+        case .noWindow:
+            return "no-window"
+        case .noScreen:
+            return "no-screen"
+        case .noUndoMove:
+            return "no-undo"
+        case .noOtherScreen:
+            return "no-other-screen"
+        case .failed:
+            return "failed"
+        }
+    }
+
+    private func personalizedCommandPaletteActions(
+        _ actions: [CommandPaletteAction]
+    ) -> [CommandPaletteAction] {
+        actions.map { action in
+            let aliases = commandAliasStore.aliases(for: action.id)
+            let hotKeyShortcut = commandHotKeyStore.parsedShortcut(for: action.id)
+            guard !aliases.isEmpty || hotKeyShortcut != nil else { return action }
+
+            return CommandPaletteAction(
+                id: action.id,
+                title: action.title,
+                subtitle: action.subtitle,
+                systemImage: action.systemImage,
+                group: action.group,
+                sourceKind: action.sourceKind,
+                keywords: action.keywords + aliases,
+                signalBadge: action.signalBadge,
+                isEnabled: action.isEnabled,
+                disabledReason: action.disabledReason,
+                canFavorite: action.canFavorite,
+                aliasBadgeTitle: Self.commandAliasBadgeTitle(aliases),
+                aliasHelpText: Self.commandAliasHelpText(aliases),
+                hotKeyBadgeTitle: hotKeyShortcut?.displayText,
+                hotKeyHelpText: hotKeyShortcut.map { "Custom global hotkey: \($0.displayText)" },
+                secondaryActions: action.secondaryActions,
+                run: action.run
+            )
+        }
+    }
+
+    private static func commandAliasBadgeTitle(_ aliases: [String]) -> String? {
+        guard let firstAlias = aliases.first?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !firstAlias.isEmpty else {
+            return nil
+        }
+        let prefix = firstAlias.count > 14 ? "\(firstAlias.prefix(13))…" : firstAlias
+        return "↪ \(prefix)"
+    }
+
+    private static func commandAliasHelpText(_ aliases: [String]) -> String? {
+        guard !aliases.isEmpty else { return nil }
+        let noun = aliases.count == 1 ? "alias" : "aliases"
+        return "Custom command \(noun): \(aliases.joined(separator: ", "))"
+    }
+
+    private func resolvedLauncherHotKeyShortcut(
+        for definition: LauncherHotKeyDefinition
+    ) -> CommandHotKeyShortcut {
+        if commandHotKeyStore.hasConflict(for: definition.id) {
+            return definition.defaultShortcut
+        }
+        return definition.resolvedShortcut(using: commandHotKeyStore)
+    }
+
+    private func registeredHotKey(
+        for definition: LauncherHotKeyDefinition,
+        shortcut: CommandHotKeyShortcut
+    ) -> HotKeyManager.RegisteredHotKey {
+        return HotKeyManager.RegisteredHotKey(
+            keyCode: shortcut.keyCode,
+            modifiers: shortcut.modifiers,
+            name: "\(definition.title) (\(shortcut.displayText))"
+        )
+    }
+
+    private func registerGlobalHotKeys() -> Bool {
+        let launcherShortcutsByActionID = Dictionary(
+            uniqueKeysWithValues: LauncherHotKeyCatalog.all.map { definition in
+                (definition.id, resolvedLauncherHotKeyShortcut(for: definition))
+            }
+        )
+        let result = hotKey.register(
+            readAction: { [weak self] in
+                Task { @MainActor in
+                    self?.startPick()
+                }
+            },
+            screenshotAction: { [weak self] in
+                Task { @MainActor in
+                    self?.startPick(mode: .screenshotLine)
+                }
+            },
+            commandAction: { [weak self] in
+                Task { @MainActor in
+                    self?.commandPalette.toggle()
+                }
+            },
+            readHotKey: registeredHotKey(
+                for: LauncherHotKeyCatalog.pickAndRead,
+                shortcut: launcherShortcutsByActionID[LauncherHotKeyCatalog.pickAndRead.id]
+                    ?? LauncherHotKeyCatalog.pickAndRead.defaultShortcut
+            ),
+            screenshotHotKey: registeredHotKey(
+                for: LauncherHotKeyCatalog.screenshot,
+                shortcut: launcherShortcutsByActionID[LauncherHotKeyCatalog.screenshot.id]
+                    ?? LauncherHotKeyCatalog.screenshot.defaultShortcut
+            ),
+            commandHotKey: registeredHotKey(
+                for: LauncherHotKeyCatalog.commands,
+                shortcut: launcherShortcutsByActionID[LauncherHotKeyCatalog.commands.id]
+                    ?? LauncherHotKeyCatalog.commands.defaultShortcut
+            ),
+            launchRecoveryAction: { [weak self] in
+                Task { @MainActor in
+                    self?.runFameLaunchRecoveryHotKey()
+                }
+            },
+            fameExceptionalLoopAction: { [weak self] in
+                Task { @MainActor in
+                    self?.runFameExceptionalLoopHotKey()
+                }
+            },
+            additionalHotKeys: customCommandHotKeyRegistrations(
+                reservedShortcutKeys: Set(launcherShortcutsByActionID.values.map(\.comparisonKey))
+            )
+        )
+
+        if case .failure(let error) = result {
+            showHotKeyError(error)
+            return false
+        }
+        if hotKey.skippedOptionalHotKeyNames.contains(HotKeyManager.launchRecoveryHotKeyDisplayName) {
+            recordActivity(category: "support", detail: Self.launchRecoveryHotKeyBusyActivityDetail())
+        }
+        fameExceptionalLoopHotKeyAvailable = !hotKey.skippedOptionalHotKeyNames.contains(
+            HotKeyManager.fameExceptionalLoopHotKeyDisplayName
+        )
+        if !fameExceptionalLoopHotKeyAvailable {
+            recordActivity(category: "support", detail: Self.fameExceptionalLoopHotKeyBusyActivityDetail())
+        }
+        updateFameExceptionalLoopMenuStatus()
+        return true
+    }
+
+    private func customCommandHotKeyRegistrations(
+        reservedShortcutKeys: Set<String>
+    ) -> [HotKeyManager.AdditionalHotKey] {
+        let actionsByID = Dictionary(uniqueKeysWithValues: commandPaletteActions().map { ($0.id, $0) })
+
+        return customCommandHotKeyBindingsForRegistration(reservedShortcutKeys: reservedShortcutKeys)
+            .enumerated()
+            .compactMap { index, binding in
+                guard let action = actionsByID[binding.actionID] else { return nil }
+                let registrationID = UInt32(100 + index)
+                let registrationName = "\(action.title) (\(binding.shortcut.displayText))"
+                return HotKeyManager.AdditionalHotKey(
+                    id: registrationID,
+                    keyCode: binding.shortcut.keyCode,
+                    modifiers: binding.shortcut.modifiers,
+                    name: registrationName,
+                    isRequired: false,
+                    action: { [weak self] in
+                        Task { @MainActor in
+                            self?.runCommandPaletteActionByID(binding.actionID, source: "custom-command-hotkey")
+                        }
+                    }
+                )
+            }
+    }
+
+    private func customCommandHotKeyBindingsForRegistration(
+        reservedShortcutKeys: Set<String>
+    ) -> [(actionID: String, shortcut: CommandHotKeyShortcut)] {
+        let launcherActionIDs = Set(LauncherHotKeyCatalog.all.map(\.id))
+        let actionIDs = Set(commandPaletteActions().map(\.id))
+        var usedShortcutKeys = reservedShortcutKeys
+
+        return commandHotKeyStore.bindings()
+            .sorted { $0.actionID.localizedCaseInsensitiveCompare($1.actionID) == .orderedAscending }
+            .filter { binding in
+                guard !launcherActionIDs.contains(binding.actionID) else {
+                    return false
+                }
+                guard actionIDs.contains(binding.actionID) else { return false }
+                return usedShortcutKeys.insert(binding.shortcut.comparisonKey).inserted
+            }
+    }
+
+    private func runCommandPaletteActionByID(_ actionID: String, source: String) {
+        guard let action = commandPaletteActions().first(where: { $0.id == actionID }) else {
+            return
+        }
+        guard action.isEnabled else {
+            readerState.errorText = action.disabledReason
+            readerState.petSay(action.disabledReason, mood: .ready)
+            readerState.pulse()
+            recordActivity(category: "command", detail: "\(source)-disabled-\(actionID)")
+            return
+        }
+
+        commandPalette.recordExternalRun(actionID: actionID)
+        recordCommandAction(actionID)
+        recordActivity(category: "command", detail: "\(source)-run-\(actionID)")
+        action.run()
     }
 
     func commandPaletteActionIDsForTesting() -> [String] {
@@ -3760,6 +5654,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func commandPaletteActionSubtitleForTesting(id: String) -> String? {
         commandPaletteActions().first { $0.id == id }?.subtitle
+    }
+
+    func commandPaletteActionSecondaryActionTitlesForTesting(id: String) -> [String] {
+        commandPaletteActions().first { $0.id == id }?.secondaryActions.map(\.title) ?? []
     }
 
     func commandPaletteActionSignalBadgeTitleForTesting(id: String) -> String? {
@@ -3792,6 +5690,215 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return nil
         }
         return action.isEnabled ? nil : action.disabledReason
+    }
+
+    func setScriptCommandItemsForTesting(_ items: [ScriptCommandItem]?) {
+        scriptCommandItemsForTesting = items
+    }
+
+    @discardableResult
+    func setCommandAliasesForTesting(actionID: String, aliasText: String) -> Bool {
+        commandAliasStore.setAliases(actionID: actionID, aliasText: aliasText)
+    }
+
+    func commandPaletteActionAliasBadgeTitleForTesting(id: String) -> String? {
+        commandPaletteActions().first { $0.id == id }?.aliasBadgeTitle
+    }
+
+    @discardableResult
+    func setCommandHotKeyForTesting(actionID: String, shortcutText: String) -> Bool {
+        commandHotKeyStore.setShortcutText(actionID: actionID, shortcutText: shortcutText)
+    }
+
+    func setShowMenuBarItemForTesting(_ isVisible: Bool) {
+        settings.showMenuBarItem = isVisible
+        applyStatusItemVisibility()
+    }
+
+    func isMenuBarItemVisibleForTesting() -> Bool {
+        statusItem != nil
+    }
+
+    func commandPaletteActionHotKeyBadgeTitleForTesting(id: String) -> String? {
+        commandPaletteActions().first { $0.id == id }?.hotKeyBadgeTitle
+    }
+
+    func filteredVisibleCommandPaletteActionIDsForTesting(query: String) -> [String] {
+        CommandPaletteAction.filter(
+            visibleCommandPaletteActions(),
+            query: query
+        ).map(\.id)
+    }
+
+    func filteredCommandPaletteActionIDsForTesting(query: String) -> [String] {
+        CommandPaletteAction.filter(
+            commandPaletteActions(),
+            query: query
+        ).map(\.id)
+    }
+
+    func filteredPlatformFirstCommandPaletteActionIDsForTesting(query: String) -> [String] {
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let allActions = commandPaletteActions()
+        let availableActions = allActions + commandPaletteInlineActions(query)
+        let priorityActionIDs = cleanQuery.isEmpty ? Set<String>() : Set(visibleCommandPaletteActions().map(\.id))
+        let preferredSourceKinds = cleanQuery.isEmpty ? Set<CommandPaletteAction.SourceKind>() : CommandPaletteWindow.platformFirstSearchSourceKinds
+
+        return CommandPaletteAction.filter(
+            availableActions,
+            query: query,
+            priorityActionIDs: priorityActionIDs,
+            preferredSourceKinds: preferredSourceKinds
+        ).map(\.id)
+    }
+
+    func commandPaletteInlineActionIDsForTesting(query: String) -> [String] {
+        commandPaletteInlineActions(query).map(\.id)
+    }
+
+    func prepareCommandPaletteRunForTesting(actionID: String, frontApp: NSRunningApplication?) {
+        lastCommandPaletteFrontApp = frontApp
+        prepareCommandPaletteInteraction(actionID: actionID)
+    }
+
+    func askAnythingForTesting() {
+        askAnything()
+    }
+
+    func cancelAskPromptWindowForTesting() {
+        askPromptWindow.cancelForTesting()
+    }
+
+    func registeredLauncherHotKeyDisplayTextForTesting(actionID: String) -> String? {
+        guard let definition = LauncherHotKeyCatalog.definition(for: actionID) else {
+            return nil
+        }
+        return resolvedLauncherHotKeyShortcut(for: definition).displayText
+    }
+
+    func customCommandHotKeyActionIDsForTesting() -> [String] {
+        customCommandHotKeyBindingsForRegistration(
+            reservedShortcutKeys: Set(
+                LauncherHotKeyCatalog.all.map { definition in
+                    resolvedLauncherHotKeyShortcut(for: definition).comparisonKey
+                }
+            )
+        ).map { $0.actionID }
+    }
+
+    @discardableResult
+    func beginAskLLMRequestForTesting() -> UInt64 {
+        beginAskLLMRequest()
+    }
+
+    func isCurrentAskLLMRequestForTesting(_ requestID: UInt64) -> Bool {
+        isCurrentAskLLMRequest(requestID)
+    }
+
+    func setSelectionOCRProviderForTesting(_ provider: (@Sendable () async throws -> String)?) {
+        selectionOCRProviderForTesting = provider
+    }
+
+    func processSelectedImageForTesting(
+        _ selectedImage: SelectedImage,
+        mode: SelectionCaptureMode = .lasso
+    ) {
+        processSelectedImage(selectedImage, mode: mode)
+    }
+
+    func waitForSelectionProcessingTaskForTesting() async {
+        let task = selectionProcessingTask
+        await task?.value
+    }
+
+    func setReadSelectedTextProviderForTesting(_ provider: (@Sendable () async -> String?)?) {
+        readSelectedTextProviderForTesting = provider
+    }
+
+    func setClipboardTextProviderForTesting(_ provider: (() -> String?)?) {
+        clipboardTextProviderForTesting = provider
+    }
+
+    func setFrontPasteTargetProviderForTesting(_ provider: (() -> NSRunningApplication?)?) {
+        frontPasteTargetProviderForTesting = provider
+    }
+
+    func setStartPickHandlerForTesting(_ handler: ((SelectionCaptureMode) -> Void)?) {
+        startPickHandlerForTesting = handler
+    }
+
+    func readSelectedTextFromFrontAppForTesting() {
+        readSelectedTextFromFrontApp()
+    }
+
+    func readSelectedStateForTesting() -> (
+        lastText: String,
+        answerText: String,
+        errorText: String,
+        petMessage: String
+    ) {
+        (
+            lastText: readerState.lastText,
+            answerText: readerState.answerText,
+            errorText: readerState.errorText,
+            petMessage: readerState.petMessage
+        )
+    }
+
+    func waitForReadSelectedTaskForTesting() async {
+        let task = readSelectedTask
+        await task?.value
+    }
+
+    func setAskLLMAnswerProviderForTesting(
+        _ provider: (
+            @Sendable (_ prompt: String, _ selectedText: String, _ imageData: Data?) async throws -> String
+        )?
+    ) {
+        askLLMAnswerProviderForTesting = provider
+    }
+
+    func askLLMForTesting(question: String) {
+        askLLM(question: question)
+    }
+
+    func runQuickLLMCommandForTesting(question: String) {
+        runQuickLLMCommand(question: question)
+    }
+
+    func runBestLocalActionForTesting(intent: String) {
+        runBestLocalAction(intent: intent)
+    }
+
+    func askLLMStateForTesting() -> (isWorking: Bool, answerText: String, errorText: String) {
+        (
+            isWorking: readerState.isWorking,
+            answerText: readerState.answerText,
+            errorText: readerState.errorText
+        )
+    }
+
+    func pendingQuickLLMQuestionForTesting() -> String? {
+        pendingQuickLLMQuestionAfterPick
+    }
+
+    func hasCapturedPasteTargetForTesting() -> Bool {
+        lastPickFrontApp != nil
+    }
+
+    func waitForQuickLLMPreparationTaskForTesting() async {
+        let task = quickLLMPreparationTask
+        await task?.value
+    }
+
+    func waitForAskLLMTaskForTesting() async {
+        let task = askLLMTask
+        await task?.value
+    }
+
+    func waitForScriptCommandTaskForTesting() async {
+        let task = scriptCommandTask
+        await task?.value
     }
 
     func launchRescueAutoMenuStatusTitleForTesting(
@@ -5968,8 +8075,77 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func commandPaletteInlineActions(_ query: String) -> [CommandPaletteAction] {
         var actions: [CommandPaletteAction] = []
 
+        actions.append(contentsOf: CommandPaletteRootSearch.makeActions(
+            query: query,
+            apps: appLaunchItems,
+            folders: commonFolderItems,
+            snippets: readerState.snippets,
+            quickLinks: quickLinkStore.items,
+            clipboardHistory: settings.saveClipboardHistory ? clipboardHistoryStore.items : [],
+            recentItems: readerState.recentItems,
+            openApp: { [weak self] item in
+                self?.launchApp(item)
+            },
+            openFolder: { [weak self] item in
+                self?.openCommonFolder(item)
+            },
+            useSnippet: { [weak self] item in
+                guard let self else { return }
+                self.readerState.useSnippet(item)
+                self.recordActivity(category: "saved", detail: "use-snippet")
+            },
+            openNotesWorkspace: { [weak self] in
+                self?.openNotesWorkspace()
+            },
+            setSnippetPinned: { [weak self] item, isPinned in
+                guard let self else { return }
+                guard self.readerState.setSnippetPinned(item, isPinned: isPinned, announce: false) else {
+                    return
+                }
+                self.readerState.errorText = ""
+                self.readerState.petSay(isPinned ? "Pinned note." : "Unpinned note.", mood: .happy)
+                self.readerState.pulse()
+                self.recordActivity(category: "saved", detail: isPinned ? "pin-note" : "unpin-note")
+            },
+            openQuickLink: { [weak self] item in
+                guard let self, let url = item.url else { return }
+                self.openURL(url)
+                self.recordActivity(category: "saved", detail: "open-quick-link")
+            },
+            copyClipboardHistory: { [weak self] item in
+                guard let self else { return }
+                self.copyToClipboard(item.text, message: "Copied clipboard history.")
+                self.recordActivity(category: "saved", detail: "copy-clipboard-history-item")
+            },
+            restoreRecentItem: { [weak self] item in
+                guard let self else { return }
+                self.readerState.restore(item)
+                self.recordActivity(category: "saved", detail: "restore-recent-item")
+            },
+            files: fileSearchItems,
+            openFile: { [weak self] item in
+                self?.openURL(item.url)
+                self?.recordActivity(category: "open", detail: "open-indexed-file")
+            },
+            revealURL: { [weak self] url in
+                self?.revealURL(url)
+                self?.recordActivity(category: "open", detail: "reveal-launcher-item")
+            },
+            copyText: { [weak self] text in
+                guard let self else { return }
+                self.copyToClipboard(text, message: "Copied launcher item.")
+                self.recordActivity(category: "open", detail: "copy-launcher-item")
+            }
+        ))
+
+        if let inlineRoute = CommandPaletteInlineRoute.makeAction(query: query, run: { [weak self] prompt in
+            self?.runBestLocalAction(intent: prompt)
+        }) {
+            actions.append(inlineRoute)
+        }
+
         if let inlineAsk = CommandPaletteInlineAsk.makeAction(query: query, run: { [weak self] prompt in
-            self?.askLLM(question: prompt)
+            self?.runQuickLLMCommand(question: prompt)
         }) {
             actions.append(inlineAsk)
         }
@@ -6012,6 +8188,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             actions.append(webAction)
         }
 
+        if let saveQuickLinkAction = WebSearch.makeSaveQuickLinkAction(
+            query: query,
+            existingItems: quickLinkStore.items,
+            save: { [weak self] urlString in
+                self?.saveQuickLink(urlString)
+            }
+        ) {
+            actions.append(saveQuickLinkAction)
+        }
+
         if let cleanURLAction = WebSearch.makeCleanURLAction(query: query, copy: { [weak self] cleanURL in
             guard let self else { return }
             self.copyToClipboard(cleanURL, message: "Copied clean URL.")
@@ -6034,28 +8220,214 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return actions
     }
 
+    private func beginQuickLLMPreparationRequest() -> UInt64 {
+        quickLLMPreparationTask?.cancel()
+        quickLLMPreparationRequestID &+= 1
+        return quickLLMPreparationRequestID
+    }
+
+    private func isCurrentQuickLLMPreparationRequest(_ requestID: UInt64) -> Bool {
+        requestID == quickLLMPreparationRequestID
+    }
+
+    private func clearQuickLLMPreparationTaskIfCurrent(_ requestID: UInt64) {
+        guard isCurrentQuickLLMPreparationRequest(requestID) else { return }
+        quickLLMPreparationTask = nil
+    }
+
+    private func hasReadyLLMContext() -> Bool {
+        !readerState.lastText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || readerState.lastImageData != nil
+    }
+
+    private func primeReaderForQuickLLMSource(_ text: String) {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanText.isEmpty else { return }
+        readerState.lastText = cleanText
+        readerState.answerText = ""
+        readerState.errorText = ""
+        readerState.lastImageData = nil
+        readerState.remember(text: cleanText)
+    }
+
+    private func runQuickLLMCommand(question: String) {
+        let prompt = question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Explain this content in a clear, short way."
+            : question.trimmingCharacters(in: .whitespacesAndNewlines)
+        pendingQuickLLMQuestionAfterPick = nil
+        lastPickFrontApp = capturePasteTargetForContinuingInteraction()
+
+        if hasReadyLLMContext() {
+            askLLM(question: prompt)
+            return
+        }
+
+        let requestID = beginQuickLLMPreparationRequest()
+        let readSelectedTextProviderForTesting = self.readSelectedTextProviderForTesting
+
+        quickLLMPreparationTask = Task { [weak self] in
+            guard let self else { return }
+
+            let selectedText: String?
+            if let readSelectedTextProviderForTesting {
+                selectedText = await readSelectedTextProviderForTesting()
+            } else {
+                selectedText = await SelectedTextReader.readSelectedText()
+            }
+
+            let clipboardText = await MainActor.run {
+                if let clipboardTextProviderForTesting = self.clipboardTextProviderForTesting {
+                    return ClipboardTextReader.clean(clipboardTextProviderForTesting())
+                }
+                return ClipboardTextReader.readClipboardText()
+            }
+
+            await MainActor.run {
+                guard self.isCurrentQuickLLMPreparationRequest(requestID) else { return }
+
+                if let selectedText = ClipboardTextReader.clean(selectedText) {
+                    self.primeReaderForQuickLLMSource(selectedText)
+                    self.recordActivity(category: "ask", detail: "quick-command-selected-text")
+                    self.askLLM(question: prompt)
+                    self.clearQuickLLMPreparationTaskIfCurrent(requestID)
+                    return
+                }
+
+                if let clipboardText {
+                    self.primeReaderForQuickLLMSource(clipboardText)
+                    self.recordActivity(category: "ask", detail: "quick-command-clipboard-text")
+                    self.askLLM(question: prompt)
+                    self.clearQuickLLMPreparationTaskIfCurrent(requestID)
+                    return
+                }
+
+                self.pendingQuickLLMQuestionAfterPick = prompt
+                self.readerState.errorText = ""
+                self.readerState.petSay("Pick text to continue AI command.", mood: .working)
+                self.readerState.pulse()
+                self.recordActivity(category: "ask", detail: "quick-command-pick")
+                self.clearQuickLLMPreparationTaskIfCurrent(requestID)
+                self.startPick()
+            }
+        }
+    }
+
+    private func openLocalActionPrompt() {
+        pendingPromptWindowPasteTarget = capturePasteTargetForNewInteraction()
+        localActionPromptWindow.show()
+        recordActivity(category: "route", detail: "open-local-action-prompt")
+    }
+
+    private func runBestLocalAction(intent: String) {
+        let cleanIntent = FreeformPrompt.clean(intent)
+        guard !cleanIntent.isEmpty else { return }
+
+        guard let route = LocalActionRouter.bestRoute(
+            for: cleanIntent,
+            candidates: localActionRouterCandidates()
+        ) else {
+            readerState.errorText = "No local AI command or script matched that request."
+            readerState.petSay("No local action matched. Try Extensions Workspace.", mood: .ready)
+            readerState.pulse()
+            recordActivity(category: "route", detail: "run-best-local-action-no-match")
+            return
+        }
+
+        if !route.candidate.isEnabled {
+            let reason = route.candidate.disabledReason ?? "That local action is not ready."
+            readerState.errorText = reason
+            let helpText = "\(route.candidate.title) matched. \(reason)"
+            readerState.petSay(helpText, mood: .ready)
+            readerState.pulse()
+            if case .prompt = route.candidate.kind {
+                settingsWindow.show()
+            }
+            recordActivity(
+                category: "route",
+                detail: "run-best-local-action-disabled-\(ActivityLogCommand.safeID(route.candidate.id))"
+            )
+            return
+        }
+
+        readerState.errorText = ""
+        readerState.petSay("Routing to \(route.candidate.title).", mood: .working)
+        readerState.pulse()
+
+        switch route.candidate.kind {
+        case .prompt(let template):
+            recordActivity(
+                category: "route",
+                detail: "run-best-local-action-prompt-\(ActivityLogCommand.safeID(template.id))"
+            )
+            runQuickLLMCommand(question: template.prompt)
+        case .script(let item):
+            recordActivity(
+                category: "route",
+                detail: "run-best-local-action-script-\(ActivityLogCommand.safeID(item.actionID))"
+            )
+            runScriptCommand(item)
+        }
+    }
+
     private func askAnything() {
         if settings.llmEnabled {
+            pendingPromptWindowPasteTarget = capturePasteTargetForNewInteraction()
             askPromptWindow.show()
             recordActivity(category: "ask", detail: "open-ask-prompt")
             return
         }
 
+        pendingPromptWindowPasteTarget = nil
         readerState.petSay("Enable LLM in Settings to ask.", mood: .ready)
         settingsWindow.show()
         recordActivity(category: "ask", detail: "ask-disabled-open-settings")
     }
 
     private func readSelectedTextFromFrontApp() {
-        Task { [weak self] in
+        // Remember where the selection came from so a follow-up LLM answer can
+        // auto-paste back into that app.
+        lastPickFrontApp = capturePasteTargetForNewInteraction()
+        let requestID = beginReadSelectedRequest()
+        let readSelectedTextProviderForTesting = self.readSelectedTextProviderForTesting
+        // #region agent log
+        agentDebugLog(
+            hypothesisId: "H1,H3",
+            location: "AppDelegate.swift:6131",
+            message: "readSelectedText starting",
+            data: [
+                "frontTarget": agentDebugAppData(lastPickFrontApp),
+                "accessibilityTrusted": PermissionStatus.accessibilityTrusted()
+            ]
+        )
+        // #endregion
+        readSelectedTask = Task { [weak self] in
             guard let self else { return }
-            let selectedText = await SelectedTextReader.readSelectedText()
+            let selectedText: String?
+            if let readSelectedTextProviderForTesting {
+                selectedText = await readSelectedTextProviderForTesting()
+            } else {
+                selectedText = await SelectedTextReader.readSelectedText()
+            }
             await MainActor.run {
+                guard self.isCurrentReadSelectedRequest(requestID) else { return }
+                // #region agent log
+                self.agentDebugLog(
+                    hypothesisId: "H1,H3",
+                    location: "AppDelegate.swift:6136",
+                    message: "readSelectedText finished",
+                    data: [
+                        "foundText": selectedText != nil,
+                        "textLength": selectedText?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0,
+                        "frontTarget": self.agentDebugAppData(self.lastPickFrontApp)
+                    ]
+                )
+                // #endregion
                 guard let selectedText else {
                     self.readerState.errorText = "No selected text found."
                     self.effects.play(.error, settings: self.settings)
                     self.flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
                     self.recordActivity(category: "core", detail: "read-selected-empty")
+                    self.clearReadSelectedTaskIfCurrent(requestID)
                     return
                 }
 
@@ -6069,6 +8441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.effects.hit(.success, settings: self.settings, haptic: .alignment)
                 self.flashStatus(symbol: "sparkles", tint: .systemGreen, length: 0.32)
                 self.recordActivity(category: "core", detail: "read-selected")
+                self.clearReadSelectedTaskIfCurrent(requestID)
             }
         }
     }
@@ -8286,7 +10659,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let previousTrendToken = activity.previousTrend.map(bestChannelLaunchPackPressureTrendToken) ?? "none"
         let trendToken = bestChannelLaunchPackPressureTrendToken(activity.trend)
         let latestToken = "\(previousTrendToken)-to-\(trendToken)"
-        let count = max(0, defaults.integer(forKey: countKey)) + 1
+        let count = incrementSaturating(max(0, defaults.integer(forKey: countKey)))
         let direction = bestChannelLaunchPackPressureModeTransitionDirection(
             fromToken: previousTrendToken,
             toToken: trendToken
@@ -8386,9 +10759,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             previousDirection = 0
         }
         if previousDirection == normalizedDirection {
-            return normalizedDirection * (abs(previousStreak) + 1)
+            let previousMagnitude: Int
+            if previousStreak == Int.min {
+                previousMagnitude = Int.max
+            } else {
+                previousMagnitude = abs(previousStreak)
+            }
+            let nextMagnitude = incrementSaturating(previousMagnitude)
+            return normalizedDirection > 0 ? nextMagnitude : -nextMagnitude
         }
         return normalizedDirection
+    }
+
+    nonisolated private static func incrementSaturating(_ value: Int) -> Int {
+        guard value < Int.max else {
+            return Int.max
+        }
+        return value + 1
     }
 
     nonisolated static func launchRecoveryQuickRunShortcutHint() -> String {
@@ -13049,13 +15436,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return []
         }
 
-        return history.map { day in
-            LaunchControlHealthTransitionHistoryDay(
-                dayStamp: day.dayStamp,
+        var historyByDay: [String: LaunchControlHealthTransitionHistoryDay] = [:]
+        for day in history {
+            guard let normalizedDayStamp = normalizedLaunchControlHealthTransitionDayStamp(day.dayStamp) else {
+                continue
+            }
+
+            historyByDay[normalizedDayStamp] = LaunchControlHealthTransitionHistoryDay(
+                dayStamp: normalizedDayStamp,
                 watchToRiskCount: max(0, day.watchToRiskCount),
                 riskToReadyCount: max(0, day.riskToReadyCount)
             )
         }
+
+        return historyByDay.values.sorted { lhs, rhs in
+            lhs.dayStamp < rhs.dayStamp
+        }
+    }
+
+    nonisolated private static func normalizedLaunchControlHealthTransitionDayStamp(
+        _ rawValue: String
+    ) -> String? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              parts[0].count == 4,
+              parts[1].count == 2,
+              parts[2].count == 2,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else {
+            return nil
+        }
+
+        var dateComponents = DateComponents()
+        let calendar = Calendar(identifier: .gregorian)
+        dateComponents.calendar = calendar
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = day
+        guard let date = dateComponents.date else {
+            return nil
+        }
+
+        let resolvedComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        guard resolvedComponents.year == year,
+              resolvedComponents.month == month,
+              resolvedComponents.day == day else {
+            return nil
+        }
+
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 
     nonisolated static func launchControlHealthTransitionHistoryWindow(
@@ -13136,9 +15567,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         if token == "watch-to-risk" {
-            watchToRiskCount += 1
+            watchToRiskCount = incrementSaturating(watchToRiskCount)
         } else {
-            riskToReadyCount += 1
+            riskToReadyCount = incrementSaturating(riskToReadyCount)
         }
 
         defaults.set(todayStamp, forKey: dayKey)
@@ -15528,6 +17959,257 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             effects.play(.error, settings: settings)
             flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
             recordActivity(category: "open", detail: "open-fame-snapshot-folder-error")
+        }
+    }
+
+    private func currentScriptCommandItems() -> [ScriptCommandItem] {
+        scriptCommandItemsForTesting ?? scriptCommandItems
+    }
+
+    private func openScriptCommandsFolder() {
+        do {
+            let directoryURL = try ScriptCommandCatalog.ensureDefaultDirectoryExists()
+            revealURL(directoryURL)
+            readerState.petSay("Opened script commands folder.", mood: .happy)
+            readerState.errorText = ""
+            recordActivity(category: "open", detail: "open-script-commands-folder")
+        } catch {
+            readerState.errorText = "Could not open script commands folder."
+            effects.play(.error, settings: settings)
+            flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+            recordActivity(category: "open", detail: "open-script-commands-folder-error")
+        }
+    }
+
+    private func refreshScriptCommands(showFeedback: Bool = true) {
+        if scriptCommandItemsForTesting == nil {
+            scriptCommandItems = ScriptCommandCatalog.load()
+        }
+        refreshCommandPaletteIfVisible()
+        if showFeedback {
+            readerState.errorText = ""
+            readerState.petSay(
+                "Script commands refreshed (\(currentScriptCommandItems().count)).",
+                mood: .happy
+            )
+            readerState.pulse()
+        }
+        recordActivity(category: "open", detail: "refresh-script-commands")
+    }
+
+    private func installStarterExtension(_ template: StarterExtensionTemplate) {
+        do {
+            let directoryURL = try ScriptCommandCatalog.ensureDefaultDirectoryExists()
+            let result = try StarterExtensionInstaller.install(template, directoryURL: directoryURL)
+
+            switch result {
+            case .installed(let fileURL):
+                refreshScriptCommands(showFeedback: false)
+                readerState.errorText = ""
+                readerState.petSay("Installed \(template.title).", mood: .happy)
+                readerState.pulse()
+                revealURL(fileURL)
+                recordActivity(
+                    category: "script",
+                    detail: "install-starter-extension-\(ActivityLogCommand.safeID(template.id))"
+                )
+            case .alreadyInstalled(let fileURL):
+                readerState.errorText = ""
+                readerState.petSay("\(template.title) is already installed.", mood: .ready)
+                readerState.pulse()
+                revealURL(fileURL)
+                recordActivity(
+                    category: "script",
+                    detail: "starter-extension-already-installed-\(ActivityLogCommand.safeID(template.id))"
+                )
+            }
+        } catch {
+            readerState.errorText = "Could not install starter extension."
+            readerState.petSay("Starter extension install failed.", mood: .error)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+            flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+            recordActivity(
+                category: "script",
+                detail: "install-starter-extension-error-\(ActivityLogCommand.safeID(template.id))"
+            )
+        }
+    }
+
+    private func revealStarterExtension(_ template: StarterExtensionTemplate) {
+        if let item = StarterExtensionCatalog.installedScript(
+            for: template,
+            in: currentScriptCommandItems()
+        ) {
+            revealURL(item.url)
+            recordActivity(
+                category: "open",
+                detail: "reveal-starter-extension-\(ActivityLogCommand.safeID(template.id))"
+            )
+            return
+        }
+
+        readerState.errorText = "Starter extension is not installed yet."
+        readerState.petSay("Install \(template.title) first.", mood: .ready)
+        readerState.pulse()
+    }
+
+    private func importExtensionPack() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+
+        let panel = NSOpenPanel()
+        panel.title = "Import Extension Pack"
+        panel.prompt = "Import"
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.json]
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let pack = try LocalExtensionPack.load(from: url)
+            let directoryURL = try ScriptCommandCatalog.ensureDefaultDirectoryExists()
+            let result = try pack.install(into: directoryURL)
+            refreshScriptCommands(showFeedback: false)
+
+            switch result {
+            case .installed(let installedURL):
+                readerState.errorText = ""
+                readerState.petSay("Imported \(pack.title).", mood: .happy)
+                readerState.pulse()
+                revealURL(installedURL)
+                recordActivity(category: "script", detail: "import-extension-pack-installed")
+            case .alreadyInstalled(let installedURL):
+                readerState.errorText = ""
+                readerState.petSay("\(pack.title) is already installed.", mood: .ready)
+                readerState.pulse()
+                revealURL(installedURL)
+                recordActivity(category: "script", detail: "import-extension-pack-existing")
+            case .replaced(let installedURL):
+                readerState.errorText = ""
+                readerState.petSay("Updated \(pack.title) from extension pack.", mood: .happy)
+                readerState.pulse()
+                revealURL(installedURL)
+                recordActivity(category: "script", detail: "import-extension-pack-replaced")
+            }
+        } catch {
+            readerState.errorText = "Could not import extension pack."
+            readerState.petSay("Extension pack import failed.", mood: .error)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+            flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+            recordActivity(category: "script", detail: "import-extension-pack-error")
+        }
+    }
+
+    private func exportScriptCommand(_ item: ScriptCommandItem) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+
+        do {
+            guard FileManager.default.fileExists(atPath: item.url.path) else {
+                throw LocalExtensionPackError.missingScriptFile
+            }
+            let contents = try String(contentsOf: item.url, encoding: .utf8)
+            let pack = LocalExtensionPack(scriptCommand: item, scriptContents: contents)
+
+            let panel = NSSavePanel()
+            panel.title = "Export Extension Pack"
+            panel.nameFieldStringValue = pack.suggestedExportFileName
+            panel.canCreateDirectories = true
+            panel.allowedContentTypes = [.json]
+
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try pack.jsonData().write(to: url, options: .atomic)
+            readerState.errorText = ""
+            readerState.petSay("Exported \(item.title) pack.", mood: .happy)
+            readerState.pulse()
+            revealURL(url)
+            recordActivity(
+                category: "script",
+                detail: "export-extension-pack-\(ActivityLogCommand.safeID(item.actionID))"
+            )
+        } catch {
+            readerState.errorText = "Could not export extension pack."
+            readerState.petSay("Extension pack export failed.", mood: .error)
+            readerState.pulse()
+            effects.play(.error, settings: settings)
+            flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+            recordActivity(
+                category: "script",
+                detail: "export-extension-pack-error-\(ActivityLogCommand.safeID(item.actionID))"
+            )
+        }
+    }
+
+    private func runScriptCommand(_ item: ScriptCommandItem) {
+        let scriptTitle = item.title
+        let executionConfiguration = item.executionConfiguration()
+        guard case .success = executionConfiguration else {
+            let message: String
+            switch executionConfiguration {
+            case .success:
+                message = "Script command is not ready."
+            case .failure(let failureReason):
+                message = failureReason.errorDescription ?? "Script command is not ready."
+            }
+            readerState.errorText = message
+            readerState.petSay(message, mood: .ready)
+            readerState.pulse()
+            return
+        }
+
+        readerState.isWorking = true
+        readerState.errorText = ""
+        readerState.petSay("Running \(scriptTitle)...", mood: .working)
+        readerState.pulse()
+        recordActivity(category: "script", detail: "run-script-command")
+
+        scriptCommandTask = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                Result { try ScriptCommandRunner.run(item) }
+            }.value
+
+            await MainActor.run {
+                guard let self else { return }
+                self.readerState.isWorking = false
+                switch result {
+                case .success(let runResult):
+                    let output = runResult.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard runResult.exitCode == 0 else {
+                        let errorMessage = output.isEmpty
+                            ? "\(scriptTitle) exited with status \(runResult.exitCode)."
+                            : output
+                        self.readerState.errorText = errorMessage
+                        self.readerState.petSay("Script failed.", mood: .error)
+                        self.readerState.pulse()
+                        self.effects.play(.error, settings: self.settings)
+                        self.flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+                        self.recordActivity(category: "script", detail: "run-script-command-error")
+                        return
+                    }
+
+                    if !output.isEmpty {
+                        self.readerState.lastText = output
+                        self.readerState.answerText = ""
+                        self.readerState.lastImageData = nil
+                        self.readerState.errorText = ""
+                        self.readerState.remember(text: output)
+                        self.readerWindow.show()
+                    } else {
+                        self.readerState.errorText = ""
+                    }
+                    self.readerState.petSay("Ran \(scriptTitle).", mood: .happy)
+                    self.readerState.pulse()
+                case .failure(let error):
+                    self.readerState.errorText = error.localizedDescription
+                    self.readerState.petSay("Script failed.", mood: .error)
+                    self.readerState.pulse()
+                    self.effects.play(.error, settings: self.settings)
+                    self.flashStatus(symbol: "xmark.circle.fill", tint: .systemRed, length: 0.24)
+                    self.recordActivity(category: "script", detail: "run-script-command-error")
+                }
+            }
         }
     }
 
@@ -20312,6 +22994,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             settingsWindow.show()
         case .loginItemsSettings:
             LaunchAtLoginManager.openSettings()
+        case .openCommands:
+            if !commandPalette.isVisible {
+                commandPalette.show()
+            }
+        case .openNotesWorkspace:
+            openNotesWorkspace()
+        case .openExtensionsWorkspace:
+            openExtensionsWorkspace()
+        case .openWindowSettings:
+            openWindowSettings()
         }
 
         recordActivity(category: "setup", detail: "setup-\(action.rawValue)")
@@ -20326,6 +23018,90 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func searchWeb(query: String) {
         guard let url = WebSearch.searchURL(for: query) else { return }
         openURL(url)
+    }
+
+    private func refreshLauncherCatalogSubtitle() -> String {
+        let rootCount = settings.launcherIndexedRootPaths.count
+        let rootLabel = rootCount == 1 ? "1 indexed root" : "\(rootCount) indexed roots"
+        return "Reload installed apps, folders, and files from \(rootLabel)"
+    }
+
+    private func launcherIndexedRootURLs() -> [URL] {
+        LocalFileSearchCatalog.rootURLs(fromPaths: settings.launcherIndexedRootPaths)
+    }
+
+    private func refreshIndexedFileSearch(showFeedback: Bool = false) {
+        fileSearchItems = LocalFileSearchCatalog.load(roots: launcherIndexedRootURLs())
+        commandPalette.requestRefresh()
+        guard showFeedback else { return }
+
+        let rootCount = settings.launcherIndexedRootPaths.count
+        let rootLabel = rootCount == 1 ? "1 indexed root" : "\(rootCount) indexed roots"
+        readerState.petSay("Indexed \(fileSearchItems.count) files from \(rootLabel).", mood: .happy)
+        readerState.pulse()
+    }
+
+    private func refreshLauncherSearchCatalogs(showFeedback: Bool = true) {
+        appLaunchItems = AppLaunchCatalog.load()
+        fileSearchItems = LocalFileSearchCatalog.load(roots: launcherIndexedRootURLs())
+        commonFolderItems = CommonFolderCatalog.load()
+        if scriptCommandItemsForTesting == nil {
+            scriptCommandItems = ScriptCommandCatalog.load()
+        }
+        commandPalette.requestRefresh()
+        recordActivity(category: "open", detail: "refresh-app-launcher")
+        guard showFeedback else { return }
+        let rootCount = settings.launcherIndexedRootPaths.count
+        let rootLabel = rootCount == 1 ? "1 indexed root" : "\(rootCount) indexed roots"
+        readerState.petSay(
+            "Refreshed \(appLaunchItems.count) apps, \(fileSearchItems.count) files from \(rootLabel), \(commonFolderItems.count) folders, and \(currentScriptCommandItems().count) script commands.",
+            mood: .happy
+        )
+        readerState.pulse()
+    }
+
+    private func pickLauncherIndexedRootFromSettings() {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+
+        let panel = NSOpenPanel()
+        panel.title = "Add Indexed Folder"
+        panel.prompt = "Add"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let nextPaths = LocalFileSearchCatalog.normalizedRootPaths(
+            settings.launcherIndexedRootPaths + [url.path]
+        )
+        guard nextPaths != settings.launcherIndexedRootPaths else {
+            readerState.petSay("Indexed folder already added.", mood: .ready)
+            readerState.pulse()
+            return
+        }
+
+        settings.launcherIndexedRootPaths = nextPaths
+        readerState.errorText = ""
+        readerState.petSay(
+            "Added indexed folder: \(LocalFileSearchCatalog.displayRootPath(url.path)).",
+            mood: .happy
+        )
+        readerState.pulse()
+        recordActivity(category: "open", detail: "add-indexed-root")
+    }
+
+    private func launchApp(_ item: AppLaunchItem) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+        NSWorkspace.shared.open(item.url)
+        recordActivity(category: "open", detail: "open-app")
+    }
+
+    private func openCommonFolder(_ item: CommonFolderItem) {
+        guard !RuntimeEnvironment.suppressesExternalEffects else { return }
+        NSWorkspace.shared.open(item.url)
+        recordActivity(category: "open", detail: "open-folder")
     }
 
     private func openURL(_ url: URL) {
@@ -20669,6 +23445,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         recordActivity(category: "core", detail: "stop-speech")
     }
 
+    @discardableResult
+    private func beginSelectionCaptureRequest() -> UInt64 {
+        let hadInFlightSelection = selectionProcessingTask != nil
+        selectionProcessingTask?.cancel()
+        if hadInFlightSelection {
+            stopWorkingFeedback()
+            readerState.isWorking = false
+        }
+        selectionCaptureRequestID &+= 1
+        return selectionCaptureRequestID
+    }
+
+    private func isCurrentSelectionCaptureRequest(_ requestID: UInt64) -> Bool {
+        requestID == selectionCaptureRequestID
+    }
+
+    private func clearSelectionProcessingTaskIfCurrent(_ requestID: UInt64) {
+        guard isCurrentSelectionCaptureRequest(requestID) else { return }
+        selectionProcessingTask = nil
+    }
+
+    @discardableResult
+    private func beginReadSelectedRequest() -> UInt64 {
+        readSelectedTask?.cancel()
+        readSelectedRequestID &+= 1
+        return readSelectedRequestID
+    }
+
+    private func isCurrentReadSelectedRequest(_ requestID: UInt64) -> Bool {
+        requestID == readSelectedRequestID
+    }
+
+    private func clearReadSelectedTaskIfCurrent(_ requestID: UInt64) {
+        guard isCurrentReadSelectedRequest(requestID) else { return }
+        readSelectedTask = nil
+    }
+
+    @discardableResult
+    private func beginAskLLMRequest() -> UInt64 {
+        askLLMTask?.cancel()
+        askLLMRequestID &+= 1
+        return askLLMRequestID
+    }
+
+    private func isCurrentAskLLMRequest(_ requestID: UInt64) -> Bool {
+        requestID == askLLMRequestID
+    }
+
+    private func clearAskLLMTaskIfCurrent(_ requestID: UInt64) {
+        guard isCurrentAskLLMRequest(requestID) else { return }
+        askLLMTask = nil
+    }
+
     private func askLLM(question: String) {
         guard settings.llmEnabled else {
             readerState.errorText = "LLM is off."
@@ -20686,30 +23515,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let prompt = questionText.isEmpty ? "Explain this content in a clear, short way." : questionText
         let text = readerState.lastText
         let imageData = readerState.lastImageData
+        let requestID = beginAskLLMRequest()
+        let askLLMAnswerProviderForTesting = self.askLLMAnswerProviderForTesting
 
         readerState.isWorking = true
         readerState.errorText = ""
 
-        Task {
+        askLLMTask = Task { [weak self] in
+            guard let self else { return }
             do {
-                let answer = try await OpenAIClient(apiKey: apiKey).askAboutSelection(
-                    question: prompt,
-                    selectedText: text,
-                    imageData: imageData,
-                    model: settings.llmModel,
-                    provider: settings.llmProvider,
-                    endpoint: settings.llmEndpoint
-                )
+                let answer: String
+                if let askLLMAnswerProviderForTesting {
+                    answer = try await askLLMAnswerProviderForTesting(prompt, text, imageData)
+                } else {
+                    answer = try await OpenAIClient(apiKey: apiKey).askAboutSelection(
+                        question: prompt,
+                        selectedText: text,
+                        imageData: imageData,
+                        model: settings.llmModel,
+                        provider: settings.llmProvider,
+                        endpoint: settings.llmEndpoint
+                    )
+                }
 
                 await MainActor.run {
-                    readerState.answerText = answer
-                    readerState.remember(text: text, answer: answer)
-                    readerState.pulse()
-                    readerState.isWorking = false
-                    effects.hit(.success, settings: settings, haptic: .levelChange)
-                    flashStatus(symbol: "sparkles", tint: .systemGreen, length: 0.42)
-                    recordActivity(category: "ask", detail: "ask-success")
+                    guard self.isCurrentAskLLMRequest(requestID) else { return }
+                    self.readerState.answerText = answer
+                    self.readerState.remember(text: text, answer: answer)
+                    self.readerState.pulse()
+                    self.readerState.isWorking = false
+                    self.effects.hit(.success, settings: self.settings, haptic: .levelChange)
+                    self.flashStatus(symbol: "sparkles", tint: .systemGreen, length: 0.42)
+                    self.recordActivity(category: "ask", detail: "ask-success")
+
+                    // #region agent log
+                    self.agentDebugLog(
+                        hypothesisId: "H1,H4,H5",
+                        location: "AppDelegate.swift:20795",
+                        message: "LLM answer ready",
+                        data: [
+                            "answerLength": answer.trimmingCharacters(in: .whitespacesAndNewlines).count,
+                            "autoPasteLLMAnswers": self.settings.autoPasteLLMAnswers,
+                            "frontTarget": self.agentDebugAppData(self.lastPickFrontApp)
+                        ]
+                    )
+                    // #endregion
+
+                    if self.settings.autoPasteLLMAnswers {
+                        self.autoPaste(answer, to: self.lastPickFrontApp)
+                    }
                 }
+
+                let shouldContinue = await MainActor.run {
+                    self.isCurrentAskLLMRequest(requestID) && !Task.isCancelled
+                }
+                guard shouldContinue else { return }
 
                 if settings.useCloudVoiceForLLM {
                     let data = try await OpenAIClient(apiKey: apiKey).makeSpeech(
@@ -20719,20 +23579,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         instructions: settings.cloudVoiceInstructions
                     )
                     await MainActor.run {
-                        speech.playAudioData(data)
+                        guard self.isCurrentAskLLMRequest(requestID) else { return }
+                        self.speech.playAudioData(data)
+                        self.clearAskLLMTaskIfCurrent(requestID)
                     }
                 } else {
                     await MainActor.run {
-                        read(answer)
+                        guard self.isCurrentAskLLMRequest(requestID) else { return }
+                        self.read(answer)
+                        self.clearAskLLMTaskIfCurrent(requestID)
                     }
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    guard self.isCurrentAskLLMRequest(requestID) else { return }
+                    self.readerState.isWorking = false
+                    self.clearAskLLMTaskIfCurrent(requestID)
                 }
             } catch {
                 await MainActor.run {
-                    readerState.isWorking = false
-                    readerState.errorText = error.localizedDescription
-                    effects.play(.error, settings: settings)
-                    flashStatus(symbol: "exclamationmark.triangle.fill", tint: .systemRed, length: 0.36)
-                    recordActivity(category: "ask", detail: "ask-error")
+                    guard self.isCurrentAskLLMRequest(requestID) else { return }
+                    self.readerState.isWorking = false
+                    self.readerState.errorText = error.localizedDescription
+                    self.effects.play(.error, settings: self.settings)
+                    self.flashStatus(symbol: "exclamationmark.triangle.fill", tint: .systemRed, length: 0.36)
+                    self.recordActivity(category: "ask", detail: "ask-error")
+                    self.clearAskLLMTaskIfCurrent(requestID)
                 }
             }
         }
@@ -23382,11 +26254,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         return decoded
-            .filter { sample in
-                sample.recordedAt > 0
-                    && !sample.commandToken
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .isEmpty
+            .compactMap { sample in
+                guard sample.recordedAt.isFinite, sample.recordedAt > 0 else {
+                    return nil
+                }
+
+                let trimmedCommandToken = sample.commandToken.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                guard !trimmedCommandToken.isEmpty else {
+                    return nil
+                }
+
+                let normalizedCommandToken = ActivityLogCommand.safeID(trimmedCommandToken)
+                guard !normalizedCommandToken.isEmpty else {
+                    return nil
+                }
+
+                return FameExceptionalLoopOutcomeCommandSample(
+                    commandToken: normalizedCommandToken,
+                    recordedAt: sample.recordedAt,
+                    wasSuccess: sample.wasSuccess
+                )
             }
             .sorted { $0.recordedAt < $1.recordedAt }
     }
