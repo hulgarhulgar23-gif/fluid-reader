@@ -1,1 +1,14 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Quick troubleshooting
+    url: https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/docs/TROUBLESHOOTING.md
+    about: Check common fixes before opening an issue.
+  - name: Support and safe issue bundles
+    url: https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/SUPPORT.md
+    about: Find the fastest support path and safe logs.
+  - name: Security and privacy reporting
+    url: https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/SECURITY.md
+    about: Report private or security-sensitive problems safely.
+  - name: Maintainer guide
+    url: https://github.com/hulgarhulgar23-gif/fluid-reader/blob/main/MAINTAINERS.md
+    about: See maintainer, review, and release expectations.

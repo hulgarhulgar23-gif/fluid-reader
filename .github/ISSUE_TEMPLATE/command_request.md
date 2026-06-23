@@ -2,7 +2,7 @@
 name: Command request
 about: Suggest a command or search alias
 title: "[Command] "
-labels: enhancement
+labels: enhancement, command-request
 assignees: ""
 ---
 
