@@ -6,7 +6,7 @@
 [Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
 [Power User Guide](docs/POWER_USER_GUIDE.md)
 
-Fluid Reader is a local-first macOS launcher for OCR, read-aloud, notes, scripts, and optional AI commands. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
+Fluid Reader is a local-first macOS reader and launcher for OCR, read-aloud, notes, scripts, and optional AI commands. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
 ## Project Snapshot
 
