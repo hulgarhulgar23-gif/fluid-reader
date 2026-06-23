@@ -15,6 +15,7 @@ Fluid Reader is actively maintained in public.
 - Keep the website, release notes, Homebrew cask, and support docs in sync
 - Keep support bundles and issue flows safe for private data
 - Own review routing through `.github/CODEOWNERS` and dependency updates through `.github/dependabot.yml`
+- Watch GitHub security automation such as private vulnerability reporting, secret scanning, Dependabot security updates, and code scanning
 
 ## Before merge
 

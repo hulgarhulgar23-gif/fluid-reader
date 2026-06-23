@@ -6,7 +6,9 @@ Fluid Reader handles selected text, screenshots, clipboard text, and API keys. P
 
 Do not open a public issue for secrets, private text, screenshots, or API keys.
 
-Email the maintainer, or open a short public issue that says you found a security problem and can share details privately.
+GitHub private vulnerability reporting is enabled for this repository. Use the repository Security tab if you want to report a vulnerability privately through GitHub.
+
+If you cannot use that path, email the maintainer, or open a short public issue that says you found a security problem and can share details privately.
 
 ## What to Include
 
