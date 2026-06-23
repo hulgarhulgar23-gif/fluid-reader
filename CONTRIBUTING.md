@@ -188,6 +188,8 @@ Do not open a public issue with secrets, private text, screenshots, API keys, or
 
 ## Project map
 
+Read [MAINTAINERS.md](MAINTAINERS.md) before changing triage, review, release, support, or safety workflows.
+
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding commands, stores, permissions, or release changes.
 
 Try [docs/DEMO.md](docs/DEMO.md) before changing core flows.

@@ -4,7 +4,8 @@
 
 [Website](https://hulgarhulgar23-gif.github.io/fluid-reader/) ·
 [Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
-[Power User Guide](docs/POWER_USER_GUIDE.md)
+[Power User Guide](docs/POWER_USER_GUIDE.md) ·
+[Maintainer Guide](MAINTAINERS.md)
 
 Fluid Reader is a local-first macOS reader and launcher for OCR, read-aloud, notes, scripts, and optional AI commands. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
@@ -12,7 +13,7 @@ Fluid Reader is a local-first macOS reader and launcher for OCR, read-aloud, not
 
 - Local-first by default: screen capture stays on the Mac, OCR uses Apple Vision, speech uses macOS voices, and AI is optional.
 - Real shipped app: there is a public [website](https://hulgarhulgar23-gif.github.io/fluid-reader/), a downloadable macOS [release](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest), and a Homebrew cask install path.
-- Maintained in public: the repo is MIT-licensed and includes [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Maintained in public: the repo is MIT-licensed and includes [MAINTAINERS.md](MAINTAINERS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Release and maintainer work are checked in CI on macOS, including `swift test`, docs checks, release packaging checks, public release safety checks, and open-source readiness checks.
 
 The default mode is local:
