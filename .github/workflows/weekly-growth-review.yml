@@ -73,7 +73,7 @@ jobs:
 
       - name: Locate sprint metrics
         id: sprint_metrics
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           INPUT_WEEK: ${{ inputs.week }}
         with:
@@ -838,7 +838,7 @@ jobs:
       - name: Extract previous Monday checklist effectiveness
         id: monday_effectiveness
         if: steps.sprint_metrics.outputs.issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PREVIOUS_WEEK: ${{ steps.sprint_metrics.outputs.previous_week }}
           PREVIOUS_BASELINE_WEEK: ${{ steps.sprint_metrics.outputs.previous_baseline_week }}
@@ -2475,7 +2475,7 @@ jobs:
       - name: Extract founder outreach sprint outcomes
         id: outreach_sprint_outcomes
         if: steps.sprint_metrics.outputs.issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PREVIOUS_WEEK: ${{ steps.sprint_metrics.outputs.previous_week }}
           PREVIOUS_BASELINE_WEEK: ${{ steps.sprint_metrics.outputs.previous_baseline_week }}
@@ -2968,7 +2968,7 @@ jobs:
 
       - name: Sync reply pack effectiveness into sprint issue
         if: steps.sprint_metrics.outputs.issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.sprint_metrics.outputs.issue_number }}
           SOURCE_WEEK: ${{ steps.monday_effectiveness.outputs.source_week }}
@@ -3621,7 +3621,7 @@ jobs:
       - name: Classify sprint health
         if: steps.sprint_metrics.outputs.issue_number != ''
         id: sprint_health
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WIN_CARD: ${{ steps.sprint_metrics.outputs.win_card }}
           WIN_RECAP: ${{ steps.sprint_metrics.outputs.win_recap }}
@@ -3688,7 +3688,7 @@ jobs:
 
       - name: Upsert weekly review comment
         if: steps.sprint_metrics.outputs.issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.sprint_metrics.outputs.issue_number }}
           REVIEW_PATH: ${{ env.review_path }}
@@ -3858,7 +3858,7 @@ jobs:
       - name: Escalate sprint health
         id: escalation
         if: steps.sprint_metrics.outputs.issue_number != '' && steps.sprint_health.outputs.health_status != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.sprint_metrics.outputs.issue_number }}
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
@@ -4108,7 +4108,7 @@ jobs:
       - name: Generate Monday draft from highlight plan
         id: monday_draft
         if: steps.escalation.outputs.highlight_plan_issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           HIGHLIGHT_PLAN_ISSUE_NUMBER: ${{ steps.escalation.outputs.highlight_plan_issue_number }}
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
@@ -4432,7 +4432,7 @@ jobs:
       - name: Upsert Monday publish checklist issue
         id: monday_publish
         if: steps.monday_draft.outputs.monday_draft_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
           SPRINT_ISSUE_NUMBER: ${{ steps.sprint_metrics.outputs.issue_number }}
@@ -5156,7 +5156,7 @@ jobs:
 
       - name: Close Monday publish checklist when not exceptional
         if: steps.sprint_metrics.outputs.issue_number != '' && steps.monday_draft.outputs.monday_draft_path == ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
         with:
@@ -5308,7 +5308,7 @@ jobs:
 
       - name: Upsert Monday publish checkpoint comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.checkpoint_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           CHECKPOINT_PATH: ${{ env.checkpoint_path }}
@@ -5402,7 +5402,7 @@ jobs:
 
       - name: Upsert first-24h reply pack comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.reply_pack_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           REPLY_PACK_PATH: ${{ env.reply_pack_path }}
@@ -5499,7 +5499,7 @@ jobs:
 
       - name: Upsert social proof kit comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.social_proof_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           SOCIAL_PROOF_PATH: ${{ env.social_proof_path }}
@@ -5600,7 +5600,7 @@ jobs:
 
       - name: Upsert creator outreach kit comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.creator_outreach_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           CREATOR_OUTREACH_PATH: ${{ env.creator_outreach_path }}
@@ -5742,7 +5742,7 @@ jobs:
 
       - name: Upsert creator target list comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.creator_target_list_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           CREATOR_TARGET_LIST_PATH: ${{ env.creator_target_list_path }}
@@ -5851,7 +5851,7 @@ jobs:
 
       - name: Upsert distribution follow-up plan comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.distribution_plan_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           DISTRIBUTION_PLAN_PATH: ${{ env.distribution_plan_path }}
@@ -5956,7 +5956,7 @@ jobs:
 
       - name: Upsert viral experiment board comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.viral_experiment_board_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           VIRAL_EXPERIMENT_BOARD_PATH: ${{ env.viral_experiment_board_path }}
@@ -6067,7 +6067,7 @@ jobs:
 
       - name: Upsert winning hook library comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.winning_hook_library_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           WINNING_HOOK_LIBRARY_PATH: ${{ env.winning_hook_library_path }}
@@ -6178,7 +6178,7 @@ jobs:
 
       - name: Upsert social proof wall comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.social_proof_wall_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           SOCIAL_PROOF_WALL_PATH: ${{ env.social_proof_wall_path }}
@@ -6287,7 +6287,7 @@ jobs:
 
       - name: Upsert credibility ledger comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.credibility_ledger_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           CREDIBILITY_LEDGER_PATH: ${{ env.credibility_ledger_path }}
@@ -6841,7 +6841,7 @@ jobs:
 
       - name: Upsert founder fame pack comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_PATH: ${{ env.founder_fame_path }}
@@ -6883,7 +6883,7 @@ jobs:
 
       - name: Upsert founder press kit comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_press_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_PRESS_PATH: ${{ env.founder_press_path }}
@@ -6925,7 +6925,7 @@ jobs:
 
       - name: Upsert founder media blast comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_media_blast_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_MEDIA_BLAST_PATH: ${{ env.founder_media_blast_path }}
@@ -6967,7 +6967,7 @@ jobs:
 
       - name: Upsert founder guesting queue comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_guesting_queue_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_GUESTING_QUEUE_PATH: ${{ env.founder_guesting_queue_path }}
@@ -7009,7 +7009,7 @@ jobs:
 
       - name: Upsert founder guesting sprint brief comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_guesting_brief_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_GUESTING_BRIEF_PATH: ${{ env.founder_guesting_brief_path }}
@@ -7051,7 +7051,7 @@ jobs:
 
       - name: Upsert founder fame ops brief comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_ops_brief_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_OPS_BRIEF_PATH: ${{ env.founder_fame_ops_brief_path }}
@@ -7093,7 +7093,7 @@ jobs:
 
       - name: Upsert founder fame action queue comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_action_queue_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_ACTION_QUEUE_PATH: ${{ env.founder_fame_action_queue_path }}
@@ -7139,7 +7139,7 @@ jobs:
 
       - name: Upsert founder fame interview prep comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_interview_prep_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_INTERVIEW_PREP_PATH: ${{ env.founder_fame_interview_prep_path }}
@@ -7181,7 +7181,7 @@ jobs:
 
       - name: Upsert founder fame transcript ingestion comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_transcript_ingestion_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_TRANSCRIPT_INGESTION_PATH: ${{ env.founder_fame_transcript_ingestion_path }}
@@ -7223,7 +7223,7 @@ jobs:
 
       - name: Upsert founder fame repurpose plan comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_repurpose_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_REPURPOSE_PATH: ${{ env.founder_fame_repurpose_path }}
@@ -7265,7 +7265,7 @@ jobs:
 
       - name: Upsert founder fame momentum brief comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_momentum_brief_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_MOMENTUM_BRIEF_PATH: ${{ env.founder_fame_momentum_brief_path }}
@@ -7307,7 +7307,7 @@ jobs:
 
       - name: Upsert founder fame opportunity radar comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_opportunity_radar_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_OPPORTUNITY_RADAR_PATH: ${{ env.founder_fame_opportunity_radar_path }}
@@ -7349,7 +7349,7 @@ jobs:
 
       - name: Upsert founder fame execution sprint comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_execution_sprint_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_EXECUTION_SPRINT_PATH: ${{ env.founder_fame_execution_sprint_path }}
@@ -7391,7 +7391,7 @@ jobs:
 
       - name: Upsert founder fame execution scorecard comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_execution_scorecard_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_EXECUTION_SCORECARD_PATH: ${{ env.founder_fame_execution_scorecard_path }}
@@ -7433,7 +7433,7 @@ jobs:
 
       - name: Upsert founder fame risk response plan comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_risk_response_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_RISK_RESPONSE_PATH: ${{ env.founder_fame_risk_response_path }}
@@ -7475,7 +7475,7 @@ jobs:
 
       - name: Upsert founder fame escalation queue comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_escalation_queue_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_ESCALATION_QUEUE_PATH: ${{ env.founder_fame_escalation_queue_path }}
@@ -7517,7 +7517,7 @@ jobs:
 
       - name: Upsert founder fame command center comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_command_center_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_COMMAND_CENTER_PATH: ${{ env.founder_fame_command_center_path }}
@@ -7559,7 +7559,7 @@ jobs:
 
       - name: Upsert founder fame next-move handoff comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_next_move_handoff_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_NEXT_MOVE_HANDOFF_PATH: ${{ env.founder_fame_next_move_handoff_path }}
@@ -7601,7 +7601,7 @@ jobs:
 
       - name: Upsert founder fame spotlight pack comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_spotlight_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_SPOTLIGHT_PATH: ${{ env.founder_fame_spotlight_path }}
@@ -7643,7 +7643,7 @@ jobs:
 
       - name: Upsert founder fame breakout plan comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_breakout_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_BREAKOUT_PATH: ${{ env.founder_fame_breakout_path }}
@@ -7685,7 +7685,7 @@ jobs:
 
       - name: Upsert founder fame outreach sprint comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_outreach_sprint_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_OUTREACH_SPRINT_PATH: ${{ env.founder_fame_outreach_sprint_path }}
@@ -7778,7 +7778,7 @@ jobs:
 
       - name: Upsert founder fame proof loop comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_proof_loop_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_PROOF_LOOP_PATH: ${{ env.founder_fame_proof_loop_path }}
@@ -7884,7 +7884,7 @@ jobs:
 
       - name: Upsert founder fame KPI snapshot comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_kpi_snapshot_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_KPI_SNAPSHOT_PATH: ${{ env.founder_fame_kpi_snapshot_path }}
@@ -7956,7 +7956,7 @@ jobs:
 
       - name: Upsert founder fame velocity scoreboard comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_velocity_scoreboard_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_VELOCITY_SCOREBOARD_PATH: ${{ env.founder_fame_velocity_scoreboard_path }}
@@ -8149,7 +8149,7 @@ jobs:
 
       - name: Upsert founder fame narrative lab comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_fame_narrative_lab_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FAME_NARRATIVE_LAB_PATH: ${{ env.founder_fame_narrative_lab_path }}
@@ -8341,7 +8341,7 @@ jobs:
 
       - name: Upsert founder first-48h post pack comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_first48h_post_pack_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FIRST48H_POST_PACK_PATH: ${{ env.founder_first48h_post_pack_path }}
@@ -8384,7 +8384,7 @@ jobs:
       - name: Sync founder first-48h controls into Monday checklist
         id: founder_first48h_controls_sync
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && env.founder_first48h_post_pack_path != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           FOUNDER_FIRST48H_POST_PACK_PATH: ${{ env.founder_first48h_post_pack_path }}
@@ -8550,7 +8550,7 @@ jobs:
       - name: Reconcile founder narrative route incident issue
         id: founder_narrative_route_incident
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
@@ -8931,7 +8931,7 @@ jobs:
       - name: Reconcile founder narrative route critical escalation comment
         id: founder_narrative_route_critical_comment
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && steps.founder_narrative_route_incident.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           CRITICAL_STATE: ${{ steps.founder_narrative_route_incident.outputs.critical_state }}
@@ -9157,7 +9157,7 @@ jobs:
       - name: Reconcile founder narrative route owner queue comment
         id: founder_narrative_route_owner_queue
         if: steps.monday_publish.outputs.monday_publish_issue_number != '' && steps.founder_narrative_route_incident.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           SOURCE_WEEK: ${{ steps.monday_effectiveness.outputs.source_week }}
@@ -9602,7 +9602,7 @@ jobs:
       - name: Reconcile founder fame proof loop verification alert comment
         id: founder_fame_proof_loop_verifier_alert_comment
         if: env.founder_fame_proof_loop_check_path != '' && steps.monday_publish.outputs.monday_publish_issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           VERIFICATION_OUTCOME: ${{ steps.founder_fame_proof_loop_verify.outcome }}
@@ -9787,7 +9787,7 @@ jobs:
         id: founder_fame_proof_loop_incident
         if: env.founder_fame_proof_loop_check_path != ''
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
@@ -10102,7 +10102,7 @@ jobs:
       - name: Reconcile founder fame proof loop critical escalation comment
         id: founder_fame_proof_loop_critical_comment
         if: env.founder_fame_proof_loop_check_path != '' && steps.monday_publish.outputs.monday_publish_issue_number != '' && steps.founder_fame_proof_loop_incident.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           VERIFICATION_OUTCOME: ${{ steps.founder_fame_proof_loop_verify.outcome }}
@@ -10517,7 +10517,7 @@ jobs:
       - name: Upsert distribution execution nudge
         id: distribution_nudge
         if: steps.monday_publish.outputs.monday_publish_issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           SOURCE_WEEK: ${{ steps.monday_effectiveness.outputs.source_week }}
@@ -11031,7 +11031,7 @@ jobs:
 
       - name: Reconcile distribution nudge verification alert comment
         if: env.distribution_nudge_live_check_path != '' && steps.monday_publish.outputs.monday_publish_issue_number != ''
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           VERIFICATION_OUTCOME: ${{ steps.distribution_nudge_verify.outcome }}
@@ -11117,7 +11117,7 @@ jobs:
         id: distribution_nudge_incident
         if: env.distribution_nudge_live_check_path != ''
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           WEEK: ${{ steps.sprint_metrics.outputs.week }}
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
@@ -11432,7 +11432,7 @@ jobs:
       - name: Reconcile distribution nudge critical escalation comment
         id: distribution_nudge_critical_comment
         if: env.distribution_nudge_live_check_path != '' && steps.monday_publish.outputs.monday_publish_issue_number != '' && steps.distribution_nudge_incident.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           CHECKLIST_ISSUE_NUMBER: ${{ steps.monday_publish.outputs.monday_publish_issue_number }}
           VERIFICATION_OUTCOME: ${{ steps.distribution_nudge_verify.outcome }}
