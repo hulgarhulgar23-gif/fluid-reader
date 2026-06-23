@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "hulgarhulgar23-gif"
+    assignees:
+      - "hulgarhulgar23-gif"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "hulgarhulgar23-gif"
+    assignees:
+      - "hulgarhulgar23-gif"
+    labels:
+      - "dependencies"
+      - "swift"
+    commit-message:
+      prefix: "deps"

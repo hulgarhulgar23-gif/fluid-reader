@@ -1,0 +1,8 @@
+# Default review ownership
+* @hulgarhulgar23-gif
+
+# Higher-risk areas
+.github/workflows/* @hulgarhulgar23-gif
+scripts/* @hulgarhulgar23-gif
+Sources/* @hulgarhulgar23-gif
+Tests/* @hulgarhulgar23-gif
