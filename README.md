@@ -11,6 +11,8 @@
 
 Fluid Reader is a local-first macOS reader and launcher for OCR, read-aloud, notes, scripts, and optional AI commands. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
+Why it matters: many Mac workflows still trap text inside screenshots, scanned PDFs, paused video, and apps with poor copy or accessibility support. Fluid Reader gives users a small installable tool to read that text without making cloud upload the default.
+
 ## Project Snapshot
 
 - Local-first by default: screen capture stays on the Mac, OCR uses Apple Vision, speech uses macOS voices, and AI is optional.
