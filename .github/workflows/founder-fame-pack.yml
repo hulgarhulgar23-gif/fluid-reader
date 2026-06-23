@@ -68,6 +68,9 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Install ripgrep
+        run: brew list ripgrep >/dev/null 2>&1 || brew install ripgrep
+
       - name: Run founder pack pipeline
         shell: zsh {0}
         env:

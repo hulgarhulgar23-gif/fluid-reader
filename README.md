@@ -6,6 +6,13 @@
 
 Fluid Reader is a small macOS menu-bar app. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
+## Project Snapshot
+
+- Local-first by default: screen capture stays on the Mac, OCR uses Apple Vision, speech uses macOS voices, and AI is optional.
+- Real shipped app: there is a public [website](https://hulgarhulgar23-gif.github.io/fluid-reader/), a downloadable macOS [release](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest), and a Homebrew cask install path.
+- Maintained in public: the repo is MIT-licensed and includes [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Release and maintainer work are checked in CI on macOS, including `swift test`, docs checks, release packaging checks, public release safety checks, and open-source readiness checks.
+
 The default mode is local:
 
 - Screen capture stays on the Mac.
