@@ -69,7 +69,7 @@ require_file "scripts/check_public_publish_ready.sh"
 
 require_text "LICENSE" "MIT License"
 
-require_text "README.md" "Fluid Reader is a small macOS menu-bar app."
+require_text "README.md" "Fluid Reader is a local-first macOS reader and launcher"
 require_text "README.md" "Screen capture stays on the Mac."
 require_text "README.md" "LLM support is off until the user turns it on."
 require_text "README.md" "OpenAI API key"
