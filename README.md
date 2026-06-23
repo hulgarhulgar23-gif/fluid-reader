@@ -1,10 +1,12 @@
 # Fluid Reader
 
+[![CI](https://github.com/hulgarhulgar23-gif/fluid-reader/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hulgarhulgar23-gif/fluid-reader/actions/workflows/ci.yml)
+
 [Website](https://hulgarhulgar23-gif.github.io/fluid-reader/) ·
 [Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
 [Power User Guide](docs/POWER_USER_GUIDE.md)
 
-Fluid Reader is a small macOS menu-bar app. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
+Fluid Reader is a local-first macOS launcher for OCR, read-aloud, notes, scripts, and optional AI commands. Press `Option + Shift + Space` for Commands, or `Option + Shift + R` to draw around any screen content and read the text it finds.
 
 ## Project Snapshot
 
