@@ -4,6 +4,8 @@
 
 [Website](https://hulgarhulgar23-gif.github.io/fluid-reader/) ·
 [Download](https://github.com/hulgarhulgar23-gif/fluid-reader/releases/latest) ·
+[Roadmap](docs/ROADMAP.md) ·
+[Good First Issues](docs/GOOD_FIRST_ISSUES.md) ·
 [Power User Guide](docs/POWER_USER_GUIDE.md) ·
 [Maintainer Guide](MAINTAINERS.md)
 
@@ -16,6 +18,8 @@ Fluid Reader is a local-first macOS reader and launcher for OCR, read-aloud, not
 - Maintained in public: the repo is MIT-licensed and includes [MAINTAINERS.md](MAINTAINERS.md), [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Security signals are public too: secret scanning, push protection, private vulnerability reporting, and automated security updates are enabled on GitHub.
 - Release and maintainer work are checked in CI on macOS, including `swift test`, docs checks, release packaging checks, public release safety checks, and open-source readiness checks.
+
+New contributors should start with [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md) and [docs/ROADMAP.md](docs/ROADMAP.md). The goal is small, testable work that keeps private reader data safe and keeps the app fast.
 
 The default mode is local:
 
