@@ -17,7 +17,7 @@ write_clean_repo() {
   cat > "$repo_dir/README.md" <<'EOF'
 # Fluid Reader
 
-Fluid Reader is a small macOS menu-bar app.
+Fluid Reader is a local-first macOS reader and launcher.
 Screen capture stays on the Mac.
 LLM support is off until the user turns it on.
 OpenAI API key
