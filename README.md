@@ -39,7 +39,7 @@ unzip it, and move `FluidReader.app` to `/Applications`.
 Or install with Homebrew:
 
 ```sh
-brew install --cask hulgarhulgar23-gif/fluidreader/fluid-reader
+brew install --cask hulgarhulgar23-gif/tap/fluid-reader
 ```
 
 ### First launch on macOS
